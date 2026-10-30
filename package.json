@@ -17,10 +17,7 @@
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {
-    "dsh-better-session": "github:catyugu/dsh-web-pack#path:/packages/dsh-better-session",
-    "dsh-session-cleanup": "github:catyugu/dsh-web-pack#path:/packages/dsh-session-cleanup"
-  },
+  "dependencies": {},
   "scripts": {
     "build": "node scripts/build-client.mjs",
     "test": "node --test --test-concurrency=1 \"packages/*/test/*.test.mjs\"",

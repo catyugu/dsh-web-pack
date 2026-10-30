@@ -1,0 +1,5 @@
+# One row: this package is its own bundle, so the plugin manager shows it as one
+# card with its own icon, description, and switch.
+- insert:
+    - id: dsh-better-session
+      name: dsh-better-session
