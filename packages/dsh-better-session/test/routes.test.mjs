@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict'
 import { ROUTES, apply } from '../src/host.js'
-import { call, fakeCtx, removeHome, resetHome } from './support.mjs'
+import { call, fakeCtx, removeHome, request, resetHome } from './support.mjs'
 
 await resetHome()
 
@@ -51,21 +51,43 @@ try {
   const emptyText = await regenerate({ sessionId: 'session-turn', messageId: 'question-one', operationId: 'operation-route', text: '  ' })
   assert.equal(emptyText.status, 400)
 
-  // The compaction settings read as the official defaults on a fresh home.
-  const settings = await call(host.routes, ROUTES.compaction)
+  // A settings request must name the session it belongs to.
+  const nameless = await call(host.routes, ROUTES.compaction)
+  assert.equal(nameless.status, 400, JSON.stringify(nameless.body))
+
+  // A session with no file inherits, and the answer says so.
+  const settings = await request(host.routes, ROUTES.compaction, { query: '?sessionId=session-turn' })
   assert.equal(settings.status, 200, JSON.stringify(settings.body))
-  assert.equal(settings.body.settings.enabled, false)
+  assert.equal(settings.body.overridden, false)
   assert.equal(settings.body.settings.thresholdRatio, 0.8)
   assert.deepEqual(settings.body.defaults, settings.body.settings, 'an unpatched engine has no other defaults')
 
-  // A submission outside a range is refused with the reason the dictionary knows.
-  const refused = await call(host.routes, ROUTES.compaction, {
-    enabled: true,
-    thresholdRatio: 0.95,
+  // The global base is the second place a session can inherit from.
+  const global = await call(host.routes, ROUTES.defaults, {
+    thresholdRatio: 0.7,
     retainRatio: 0.2,
     maxTokens: 4096,
     compactionRetries: 1,
     maxOverflowRetries: 1,
+  })
+  assert.equal(global.status, 200, JSON.stringify(global.body))
+  assert.equal(global.body.settings.thresholdRatio, 0.7)
+  const inherited = await request(host.routes, ROUTES.compaction, { query: '?sessionId=session-turn' })
+  assert.equal(inherited.body.settings.thresholdRatio, 0.7)
+  assert.equal(inherited.body.overridden, false)
+  await request(host.routes, ROUTES.defaults, { method: 'DELETE' })
+
+  // A submission outside a range is refused with the reason the dictionary knows.
+  const refused = await request(host.routes, ROUTES.compaction, {
+    method: 'POST',
+    query: '?sessionId=session-turn',
+    body: {
+      thresholdRatio: 0.95,
+      retainRatio: 0.2,
+      maxTokens: 4096,
+      compactionRetries: 1,
+      maxOverflowRetries: 1,
+    },
   })
   assert.equal(refused.status, 400, JSON.stringify(refused.body))
   assert.equal(refused.body.code, 'invalid-threshold-ratio')

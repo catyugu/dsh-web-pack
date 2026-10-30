@@ -1,20 +1,20 @@
 /**
- * The compaction settings: what the Harness compresses at, and the runtime
- * override that applies them to the engines the running sessions use.
+ * The compaction settings of one session.
  *
  * The Harness reads a compaction engine's configuration every time it prices
- * pressure, so replacing that configuration changes the behaviour of the
- * running sessions without touching the profile's own files: the official
- * configuration stays exactly as it was, and the plugin's settings live in the
- * Harness home.
+ * pressure, so replacing that configuration changes what one conversation
+ * compacts at without touching the profile's own files. The settings belong to
+ * the session: they live in the session's own directory, they are read when the
+ * agent takes a step, and a subagent inherits its parent's values.
  *
- * @module dsh-better-session/manage/compaction
+ * @module dsh-better-session/compaction
  */
-import { dshHome, readJson, settingsFile, writeJson } from './home.js'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { dshHome, packFile, readJson, sessionDirectory, writeJson } from './home.js'
 
 /** The values the official engine ships with. */
 export const DEFAULT_SETTINGS = Object.freeze({
-  enabled: false,
   thresholdRatio: 0.8,
   retainRatio: 0.16,
   maxTokens: 8192,
@@ -30,13 +30,8 @@ export const LIMITS = Object.freeze({
   retries: [0, 10],
 })
 
-/**
- * The settings artifact path.
- * @returns its absolute path.
- */
-function settingsPath() {
-  return settingsFile(dshHome(), 'compaction')
-}
+/** The settings artifact inside one session directory. */
+const FILE = 'better-session.json'
 
 /**
  * Clamp one number into its range.
@@ -62,7 +57,6 @@ export function normalizeSettings(value, defaults = DEFAULT_SETTINGS) {
   const thresholdRatio = clamp(source.thresholdRatio, defaults.thresholdRatio, LIMITS.thresholdRatio)
   const retainRatio = clamp(source.retainRatio, defaults.retainRatio, LIMITS.retainRatio)
   return {
-    enabled: source.enabled === true,
     thresholdRatio,
     // The retained tail has to stay below the pressure threshold, or the
     // engine would compact into a context that is still under pressure.
@@ -80,7 +74,6 @@ export function normalizeSettings(value, defaults = DEFAULT_SETTINGS) {
  */
 export function validateSettings(value) {
   if (value === null || typeof value !== 'object') return 'bad-request'
-  if (typeof value.enabled !== 'boolean') return 'invalid-enabled'
   if (!isNumberInRange(value.thresholdRatio, LIMITS.thresholdRatio)) return 'invalid-threshold-ratio'
   if (!isNumberInRange(value.retainRatio, LIMITS.retainRatio)) return 'invalid-retain-ratio'
   if (value.retainRatio >= value.thresholdRatio) return 'retain-ratio-not-less-than-threshold'
@@ -111,28 +104,75 @@ function isIntegerInRange(value, range) {
 }
 
 /**
- * Read the stored settings.
- *
- * A missing file is a fresh install and takes the defaults. A file this build
- * cannot read is an error: the settings decide how much context a session
- * keeps, and guessing them would silently change the conversation.
- * @returns the effective settings.
+ * Read one session's settings.
+ * @param home - the Harness home directory.
+ * @param sessionId - the session identity.
+ * @returns the stored settings, or undefined when the session inherits.
  */
-export async function readSettings() {
-  const parsed = await readJson(settingsPath(), 'compaction settings')
-  if (parsed === undefined) return { ...DEFAULT_SETTINGS }
-  return normalizeSettings(parsed)
+export async function readSessionSettings(home, sessionId) {
+  const directory = await sessionDirectory(home, sessionId)
+  if (directory === undefined) return undefined
+  const parsed = await readJson(join(directory, FILE), 'session compaction settings')
+  return parsed === undefined ? undefined : normalizeSettings(parsed)
 }
 
 /**
- * Persist the settings.
- * @param settings - the settings to store.
+ * Store one session's settings.
+ * @param home - the Harness home directory.
+ * @param sessionId - the session identity.
+ * @param value - the submitted settings.
+ * @returns the stored settings.
+ * @throws {Error} with code `SESSION_NOT_STORED` when the session has no directory.
+ */
+export async function writeSessionSettings(home, sessionId, value) {
+  const directory = await sessionDirectory(home, sessionId)
+  if (directory === undefined) {
+    throw Object.assign(new Error(`session "${sessionId}" has no directory yet`), { code: 'SESSION_NOT_STORED' })
+  }
+  const settings = normalizeSettings(value)
+  await writeJson(join(directory, FILE), settings)
+  return settings
+}
+
+/**
+ * Drop one session's settings, so the session inherits the profile's values.
+ * @param home - the Harness home directory.
+ * @param sessionId - the session identity.
+ */
+export async function clearSessionSettings(home, sessionId) {
+  const directory = await sessionDirectory(home, sessionId)
+  if (directory === undefined) return
+  await rm(join(directory, FILE), { force: true })
+}
+
+/**
+ * Read the pack's global settings, the base every session inherits.
+ * @param home - the Harness home directory.
+ * @returns the stored settings, or undefined when the pack has none.
+ */
+export async function readGlobalSettings(home) {
+  const parsed = await readJson(packFile(home, 'compaction'), 'global compaction settings')
+  return parsed === undefined ? undefined : normalizeSettings(parsed)
+}
+
+/**
+ * Store the pack's global settings.
+ * @param home - the Harness home directory.
+ * @param value - the submitted settings.
  * @returns the stored settings.
  */
-export async function writeSettings(settings) {
-  const value = normalizeSettings(settings)
-  await writeJson(settingsPath(), value)
-  return value
+export async function writeGlobalSettings(home, value) {
+  const settings = normalizeSettings(value)
+  await writeJson(packFile(home, 'compaction'), settings)
+  return settings
+}
+
+/**
+ * Drop the pack's global settings.
+ * @param home - the Harness home directory.
+ */
+export async function clearGlobalSettings(home) {
+  await rm(packFile(home, 'compaction'), { force: true })
 }
 
 /**
@@ -143,7 +183,6 @@ export async function writeSettings(settings) {
 function settingsFrom(config) {
   if (config === null || typeof config !== 'object') return { ...DEFAULT_SETTINGS }
   return {
-    ...DEFAULT_SETTINGS,
     thresholdRatio: numberOr(config.thresholdRatio, DEFAULT_SETTINGS.thresholdRatio),
     retainRatio: numberOr(config.retainRatio, DEFAULT_SETTINGS.retainRatio),
     maxTokens: numberOr(config.maxTokens, DEFAULT_SETTINGS.maxTokens),
@@ -182,9 +221,9 @@ function routeOf(agent) {
 }
 
 /**
- * One engine's configuration with the plugin's settings applied.
+ * One engine's configuration with the session's settings applied.
  * @param config - the engine's own configuration.
- * @param settings - the plugin's settings.
+ * @param settings - the settings in force.
  * @param agent - the agent whose route the configuration addresses.
  * @returns the patched configuration.
  */
@@ -223,76 +262,48 @@ function engineOf(ctx, agent) {
 }
 
 /**
- * Apply the settings to the engines the running sessions use.
+ * Apply one session's settings to its agent, and give them back on reset.
  *
- * The original configurations are remembered so the plugin can give them back
- * when it is disabled or removed.
+ * The engine's own configuration is remembered the first time it is patched, so
+ * "reset" restores exactly what the profile shipped.
  * @param ctx - host context.
- * @param settingsProvider - reads the settings that are in force.
  * @returns the controller.
  */
-export function createRuntimeController(ctx, settingsProvider) {
+export function createSessionController(ctx) {
   const originals = new WeakMap()
-  const touched = new Set()
   /** The engine's own values, read before this plugin patches anything. */
   const official = settingsFrom(ctx.get?.('compaction')?.config)
 
   /**
-   * Apply the settings to one engine.
-   * @param engine - the engine to patch.
+   * Apply the settings to one agent's engine.
+   * @param agent - live agent.
    * @param settings - the settings in force.
-   * @param agent - the agent whose route the configuration addresses.
    */
-  const patch = (engine, settings, agent) => {
+  const apply = (agent, settings) => {
+    const engine = engineOf(ctx, agent)
     if (engine === null || typeof engine !== 'object' || engine.config === undefined) return
-    if (!originals.has(engine)) {
-      originals.set(engine, engine.config)
-      touched.add(engine)
-    }
+    if (!originals.has(engine)) originals.set(engine, engine.config)
     engine.config = withSettings(engine.config, settings, agent)
   }
 
   /**
-   * Apply the settings to one agent's engine.
+   * Give one agent's engine its own configuration back.
    * @param agent - live agent.
    */
-  const applyToAgent = (agent) => {
-    const settings = settingsProvider()
-    if (!settings.enabled) return
-    patch(engineOf(ctx, agent), settings, agent)
-  }
-
-  /**
-   * Apply the settings to every live agent.
-   */
-  const applyToLiveAgents = () => {
-    const settings = settingsProvider()
-    if (!settings.enabled) {
-      restore()
-      return
-    }
-    const agents = typeof ctx.agents?.list === 'function' ? ctx.agents.list() : []
-    for (const agent of agents) applyToAgent(agent)
-    const root = ctx.get?.('compaction')
-    if (root !== undefined) patch(root, settings, undefined)
-  }
-
-  /**
-   * Give every patched engine its own configuration back.
-   */
-  const restore = () => {
-    for (const engine of touched) {
-      const original = originals.get(engine)
-      if (original !== undefined) engine.config = original
-      originals.delete(engine)
-    }
-    touched.clear()
+  const restore = (agent) => {
+    const engine = engineOf(ctx, agent)
+    if (engine === null || typeof engine !== 'object') return
+    const original = originals.get(engine)
+    if (original === undefined) return
+    engine.config = original
+    originals.delete(engine)
   }
 
   return {
-    applyToAgent,
-    applyToLiveAgents,
+    apply,
     restore,
     defaults: () => ({ ...official }),
+    /** The home this plugin reads its per-session files from. */
+    home: dshHome(),
   }
 }

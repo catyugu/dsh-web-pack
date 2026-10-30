@@ -38,6 +38,25 @@ export function projectionCacheFile(home, sessionId) {
 }
 
 /**
+ * The pack's settings directory, beside the Harness's own stores.
+ * @param home - the Harness home directory.
+ * @returns its absolute path.
+ */
+export function packDirectory(home) {
+  return join(home, 'dsh-web-pack')
+}
+
+/**
+ * One of the pack's settings artifacts.
+ * @param home - the Harness home directory.
+ * @param name - the artifact name, without its suffix.
+ * @returns its absolute path.
+ */
+export function packFile(home, name) {
+  return join(packDirectory(home), 'better-session', `${name}.json`)
+}
+
+/**
  * One of this plugin's settings artifacts.
  * @param home - the Harness home directory.
  * @param name - the artifact name, without its suffix.
@@ -91,6 +110,17 @@ export async function sessionDirectories(home, sessionId) {
     if (await isDirectory(candidate)) found.push(candidate)
   }
   return found
+}
+
+/**
+ * The directory one Session owns.
+ * @param home - the Harness home directory.
+ * @param sessionId - the Session identity.
+ * @returns its absolute directory, or undefined when no project holds it yet.
+ */
+export async function sessionDirectory(home, sessionId) {
+  const [directory] = await sessionDirectories(home, sessionId)
+  return directory
 }
 
 /**

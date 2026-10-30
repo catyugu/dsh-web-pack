@@ -286,6 +286,23 @@ export async function call(routes, path, body) {
 }
 
 /**
+ * Call one route with a method, an optional query string, and an optional body.
+ * @param routes - the registered routes.
+ * @param path - the route path.
+ * @param options - method, body, and query string.
+ * @returns the status and the decoded body.
+ */
+export async function request(routes, path, { method = 'GET', body, query } = {}) {
+  const route = routes.get(path)
+  assert.notEqual(route, undefined, `route ${path} is registered`)
+  const init = body === undefined
+    ? { method }
+    : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+  const response = await route.fetch(new Request(`http://localhost${path}${query ?? ''}`, init))
+  return { status: response.status, body: await response.json() }
+}
+
+/**
  * Whether a path exists, whatever its type.
  * @param path - absolute path.
  * @returns whether the filesystem holds it.

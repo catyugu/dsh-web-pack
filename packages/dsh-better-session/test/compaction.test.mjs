@@ -1,102 +1,92 @@
 /**
- * Compaction settings checks for the session management sub-component: the
- * ranges a submission must respect, the clamping a stored value gets, the
- * settings artifact, and the runtime override that gives an engine back its own
- * configuration.
- *
- * The override is what makes the settings act on sessions that are already
- * running, so it is checked against a fake engine rather than a real Harness.
+ * The per-session compaction settings: where they live, what a submission may
+ * say, and how "reset" gives the profile's values back.
  */
 import assert from 'node:assert/strict'
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import {
   DEFAULT_SETTINGS,
-  createRuntimeController,
+  clearGlobalSettings,
+  clearSessionSettings,
   normalizeSettings,
-  readSettings,
+  readGlobalSettings,
+  readSessionSettings,
   validateSettings,
-  writeSettings,
+  writeGlobalSettings,
+  writeSessionSettings,
 } from '../src/compaction.js'
 import { removeHome, resetHome } from './support.mjs'
 
 await resetHome()
+const home = process.env.DSH_HOME
 
-try {
-  // The settings accept the official ranges and refuse the rest.
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true }), undefined)
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.95 }), 'invalid-threshold-ratio')
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, retainRatio: 0.9 }), 'invalid-retain-ratio')
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.6, retainRatio: 0.3 }), undefined)
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.3, retainRatio: 0.2 }), undefined)
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.29 }), 'invalid-threshold-ratio')
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.3, retainRatio: 0.3 }), 'retain-ratio-not-less-than-threshold')
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: true, maxTokens: 12 }), 'invalid-max-tokens')
-  assert.equal(validateSettings({ ...DEFAULT_SETTINGS, enabled: 'yes' }), 'invalid-enabled')
+const sessionId = 'session-compaction'
+const sessionDirectory = join(home, 'sessions', '--workspace--', sessionId)
+await mkdir(sessionDirectory, { recursive: true })
 
-  // A stored value is clamped into its range, and a retained share that reaches
-  // the threshold is pulled back below it.
-  const normalized = normalizeSettings({ enabled: true, thresholdRatio: 5, retainRatio: 0.4, maxTokens: 10 })
-  assert.equal(normalized.thresholdRatio, 0.9, 'the threshold is clamped into its range')
-  assert.ok(normalized.retainRatio < normalized.thresholdRatio, 'the retained share stays below the threshold')
-  assert.equal(normalized.maxTokens, 256, 'the summary cap is clamped into its range')
+// A session without a file inherits, so the reader says so instead of guessing.
+assert.equal(await readSessionSettings(home, sessionId), undefined)
 
-  // The settings survive a round trip through the Harness home.
-  await writeSettings({ enabled: true, thresholdRatio: 0.75, retainRatio: 0.2, maxTokens: 4096 })
-  const stored = await readSettings()
-  assert.equal(stored.enabled, true)
-  assert.equal(stored.thresholdRatio, 0.75)
-  assert.equal(stored.retainRatio, 0.2)
-  assert.equal(stored.maxTokens, 4096)
+// What the session stores is the file in its own directory.
+const stored = await writeSessionSettings(home, sessionId, {
+  thresholdRatio: 0.5,
+  retainRatio: 0.12,
+  maxTokens: 4096,
+  compactionRetries: 2,
+  maxOverflowRetries: 0,
+})
+assert.deepEqual(stored, {
+  thresholdRatio: 0.5,
+  retainRatio: 0.12,
+  maxTokens: 4096,
+  compactionRetries: 2,
+  maxOverflowRetries: 0,
+})
+assert.deepEqual(JSON.parse(await readFile(join(sessionDirectory, 'better-session.json'), 'utf8')), stored)
+assert.deepEqual(await readSessionSettings(home, sessionId), stored)
 
-  // The runtime override patches the engine and gives it back.
-  {
-    const engine = { config: { thresholdRatio: 0.8, retainRatio: 0.16, maxTokens: 8192, auto: true } }
-    const ctx = {
-      get: (name) => (name === 'compaction' ? engine : undefined),
-      agents: { list: () => [] },
-    }
-    const settings = { current: { ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.7, retainRatio: 0.1 } }
-    const controller = createRuntimeController(ctx, () => settings.current)
-    controller.applyToLiveAgents()
-    assert.equal(engine.config.thresholdRatio, 0.7)
-    assert.equal(engine.config.retainRatio, 0.1)
-    assert.equal(engine.config.auto, true, 'the engine keeps the rest of its configuration')
-    controller.restore()
-    assert.equal(engine.config.thresholdRatio, 0.8, 'the original configuration comes back')
-  }
+// Reset drops the file and the session inherits again.
+await clearSessionSettings(home, sessionId)
+assert.equal(await readSessionSettings(home, sessionId), undefined)
 
-  // The defaults stay the engine's own values while the override is active, so
-  // a settings panel never reports the override as the official default.
-  {
-    const engine = { config: { thresholdRatio: 0.75, retainRatio: 0.2, maxTokens: 1024 } }
-    const ctx = { get: (name) => (name === 'compaction' ? engine : undefined), agents: { list: () => [] } }
-    const settings = { current: { ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.85 } }
-    const controller = createRuntimeController(ctx, () => settings.current)
-    controller.applyToLiveAgents()
-    assert.equal(engine.config.thresholdRatio, 0.85, 'the override reaches the engine')
-    const defaults = controller.defaults()
-    assert.equal(defaults.thresholdRatio, 0.75, 'the default is the engine\'s own value')
-    assert.equal(defaults.retainRatio, 0.2)
-    assert.equal(defaults.maxTokens, 1024)
-    assert.equal(defaults.compactionRetries, DEFAULT_SETTINGS.compactionRetries)
-    controller.restore()
-    assert.equal(controller.defaults().thresholdRatio, 0.75, 'the default survives the restore')
-  }
+// The global base lives beside the pack, not in a plugin directory of its own.
+assert.equal(await readGlobalSettings(home), undefined)
+const global = await writeGlobalSettings(home, { thresholdRatio: 0.7, retainRatio: 0.2 })
+assert.equal(global.thresholdRatio, 0.7)
+assert.equal((await readGlobalSettings(home)).retainRatio, 0.2)
+const globalFile = join(home, 'dsh-web-pack', 'better-session', 'compaction.json')
+assert.equal(JSON.parse(await readFile(globalFile, 'utf8')).thresholdRatio, 0.7)
+await clearGlobalSettings(home)
+assert.equal(await readGlobalSettings(home), undefined)
 
-  // Switching the override off restores the engine without waiting for an
-  // unmount.
-  {
-    const engine = { config: { thresholdRatio: 0.8, retainRatio: 0.16, maxTokens: 8192 } }
-    const ctx = { get: (name) => (name === 'compaction' ? engine : undefined), agents: { list: () => [] } }
-    const settings = { current: { ...DEFAULT_SETTINGS, enabled: true, thresholdRatio: 0.5, retainRatio: 0.1 } }
-    const controller = createRuntimeController(ctx, () => settings.current)
-    controller.applyToLiveAgents()
-    assert.equal(engine.config.thresholdRatio, 0.5)
-    settings.current = { ...settings.current, enabled: false }
-    controller.applyToLiveAgents()
-    assert.equal(engine.config.thresholdRatio, 0.8, 'a disabled override leaves the engine alone')
-  }
+// A submission is checked before anything is written.
+const valid = { thresholdRatio: 0.5, retainRatio: 0.1, maxTokens: 4096, compactionRetries: 1, maxOverflowRetries: 1 }
+assert.equal(validateSettings(valid), undefined)
+assert.equal(validateSettings({ ...valid, thresholdRatio: 0.3, retainRatio: 0.3 }), 'retain-ratio-not-less-than-threshold')
+assert.equal(validateSettings({ ...valid, thresholdRatio: 0.2 }), 'invalid-threshold-ratio')
+assert.equal(validateSettings({ ...valid, retainRatio: 0.31 }), 'invalid-retain-ratio')
+assert.equal(validateSettings({ ...valid, maxTokens: 16 }), 'invalid-max-tokens')
+assert.equal(validateSettings({ ...valid, compactionRetries: 99 }), 'invalid-compaction-retries')
+assert.equal(validateSettings({ ...valid, maxOverflowRetries: 99 }), 'invalid-max-overflow-retries')
+assert.equal(validateSettings(null), 'bad-request')
 
-  console.log('manage: compaction settings checks passed')
-} finally {
-  await removeHome()
-}
+// Normalizing keeps the retained tail below the threshold and clamps the rest.
+assert.deepEqual(normalizeSettings({}), DEFAULT_SETTINGS)
+assert.deepEqual(normalizeSettings({ thresholdRatio: 0.3, retainRatio: 0.3 }), {
+  thresholdRatio: 0.3,
+  retainRatio: 0.29,
+  maxTokens: DEFAULT_SETTINGS.maxTokens,
+  compactionRetries: DEFAULT_SETTINGS.compactionRetries,
+  maxOverflowRetries: DEFAULT_SETTINGS.maxOverflowRetries,
+})
+assert.equal(normalizeSettings({ thresholdRatio: 5 }).thresholdRatio, 0.9)
+
+// A session the store does not hold yet is refused, not written somewhere else.
+await assert.rejects(
+  () => writeSessionSettings(home, 'session-nothing', { thresholdRatio: 0.5 }),
+  (error) => error.code === 'SESSION_NOT_STORED',
+)
+
+await removeHome()
+console.log('manage: per-session compaction checks passed')

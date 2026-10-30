@@ -4,19 +4,26 @@
  *
  * What a turn is lives in `turns.js`, what the compaction engine does with a
  * context lives in `compaction.js`. This module joins those to the Harness:
- * routes, the agent of a session, and the runtime override the compaction
- * settings apply.
+ * routes, the agent of a session, and the per-session compaction settings the
+ * agent takes its next step with.
  *
- * @module dsh-better-session/manage/host
+ * @module dsh-better-session/host
  */
+import { rm } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { Refusal } from './http.js'
 import {
-  createRuntimeController,
+  clearGlobalSettings,
+  clearSessionSettings,
+  createSessionController,
   normalizeSettings,
-  readSettings,
+  readGlobalSettings,
+  readSessionSettings,
   validateSettings,
-  writeSettings,
+  writeGlobalSettings,
+  writeSessionSettings,
 } from './compaction.js'
+import { settingsFile } from './home.js'
 import { ROUTES, createRoutes } from './routes.js'
 import { TurnError, readQuestionText, regenerateFromTurn } from './turns.js'
 
@@ -27,38 +34,64 @@ export const inject = ['connection', 'agents']
 export { ROUTES }
 
 /**
- * Register the routes and the compaction override for as long as the plugin
- * is mounted.
+ * Register the routes and the per-session compaction settings for as long as
+ * the plugin is mounted.
  * @param ctx - Host context carrying Connection and the session services.
  */
 export function apply(ctx) {
-  const settings = { current: normalizeSettings({}) }
-  const controller = createRuntimeController(ctx, () => settings.current)
-  for (const route of createRoutes(operations(ctx, settings, controller))) serve(ctx, route)
-  ctx.on('agent/pre-step', ({ agent }, next) => {
+  const controller = createSessionController(ctx)
+  const cache = new Map()
+
+  /**
+   * The settings one session's next step uses: its own, its parent's, or none.
+   * @param sessionId - the session identity.
+   * @param parentSession - the session this one was forked from, when it was.
+   * @returns the settings, or undefined when the session inherits.
+   */
+  const settingsFor = async (sessionId, parentSession) => {
+    const cached = cache.get(sessionId)
+    if (cached !== undefined) return cached.settings
+    let settings = await readSessionSettings(controller.home, sessionId)
+    if (settings === undefined && typeof parentSession === 'string') {
+      settings = await readSessionSettings(controller.home, parentSession)
+    }
+    if (settings === undefined) settings = await readGlobalSettings(controller.home)
+    cache.set(sessionId, { settings })
+    return settings
+  }
+
+  /**
+   * Give one session's agent the settings it should take its next step with.
+   * @param agent - live agent.
+   */
+  const applyTo = async (agent) => {
+    const session = agent?.session
+    const sessionId = session?.id
+    if (typeof sessionId !== 'string') return
+    const settings = await settingsFor(sessionId, session?.header?.parentSession)
+    if (settings === undefined) controller.restore(agent)
+    else controller.apply(agent, settings)
+  }
+
+  for (const route of createRoutes(operations(ctx, { controller, cache, settingsFor, applyTo }))) serve(ctx, route)
+
+  ctx.on('agent/pre-step', async ({ agent }, next) => {
     try {
-      controller.applyToAgent(agent)
+      await applyTo(agent)
     } catch (error) {
       ctx.logger?.warn?.(`better-session: the compaction settings could not be applied: ${String(error)}`)
     }
     return next()
   }, { prepend: true })
+
   ctx.effect(() => {
-    let closed = false
-    readSettings()
-      .then((stored) => {
-        if (closed) return
-        settings.current = normalizeSettings(stored)
-        controller.applyToLiveAgents()
-      })
-      .catch((error) => {
-        ctx.logger?.warn?.(`better-session: the compaction settings could not be read: ${String(error)}`)
-      })
-    return () => {
-      closed = true
-      controller.restore()
-    }
-  }, 'better-session: compaction settings')
+    // One release moved these settings into the sessions; a global file left
+    // behind by an older install would keep claiming to be in force.
+    const global = settingsFile(controller.home, 'compaction')
+    rm(global, { force: true })
+      .then(() => rm(dirname(global), { recursive: false }))
+      .catch(() => {})
+  }, 'better-session: one-time settings migration')
 }
 
 /**
@@ -76,11 +109,11 @@ function serve(ctx, route) {
 /**
  * What each route does, in terms of Harness services.
  * @param ctx - Host context carrying the agents and the sessions.
- * @param settings - the compaction settings in force.
- * @param controller - the runtime override that applies them.
+ * @param state - the session settings cache and the agent that applies them.
  * @returns the operations `createRoutes` needs, plus its diagnostic sink.
  */
-function operations(ctx, settings, controller) {
+function operations(ctx, state) {
+  const { controller, cache, settingsFor, applyTo } = state
   return {
     report: (line) => ctx.logger?.warn?.(line),
     prompt: ({ sessionId, messageId }) => guard(() => readQuestionText(liveSession(ctx, sessionId), messageId)),
@@ -94,28 +127,96 @@ function operations(ctx, settings, controller) {
         interrupted: result.interrupted === true,
       }
     }),
-    readCompaction: async () => {
+    readCompaction: async ({ sessionId }) => {
       const defaults = controller.defaults()
-      settings.current = normalizeSettings(await readSettings(), defaults)
-      return { settings: settings.current, defaults }
-    },
-    saveCompaction: async (payload) => {
-      const defaults = controller.defaults()
-      const submitted = {
-        enabled: payload?.enabled,
-        thresholdRatio: payload?.thresholdRatio,
-        retainRatio: payload?.retainRatio,
-        maxTokens: payload?.maxTokens,
-        compactionRetries: payload?.compactionRetries,
-        maxOverflowRetries: payload?.maxOverflowRetries,
+      const own = await readSessionSettings(controller.home, sessionId)
+      const global = await readGlobalSettings(controller.home)
+      cache.set(sessionId, { settings: own ?? global })
+      return {
+        settings: own ?? global ?? defaults,
+        defaults,
+        global: global ?? defaults,
+        overridden: own !== undefined,
       }
+    },
+    saveCompaction: async ({ sessionId, payload }) => {
+      const submitted = compactionPayload(payload)
       const refusal = validateSettings(submitted)
       if (refusal !== undefined) throw new Refusal(400, refusal, `the compaction settings are refused: ${refusal}`)
-      settings.current = normalizeSettings(submitted, defaults)
-      await writeSettings(settings.current)
-      controller.applyToLiveAgents()
-      return { settings: settings.current, defaults }
+      const settings = normalizeSettings(submitted, controller.defaults())
+      try {
+        await writeSessionSettings(controller.home, sessionId, settings)
+      } catch (error) {
+        if (error?.code === 'SESSION_NOT_STORED') {
+          throw new Refusal(409, 'session-not-stored', `session "${sessionId}" has no directory yet`)
+        }
+        throw error
+      }
+      cache.set(sessionId, { settings })
+      const agent = ctx.get('agents')?.get(sessionId)
+      if (agent !== undefined) await applyTo(agent)
+      return { settings, defaults: controller.defaults(), overridden: true }
     },
+    readGlobal: async () => {
+      const defaults = controller.defaults()
+      const global = await readGlobalSettings(controller.home)
+      return { settings: global ?? defaults, defaults, overridden: global !== undefined }
+    },
+    saveGlobal: async ({ payload }) => {
+      const refusal = validateSettings(compactionPayload(payload))
+      if (refusal !== undefined) throw new Refusal(400, refusal, `the compaction settings are refused: ${refusal}`)
+      const settings = await writeGlobalSettings(controller.home, normalizeSettings(compactionPayload(payload), controller.defaults()))
+      cache.clear()
+      await reapplyAll(ctx, cache, settingsFor, applyTo)
+      return { settings, defaults: controller.defaults(), overridden: true }
+    },
+    resetGlobal: async () => {
+      await clearGlobalSettings(controller.home)
+      cache.clear()
+      await reapplyAll(ctx, cache, settingsFor, applyTo)
+      return { settings: controller.defaults(), defaults: controller.defaults(), overridden: false }
+    },
+    resetCompaction: async ({ sessionId }) => {
+      await clearSessionSettings(controller.home, sessionId)
+      cache.delete(sessionId)
+      const agent = ctx.get('agents')?.get(sessionId)
+      if (agent !== undefined) controller.restore(agent)
+      return { settings: controller.defaults(), defaults: controller.defaults(), overridden: false }
+    },
+  }
+}
+
+/**
+ * The fields one compaction submission carries.
+ * @param payload - the decoded body.
+ * @returns the five settings.
+ */
+function compactionPayload(payload) {
+  return {
+    thresholdRatio: payload?.thresholdRatio,
+    retainRatio: payload?.retainRatio,
+    maxTokens: payload?.maxTokens,
+    compactionRetries: payload?.compactionRetries,
+    maxOverflowRetries: payload?.maxOverflowRetries,
+  }
+}
+
+/**
+ * Give every live agent the settings that are now in force.
+ * @param ctx - host context.
+ * @param cache - the per-session settings cache.
+ * @param settingsFor - reads one session's settings.
+ * @param applyTo - applies them to one agent.
+ */
+async function reapplyAll(ctx, cache, settingsFor, applyTo) {
+  cache.clear()
+  const agents = typeof ctx.get('agents')?.list === 'function' ? ctx.get('agents').list() : []
+  for (const agent of agents) {
+    try {
+      await applyTo(agent)
+    } catch {
+      // One agent that cannot be repriced must not stop the others.
+    }
   }
 }
 
