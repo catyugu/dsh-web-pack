@@ -2,7 +2,7 @@
  * Generated from src/client.js — do not edit. Run `npm run build`.
  */
 window.__ModuleLoader__.load({
-  id: "dsh-session-cleanup",
+  id: "@catyugu/dsh-session-cleanup",
   factory(require) {
     return (/**
  * Session cleanup sub-component, browser side: the session row menu entry, the

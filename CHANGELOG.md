@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0
+
+One package on npm, and it carries its rows.
+
+### Changed
+
+- `@catyugu/dsh-web-pack` is the only published package. The two rows ship inside
+  its tarball as `file:` dependencies under `packages/`: pnpm links them into the
+  installed bundle's own `node_modules`, the profile resolves each row through the
+  bundle's dependency closure, and the row's own manifest still names its browser
+  bundle.
+- `dsh plugin add @catyugu/dsh-web-pack --profile web` is the whole install. It
+  replaces the three `github:` commands of 0.2.1.
+- CI checks that every row is a `file:` dependency, that the tarball carries the
+  row's manifest, host entry and browser bundle, and that the patch mounts it.
+- The Release workflow stages `@catyugu/dsh-web-pack` on npm for one approval; a
+  row package is never published.
+
 ## 0.2.1
 
 The compaction panel keeps only its controls.

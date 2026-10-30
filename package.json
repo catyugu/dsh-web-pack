@@ -1,6 +1,6 @@
 {
-  "name": "dsh-web-pack",
-  "version": "0.2.1",
+  "name": "@catyugu/dsh-web-pack",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "A pack of switchable DSH Web plugins: session management and session cleanup.",
@@ -17,7 +17,6 @@
     "README.md",
     "LICENSE"
   ],
-  "dependencies": {},
   "scripts": {
     "build": "node scripts/build-client.mjs",
     "test": "node --test --test-concurrency=1 \"packages/*/test/*.test.mjs\"",
@@ -31,5 +30,12 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/catyugu/dsh-web-pack.git"
+  },
+  "dependencies": {
+    "@catyugu/dsh-better-session": "file:./packages/dsh-better-session",
+    "@catyugu/dsh-session-cleanup": "file:./packages/dsh-session-cleanup"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

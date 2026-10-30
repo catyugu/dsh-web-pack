@@ -1,7 +1,6 @@
-# One row per package: the loader mounts the row's own package, so the plugin
-# manager shows each sub-component with its own icon, description, and switch.
+# One row per package, mounted by the package name its own manifest declares.
 - insert:
     - id: web-pack-better-session
-      name: dsh-better-session
+      name: "@catyugu/dsh-better-session"
     - id: web-pack-session-cleanup
-      name: dsh-session-cleanup
+      name: "@catyugu/dsh-session-cleanup"

@@ -1,22 +1,28 @@
 # dsh-web-pack
 
-A pack of switchable DeepSeek Harness Web plugins. Each sub-component is its own
-package, so `设置 → 插件` shows one card per plugin with its own icon and switch.
+A pack of switchable DeepSeek Harness Web plugins. `设置 → 插件` shows one
+switchable row per plugin, each with its own icon and its own browser half.
 
-| Package | What it does |
+| Row | What it does |
 | --- | --- |
 | `dsh-better-session` | Regenerate or edit any question; set the compaction settings of one session or of the whole install. |
 | `dsh-session-cleanup` | Delete sessions, clear archived ones, reclaim attachment bytes. |
 
 ## Install
 
-Install each package by tag and path; the pack itself carries only the patch that
-creates the rows:
-
 ```sh
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1&path:/packages/dsh-better-session" --profile web
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1&path:/packages/dsh-session-cleanup"  --profile web
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1"                                     --profile web
+dsh plugin add @catyugu/dsh-web-pack --profile web
 ```
 
-The last line is the bundle: its patch inserts one row per package.
+That command is the whole install. The bundle carries the patch that creates the
+two rows and ships both row packages inside its own tarball as `file:`
+dependencies, so pnpm links them into the installed bundle's `node_modules` and
+both rows start as soon as the bundle is enabled. No row package is published.
+
+## Update
+
+```sh
+dsh plugin add @catyugu/dsh-web-pack --profile web
+```
+
+Only `@catyugu/dsh-web-pack` exists on npm; the rows version with it.

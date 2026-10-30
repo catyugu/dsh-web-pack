@@ -36,6 +36,16 @@ jobs:
           fi
         env:
           INPUT_TAG: ${{ inputs.tag }}
+      - name: npm auth
+        run: |
+          npm install --global npm@12
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> "$HOME/.npmrc"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: stage the bundle
+        run: node scripts/stage.mjs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: pack
         run: npm pack
       - name: github release

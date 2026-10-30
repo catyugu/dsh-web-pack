@@ -2,7 +2,7 @@
  * Generated from src/client.js — do not edit. Run `npm run build`.
  */
 window.__ModuleLoader__.load({
-  id: "dsh-better-session",
+  id: "@catyugu/dsh-better-session",
   factory(require) {
     return (/**
  * Session management sub-component, browser side: the actions on every
