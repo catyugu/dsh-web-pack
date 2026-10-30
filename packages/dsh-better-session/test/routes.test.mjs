@@ -75,7 +75,6 @@ try {
   const inherited = await request(host.routes, ROUTES.compaction, { query: '?sessionId=session-turn' })
   assert.equal(inherited.body.settings.thresholdRatio, 0.7)
   assert.equal(inherited.body.overridden, false)
-  await request(host.routes, ROUTES.defaults, { method: 'DELETE' })
 
   // A submission outside a range is refused with the reason the dictionary knows.
   const refused = await request(host.routes, ROUTES.compaction, {

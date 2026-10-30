@@ -13,8 +13,6 @@ import { rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { Refusal } from './http.js'
 import {
-  clearGlobalSettings,
-  clearSessionSettings,
   createSessionController,
   normalizeSettings,
   readGlobalSettings,
@@ -135,7 +133,6 @@ function operations(ctx, state) {
       return {
         settings: own ?? global ?? defaults,
         defaults,
-        global: global ?? defaults,
         overridden: own !== undefined,
       }
     },
@@ -169,19 +166,6 @@ function operations(ctx, state) {
       cache.clear()
       await reapplyAll(ctx, cache, settingsFor, applyTo)
       return { settings, defaults: controller.defaults(), overridden: true }
-    },
-    resetGlobal: async () => {
-      await clearGlobalSettings(controller.home)
-      cache.clear()
-      await reapplyAll(ctx, cache, settingsFor, applyTo)
-      return { settings: controller.defaults(), defaults: controller.defaults(), overridden: false }
-    },
-    resetCompaction: async ({ sessionId }) => {
-      await clearSessionSettings(controller.home, sessionId)
-      cache.delete(sessionId)
-      const agent = ctx.get('agents')?.get(sessionId)
-      if (agent !== undefined) controller.restore(agent)
-      return { settings: controller.defaults(), defaults: controller.defaults(), overridden: false }
     },
   }
 }

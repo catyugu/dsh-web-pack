@@ -6,8 +6,8 @@ window.__ModuleLoader__.load({
   factory(require) {
     return (/**
  * Session management sub-component, browser side: the actions on every
- * question, the dialogs they open, and the compaction settings in the session
- * header.
+ * question, the dialogs they open, and the compaction settings the composer
+ * offers for one session or for the whole install.
  *
  * This file is one sub-component of the `dsh-better-session` browser bundle. It
  * is written as a parenthesized function expression so the package build can
@@ -26,6 +26,7 @@ window.__ModuleLoader__.load({
   const PROMPT_ROUTE = 'api/sessionManage/prompt'
   const REGENERATE_ROUTE = 'api/sessionManage/turns/regenerate'
   const COMPACTION_ROUTE = 'api/sessionManage/compaction'
+  const DEFAULTS_ROUTE = 'api/sessionManage/defaults'
   const STYLE_ID = 'dsh-better-session/styles.css'
   /** How long one turn operation may take before the page gives up on it. */
   const REQUEST_TIMEOUT_MS = 30000
@@ -54,8 +55,15 @@ window.__ModuleLoader__.load({
     'dialog.loading': '正在读取这一轮的提问…',
     'dialog.loadFailed': '读取这一轮的提问失败，请查看 Harness 日志。',
     'compaction.title': '上下文压缩配置',
-    'compaction.enabled': '启用运行时覆盖',
-    'compaction.enabledHint': '关闭后，Harness 回到自己的压缩配置。',
+    'compaction.scope': '配置范围',
+    'compaction.scopeSession': '本会话',
+    'compaction.scopeGlobal': '全局默认',
+    'compaction.sessionDescription': '只影响这个会话，从下一轮对话开始生效。',
+    'compaction.globalDescription': '新会话从这份配置开始；单独设置过的会话不受影响。',
+    'compaction.inherited': '这个会话没有单独设置，正在使用全局默认。',
+    'compaction.overridden': '这个会话有自己的设置，全局默认的变化不会影响它。',
+    'compaction.globalCustom': '这份配置会作为所有会话的默认值。',
+    'compaction.globalInherited': '没有全局默认，当前是引擎自带的值。',
     'compaction.thresholdRatio': '压缩阈值',
     'compaction.thresholdRatioHint': '上下文占用超过这个比例时开始压缩。',
     'compaction.range': '范围 {min} – {max}',
@@ -75,7 +83,10 @@ window.__ModuleLoader__.load({
     'compaction.retainAboveThreshold': '保留比例必须小于压缩阈值。',
     'compaction.invalidMaxTokens': '摘要最大 token 必须在 256 – 65536 之间。',
     'compaction.invalidRetries': '重试次数必须在 0 – 10 之间。',
-    'compaction.saved': '压缩配置已保存。',
+    'compaction.saved': '压缩配置已保存，从下一轮对话开始生效。',
+    'compaction.reset': '恢复默认',
+    'compaction.restored': '正在显示引擎自带的默认值，保存后才会生效。',
+    'compaction.sessionNotStored': '这个会话还没有写入磁盘，等第一轮对话开始后再保存。',
     'notice.regenerated': '已重新生成。',
     'notice.edited': '已用新的提问重发。',
     'notice.regeneratedInterrupted': '已中断正在生成的回答，并重新生成。',
@@ -108,8 +119,15 @@ window.__ModuleLoader__.load({
     'dialog.loading': 'Reading the question of this turn…',
     'dialog.loadFailed': 'Reading the question failed; check the Harness log.',
     'compaction.title': 'Context compaction',
-    'compaction.enabled': 'Override at runtime',
-    'compaction.enabledHint': 'With this off, the Harness uses its own compaction settings.',
+    'compaction.scope': 'Configuration',
+    'compaction.scopeSession': 'This session',
+    'compaction.scopeGlobal': 'Global default',
+    'compaction.sessionDescription': 'This applies to this session only, from the next turn on.',
+    'compaction.globalDescription': 'New sessions start from this; sessions with their own settings are unaffected.',
+    'compaction.inherited': 'This session has no settings of its own and follows the global default.',
+    'compaction.overridden': 'This session has its own settings, so the global default does not reach it.',
+    'compaction.globalCustom': 'This is the default every session starts from.',
+    'compaction.globalInherited': 'There is no global default; the engine\'s own values are in force.',
     'compaction.thresholdRatio': 'Compression threshold',
     'compaction.thresholdRatioHint': 'Compaction starts once the context passes this share of the window.',
     'compaction.range': 'Range {min} – {max}',
@@ -129,7 +147,10 @@ window.__ModuleLoader__.load({
     'compaction.retainAboveThreshold': 'The retained share must stay below the threshold.',
     'compaction.invalidMaxTokens': 'The summary cap must be between 256 and 65536.',
     'compaction.invalidRetries': 'The retry count must be between 0 and 10.',
-    'compaction.saved': 'The compaction settings are saved.',
+    'compaction.saved': 'The compaction settings are saved and take effect from the next turn.',
+    'compaction.reset': 'Reset',
+    'compaction.restored': 'These are the engine\'s own default values; they take effect once saved.',
+    'compaction.sessionNotStored': 'This session is not on disk yet; save again once its first turn has started.',
     'notice.regenerated': 'Regenerated.',
     'notice.edited': 'Resent with the edited question.',
     'notice.regeneratedInterrupted': 'Interrupted the running answer and regenerated.',
@@ -164,6 +185,8 @@ color: var(--dsw-alias-label-tertiary); cursor: pointer;
 .dsm_action svg { width: calc(15px + var(--dsh-content-font-delta, 0px)); height: calc(15px + var(--dsh-content-font-delta, 0px)); }
 .dsm_action:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }
 .dsm_action:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-2), 0 0 0 4px var(--dsw-alias-brand-primary); }
+.dsm_scope { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.dsm_footerReset { margin-right: auto; }
 .dsm_rows { display: flex; flex-direction: column; gap: 16px; }
 .dsm_row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dsm_rowText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -723,135 +746,158 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     if (code === 'invalid-retain-ratio') return t('compaction.invalidRetain')
     if (code === 'retain-ratio-not-less-than-threshold') return t('compaction.retainAboveThreshold')
     if (code === 'invalid-max-tokens') return t('compaction.invalidMaxTokens')
-    if (code === 'invalid-compaction-retries' || code === 'invalid-max-overflow-retries' || code === 'invalid-enabled') return t('compaction.invalidRetries')
+    if (code === 'invalid-compaction-retries' || code === 'invalid-max-overflow-retries') return t('compaction.invalidRetries')
+    if (code === 'session-not-stored') return t('compaction.sessionNotStored')
     if (code === 'timeout') return t('error.timeout')
     if (code === 'route-missing') return t('error.routeMissing')
     return t('compaction.saveFailed')
   }
 
   /**
-   * The compaction settings: the five parameters the Harness compresses at,
-   * and the switch that turns the runtime override on.
-   * @param useCompactionOpen - the panel-open store as a hook.
+   * The request path one scope is read from and written to.
+   * @param scope - the scope being edited.
+   * @param sessionId - the session the panel was opened for.
+   * @returns the path.
+   */
+  function compactionPath(scope, sessionId) {
+    if (scope === 'global') return DEFAULTS_ROUTE
+    return `${COMPACTION_ROUTE}?${new URLSearchParams({ sessionId }).toString()}`
+  }
+
+  /**
+   * The five fields one save carries.
+   * @param settings - the settings as the fields hold them, strings included.
+   * @returns the body of a save.
+   */
+  function compactionBody(settings) {
+    return {
+      thresholdRatio: Number(settings.thresholdRatio),
+      retainRatio: Number(settings.retainRatio),
+      maxTokens: Math.trunc(Number(settings.maxTokens)),
+      compactionRetries: Math.trunc(Number(settings.compactionRetries)),
+      maxOverflowRetries: Math.trunc(Number(settings.maxOverflowRetries)),
+    }
+  }
+
+  /**
+   * The settings as the fields show them.
+   *
+   * The engine keeps its ratios as float32, so a field would otherwise read
+   * 0.800000011920929 for 0.8.
+   * @param settings - the settings one scope answered with.
+   * @returns the settings with readable ratios.
+   */
+  function shownSettings(settings) {
+    const rounded = (value) => (Number.isFinite(value) ? Math.round(value * 1e4) / 1e4 : value)
+    return {
+      ...settings,
+      thresholdRatio: rounded(settings.thresholdRatio),
+      retainRatio: rounded(settings.retainRatio),
+    }
+  }
+
+  /** The settings fields, in the order the panel shows them. */
+  const COMPACTION_FIELDS = Object.freeze([    { key: 'thresholdRatio', label: 'compaction.thresholdRatio', hint: 'compaction.thresholdRatioHint', min: 0.3, max: 0.9, step: 0.01 },
+    { key: 'retainRatio', label: 'compaction.retainRatio', hint: 'compaction.retainRatioHint', min: 0.01, max: 0.3, step: 0.01 },
+    { key: 'maxTokens', label: 'compaction.maxTokens', hint: 'compaction.maxTokensHint', min: 256, max: 65536, step: 256 },
+    { key: 'compactionRetries', label: 'compaction.compactionRetries', hint: 'compaction.compactionRetriesHint', min: 0, max: 10, step: 1 },
+    { key: 'maxOverflowRetries', label: 'compaction.maxOverflowRetries', hint: 'compaction.maxOverflowRetriesHint', min: 0, max: 10, step: 1 },
+  ])
+
+  /**
+   * The compaction settings of one session, or of the whole install.
+   *
+   * Both scopes are edited the same way: the panel reads the values in force,
+   * writes them back, and drops them to fall back — the session to the global
+   * default, the global default to the engine's own values.
+   * @param useCompactionOpen - the open panel as a hook: the session it names.
    * @param closeCompaction - closes the panel.
-   * @param reportNotice - shows the outcome of a save.
+   * @param reportNotice - shows the outcome of an operation.
    * @param t - this plugin's translate function.
    */
   function CompactionDialog({ useCompactionOpen, closeCompaction, reportNotice, t }) {
-    const open = useCompactionOpen((value) => value)
-    const [snapshot, setSnapshot] = React.useState(null)
-    const [settings, setSettings] = React.useState(null)
+    const panel = useCompactionOpen((value) => value)
+    const [scope, setScope] = React.useState('session')
+    const [drafts, setDrafts] = React.useState({})
     const [busy, setBusy] = React.useState(false)
+    const generation = React.useRef(0)
+    const sessionId = panel === null ? '' : panel.sessionId
+
+    /**
+     * Read one scope into its draft.
+     * @param target - the scope to read.
+     * @param session - the session the panel was opened for.
+     */
+    const load = React.useCallback((target, session) => {
+      const current = generation.current
+      setDrafts((drafts) => ({ ...drafts, [target]: { state: 'loading' } }))
+      requestJson(compactionPath(target, session)).then((payload) => {
+        if (current !== generation.current) return
+        setDrafts((drafts) => ({
+          ...drafts,
+          [target]: {
+            state: 'ready',
+            settings: shownSettings(payload.settings),
+            defaults: shownSettings(payload.defaults),
+            overridden: payload.overridden === true,
+          },
+        }))
+      }, (reason) => {
+        if (current !== generation.current) return
+        console.warn('better-session: reading the compaction settings failed:', reason)
+        setDrafts((drafts) => ({ ...drafts, [target]: { state: 'failed' } }))
+      })
+    }, [])
 
     React.useEffect(() => {
-      if (!open) return undefined
-      let live = true
-      setSnapshot(null)
-      setSettings(null)
-      requestJson(COMPACTION_ROUTE).then((payload) => {
-        if (!live) return
-        setSnapshot(payload)
-        setSettings(payload.settings)
-      }, (reason) => {
-        if (!live) return
-        console.warn('better-session: reading the compaction settings failed:', reason)
-        setSnapshot({ failed: true })
-      })
-      return () => {
-        live = false
+      generation.current += 1
+      if (panel === null) return
+      setScope('session')
+      setDrafts({})
+      setBusy(false)
+      load('session', panel.sessionId)
+    }, [panel])
+
+    React.useEffect(() => {
+      if (panel === null || drafts[scope] !== undefined) return
+      load(scope, panel.sessionId)
+    }, [panel, scope, drafts])
+
+    if (panel === null) return null
+
+    const draft = drafts[scope]
+    const ready = draft?.state === 'ready'
+    const hint = !ready
+      ? ''
+      : draft.restored === true
+        ? t('compaction.restored')
+        : scope === 'global'
+          ? t(draft.overridden ? 'compaction.globalCustom' : 'compaction.globalInherited')
+          : t(draft.overridden ? 'compaction.overridden' : 'compaction.inherited')
+
+    /**
+     * Replace one field of the draft in view.
+     * @param key - the setting.
+     * @param value - the value the field holds.
+     */
+    const patch = (key, value) => setDrafts((drafts) => {
+      const entry = drafts[scope]
+      if (entry?.state !== 'ready') return drafts
+      return {
+        ...drafts,
+        [scope]: { ...entry, restored: false, settings: { ...entry.settings, [key]: value } },
       }
-    }, [open])
-
-    if (!open) return null
-
-    const patch = (key, value) => setSettings({ ...settings, [key]: value })
-    const body = snapshot === null
-      ? h('p', { className: 'dsm_rowHint' }, t('dialog.loading'))
-      : snapshot.failed === true
-        ? h('p', { className: 'dsm_rowHint' }, t('dialog.loadFailed'))
-        : h('div', { className: 'dsm_rows' },
-          h('div', { className: 'dsm_row' },
-            h('div', { className: 'dsm_rowText' },
-              h('span', { className: 'dsm_rowLabel' }, t('compaction.enabled')),
-              h('span', { className: 'dsm_rowHint' }, t('compaction.enabledHint'))),
-            h(primitives.Switch, {
-              checked: settings.enabled,
-              disabled: busy,
-              label: t('compaction.enabled'),
-              onChange: (value) => patch('enabled', value),
-            })),
-          h(NumberRow, {
-            label: t('compaction.thresholdRatio'),
-            hint: t('compaction.thresholdRatioHint'),
-            range: t('compaction.range', { min: 0.3, max: 0.9 }),
-            value: settings.thresholdRatio,
-            step: 0.01,
-            min: 0.3,
-            max: 0.9,
-            disabled: busy,
-            onChange: (value) => patch('thresholdRatio', value),
-          }),
-          h(NumberRow, {
-            label: t('compaction.retainRatio'),
-            hint: t('compaction.retainRatioHint'),
-            range: t('compaction.range', { min: 0.01, max: 0.3 }),
-            value: settings.retainRatio,
-            step: 0.01,
-            min: 0.01,
-            max: 0.3,
-            disabled: busy,
-            onChange: (value) => patch('retainRatio', value),
-          }),
-          h(NumberRow, {
-            label: t('compaction.maxTokens'),
-            hint: t('compaction.maxTokensHint'),
-            range: t('compaction.range', { min: 256, max: 65536 }),
-            value: settings.maxTokens,
-            step: 256,
-            min: 256,
-            max: 65536,
-            disabled: busy,
-            onChange: (value) => patch('maxTokens', value),
-          }),
-          h(NumberRow, {
-            label: t('compaction.compactionRetries'),
-            hint: t('compaction.compactionRetriesHint'),
-            range: t('compaction.range', { min: 0, max: 10 }),
-            value: settings.compactionRetries,
-            step: 1,
-            min: 0,
-            max: 10,
-            disabled: busy,
-            onChange: (value) => patch('compactionRetries', value),
-          }),
-          h(NumberRow, {
-            label: t('compaction.maxOverflowRetries'),
-            hint: t('compaction.maxOverflowRetriesHint'),
-            range: t('compaction.range', { min: 0, max: 10 }),
-            value: settings.maxOverflowRetries,
-            step: 1,
-            min: 0,
-            max: 10,
-            disabled: busy,
-            onChange: (value) => patch('maxOverflowRetries', value),
-          }))
+    })
 
     const save = () => {
+      if (draft?.state !== 'ready') return
       setBusy(true)
-      requestJson(COMPACTION_ROUTE, {
+      requestJson(compactionPath(scope, sessionId), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          enabled: settings.enabled,
-          thresholdRatio: Number(settings.thresholdRatio),
-          retainRatio: Number(settings.retainRatio),
-          maxTokens: Math.trunc(Number(settings.maxTokens)),
-          compactionRetries: Math.trunc(Number(settings.compactionRetries)),
-          maxOverflowRetries: Math.trunc(Number(settings.maxOverflowRetries)),
-        }),
-      }).then((answer) => {
+        body: JSON.stringify(compactionBody(draft.settings)),
+      }).then(() => {
         setBusy(false)
-        setSettings(answer.settings)
         closeCompaction()
         reportNotice({ text: t('compaction.saved') })
       }, (reason) => {
@@ -861,12 +907,63 @@ font-family: inherit; font-size: 14px; line-height: 22px;
       })
     }
 
+    /**
+     * Put the engine's own values in the fields, without writing anything.
+     *
+     * Resetting is an edit like any other: the values only land when the user
+     * saves them, and until then the panel says where they came from.
+     */
+    const restore = () => setDrafts((drafts) => {
+      const entry = drafts[scope]
+      if (entry?.state !== 'ready') return drafts
+      return { ...drafts, [scope]: { ...entry, restored: true, settings: { ...entry.defaults } } }
+    })
+
+    const body = h(React.Fragment, null,
+      h('div', { className: 'dsm_scope' },
+        h(primitives.SegmentedControl, {
+          id: 'dsm-compaction',
+          value: scope,
+          options: [
+            { value: 'session', label: t('compaction.scopeSession') },
+            { value: 'global', label: t('compaction.scopeGlobal') },
+          ],
+          onChange: (next) => setScope(next),
+          label: t('compaction.scope'),
+          disabled: busy,
+        }),
+        hint === '' ? null : h('span', { className: 'dsm_rowHint' }, hint)),
+      draft === undefined || draft.state === 'loading'
+        ? h('p', { className: 'dsm_rowHint' }, t('dialog.loading'))
+        : draft.state === 'failed'
+          ? h('p', { className: 'dsm_rowHint' }, t('dialog.loadFailed'))
+          : h('div', { className: 'dsm_rows' }, COMPACTION_FIELDS.map((field) => h(NumberRow, {
+            key: field.key,
+            label: t(field.label),
+            hint: t(field.hint),
+            range: t('compaction.range', { min: field.min, max: field.max }),
+            value: draft.settings[field.key],
+            step: field.step,
+            min: field.min,
+            max: field.max,
+            disabled: busy,
+            onChange: (value) => patch(field.key, value),
+          }))))
+
     return h(primitives.Modal, {
       open: true,
       onClose: closeCompaction,
       title: t('compaction.title'),
       closeLabel: t('dialog.close'),
+      description: t(scope === 'global' ? 'compaction.globalDescription' : 'compaction.sessionDescription'),
       footer: [
+        h(primitives.Button, {
+          key: 'reset',
+          variant: 'ghost',
+          className: 'dsm_footerReset',
+          disabled: busy || !ready,
+          onClick: restore,
+        }, t('compaction.reset')),
         h(primitives.Button, {
           key: 'cancel',
           variant: 'outline',
@@ -875,14 +972,14 @@ font-family: inherit; font-size: 14px; line-height: 22px;
         h(primitives.Button, {
           key: 'save',
           variant: 'primary',
-          disabled: busy || snapshot === null || snapshot.failed === true,
+          disabled: busy || !ready,
           onClick: save,
         }, busy ? t('compaction.saving') : t('compaction.save')),
       ],
     }, body)
   }
 
-  /** The session header entry that opens the compaction settings. */
+  /** The composer entry that opens the compaction settings. */
   function CompactionTrigger({ openCompaction, t }) {
     return h(primitives.Tooltip, { label: t('action.compaction'), side: 'bottom' },
       h('button', {
@@ -913,7 +1010,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     inject: ['slots', 'locale'],
     apply(ctx) {
       const turnAction = createStore(null)
-      const compactionOpen = createStore(false)
+      const compactionOpen = createStore(null)
       const notice = createStore(null)
       let notices = 0
       const t = ctx.locale.bind(NS)
@@ -933,13 +1030,16 @@ font-family: inherit; font-size: 14px; line-height: 22px;
           requestAction: (action) => turnAction.set({ ...action, sessionId }),
         }),
       }, UserTurnActions))
-      ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
-        name: 'conversation.session.header.actions',
+      ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
+        name: 'conversation.input.left',
         id: 'dsh-better-session.compaction',
-        order: 30,
+        order: 20,
         locale: NS,
-        inject: () => ({
-          openCompaction: () => compactionOpen.set(true),
+        inject: (sessionId) => ({
+          openCompaction: () => {
+            if (typeof sessionId !== 'string' || sessionId.length === 0) return
+            compactionOpen.set({ sessionId })
+          },
         }),
       }, CompactionTrigger))
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({
@@ -960,7 +1060,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
         locale: NS,
         inject: () => ({
           hooks: { compactionOpen },
-          closeCompaction: () => compactionOpen.set(false),
+          closeCompaction: () => compactionOpen.set(null),
           reportNotice,
         }),
       }, CompactionDialog))

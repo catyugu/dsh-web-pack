@@ -9,7 +9,6 @@
  *
  * @module dsh-better-session/compaction
  */
-import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { dshHome, packFile, readJson, sessionDirectory, writeJson } from './home.js'
 
@@ -135,17 +134,6 @@ export async function writeSessionSettings(home, sessionId, value) {
 }
 
 /**
- * Drop one session's settings, so the session inherits the profile's values.
- * @param home - the Harness home directory.
- * @param sessionId - the session identity.
- */
-export async function clearSessionSettings(home, sessionId) {
-  const directory = await sessionDirectory(home, sessionId)
-  if (directory === undefined) return
-  await rm(join(directory, FILE), { force: true })
-}
-
-/**
  * Read the pack's global settings, the base every session inherits.
  * @param home - the Harness home directory.
  * @returns the stored settings, or undefined when the pack has none.
@@ -165,14 +153,6 @@ export async function writeGlobalSettings(home, value) {
   const settings = normalizeSettings(value)
   await writeJson(packFile(home, 'compaction'), settings)
   return settings
-}
-
-/**
- * Drop the pack's global settings.
- * @param home - the Harness home directory.
- */
-export async function clearGlobalSettings(home) {
-  await rm(packFile(home, 'compaction'), { force: true })
 }
 
 /**

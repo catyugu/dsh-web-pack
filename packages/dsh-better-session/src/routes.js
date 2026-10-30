@@ -100,10 +100,10 @@ function regenerateRoute({ regenerate, report }) {
  * Read or write the compaction settings.
  * @param operations - the composed operations.
  */
-function compactionRoute({ readCompaction, saveCompaction, resetCompaction, report }) {
+function compactionRoute({ readCompaction, saveCompaction, report }) {
   return {
     path: ROUTES.compaction,
-    methods: ['GET', 'POST', 'DELETE'],
+    methods: ['GET', 'POST'],
     requestBody: 'buffered',
     fetch: (request) => answered(report, 'the compaction settings failed', 'compaction-failed', async () => {
       const sessionId = new URL(request.url).searchParams.get('sessionId')
@@ -111,7 +111,6 @@ function compactionRoute({ readCompaction, saveCompaction, resetCompaction, repo
         throw new Refusal(400, 'bad-request', 'the request must name one session')
       }
       if (request.method === 'GET') return reply(200, { ok: true, ...(await readCompaction({ sessionId })) })
-      if (request.method === 'DELETE') return reply(200, { ok: true, ...(await resetCompaction({ sessionId })) })
       const payload = await jsonBody(request)
       return reply(200, { ok: true, ...(await saveCompaction({ sessionId, payload })) })
     }),
@@ -119,17 +118,16 @@ function compactionRoute({ readCompaction, saveCompaction, resetCompaction, repo
 }
 
 /**
- * Read, write, or drop the pack's global settings.
+ * Read or write the pack's global settings.
  * @param operations - the composed operations.
  */
-function defaultsRoute({ readGlobal, saveGlobal, resetGlobal, report }) {
+function defaultsRoute({ readGlobal, saveGlobal, report }) {
   return {
     path: ROUTES.defaults,
-    methods: ['GET', 'POST', 'DELETE'],
+    methods: ['GET', 'POST'],
     requestBody: 'buffered',
     fetch: (request) => answered(report, 'the global compaction settings failed', 'defaults-failed', async () => {
       if (request.method === 'GET') return reply(200, { ok: true, ...(await readGlobal()) })
-      if (request.method === 'DELETE') return reply(200, { ok: true, ...(await resetGlobal()) })
       const payload = await jsonBody(request)
       return reply(200, { ok: true, ...(await saveGlobal({ payload })) })
     }),

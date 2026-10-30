@@ -1,14 +1,12 @@
 /**
  * The per-session compaction settings: where they live, what a submission may
- * say, and how "reset" gives the profile's values back.
+ * say, and which values a fresh install starts from.
  */
 import assert from 'node:assert/strict'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   DEFAULT_SETTINGS,
-  clearGlobalSettings,
-  clearSessionSettings,
   normalizeSettings,
   readGlobalSettings,
   readSessionSettings,
@@ -46,10 +44,6 @@ assert.deepEqual(stored, {
 assert.deepEqual(JSON.parse(await readFile(join(sessionDirectory, 'better-session.json'), 'utf8')), stored)
 assert.deepEqual(await readSessionSettings(home, sessionId), stored)
 
-// Reset drops the file and the session inherits again.
-await clearSessionSettings(home, sessionId)
-assert.equal(await readSessionSettings(home, sessionId), undefined)
-
 // The global base lives beside the pack, not in a plugin directory of its own.
 assert.equal(await readGlobalSettings(home), undefined)
 const global = await writeGlobalSettings(home, { thresholdRatio: 0.7, retainRatio: 0.2 })
@@ -57,8 +51,6 @@ assert.equal(global.thresholdRatio, 0.7)
 assert.equal((await readGlobalSettings(home)).retainRatio, 0.2)
 const globalFile = join(home, 'dsh-web-pack', 'better-session', 'compaction.json')
 assert.equal(JSON.parse(await readFile(globalFile, 'utf8')).thresholdRatio, 0.7)
-await clearGlobalSettings(home)
-assert.equal(await readGlobalSettings(home), undefined)
 
 // A submission is checked before anything is written.
 const valid = { thresholdRatio: 0.5, retainRatio: 0.1, maxTokens: 4096, compactionRetries: 1, maxOverflowRetries: 1 }
