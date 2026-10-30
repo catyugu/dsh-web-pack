@@ -1,0 +1,46 @@
+{
+  "name": "dsh-better-session",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Regenerate or edit any question, and tune what the Harness compacts.",
+  "license": "MIT",
+  "icon": "./icon.svg",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "meta": {
+    "title": "dsh-better-session",
+    "description": "Regenerate or edit any question, and tune what the Harness compacts."
+  },
+  "exports": {
+    ".": "./src/host.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "src",
+    "client.js",
+    "icon.svg",
+    "locale",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "external": [
+        "react",
+        "react-dom",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

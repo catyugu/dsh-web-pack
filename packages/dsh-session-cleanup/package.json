@@ -1,0 +1,46 @@
+{
+  "name": "dsh-session-cleanup",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Delete sessions, clear archived ones, and reclaim attachment bytes.",
+  "license": "MIT",
+  "icon": "./icon.svg",
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "meta": {
+    "title": "dsh-session-cleanup",
+    "description": "Delete sessions, clear archived ones, and reclaim attachment bytes."
+  },
+  "exports": {
+    ".": "./src/host.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "src",
+    "client.js",
+    "icon.svg",
+    "locale",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "external": [
+        "react",
+        "react-dom",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

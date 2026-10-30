@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-session-cleanup",
+    "description": "Delete sessions, clear archived ones, and reclaim attachment bytes."
+  }
+}
