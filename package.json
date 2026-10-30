@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-pack",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "A pack of switchable DSH Web plugins: session management and session cleanup.",

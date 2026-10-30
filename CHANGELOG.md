@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1
+
+The compaction panel keeps only its controls.
+
+### Changed
+
+- `dsh-better-session` 0.2.1: the panel no longer explains where its values come
+  from. The lines under the scope switch are gone, both the "this session has no
+  settings of its own" and the "there is no global default" one, and so is the line
+  that announced a reset. The fields show the values in force.
+- `dsh-session-cleanup` 0.2.1: unchanged code, released with the family.
+
 ## 0.2.0
 
 The compaction settings stopped being one switch over the whole install and became

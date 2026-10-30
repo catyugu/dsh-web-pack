@@ -54,10 +54,6 @@
     'compaction.scopeGlobal': '全局默认',
     'compaction.sessionDescription': '只影响这个会话，从下一轮对话开始生效。',
     'compaction.globalDescription': '新会话从这份配置开始；单独设置过的会话不受影响。',
-    'compaction.inherited': '这个会话没有单独设置，正在使用全局默认。',
-    'compaction.overridden': '这个会话有自己的设置，全局默认的变化不会影响它。',
-    'compaction.globalCustom': '这份配置会作为所有会话的默认值。',
-    'compaction.globalInherited': '没有全局默认，当前是引擎自带的值。',
     'compaction.thresholdRatio': '压缩阈值',
     'compaction.thresholdRatioHint': '上下文占用超过这个比例时开始压缩。',
     'compaction.range': '范围 {min} – {max}',
@@ -79,7 +75,6 @@
     'compaction.invalidRetries': '重试次数必须在 0 – 10 之间。',
     'compaction.saved': '压缩配置已保存，从下一轮对话开始生效。',
     'compaction.reset': '恢复默认',
-    'compaction.restored': '正在显示引擎自带的默认值，保存后才会生效。',
     'compaction.sessionNotStored': '这个会话还没有写入磁盘，等第一轮对话开始后再保存。',
     'notice.regenerated': '已重新生成。',
     'notice.edited': '已用新的提问重发。',
@@ -118,10 +113,6 @@
     'compaction.scopeGlobal': 'Global default',
     'compaction.sessionDescription': 'This applies to this session only, from the next turn on.',
     'compaction.globalDescription': 'New sessions start from this; sessions with their own settings are unaffected.',
-    'compaction.inherited': 'This session has no settings of its own and follows the global default.',
-    'compaction.overridden': 'This session has its own settings, so the global default does not reach it.',
-    'compaction.globalCustom': 'This is the default every session starts from.',
-    'compaction.globalInherited': 'There is no global default; the engine\'s own values are in force.',
     'compaction.thresholdRatio': 'Compression threshold',
     'compaction.thresholdRatioHint': 'Compaction starts once the context passes this share of the window.',
     'compaction.range': 'Range {min} – {max}',
@@ -143,7 +134,6 @@
     'compaction.invalidRetries': 'The retry count must be between 0 and 10.',
     'compaction.saved': 'The compaction settings are saved and take effect from the next turn.',
     'compaction.reset': 'Reset',
-    'compaction.restored': 'These are the engine\'s own default values; they take effect once saved.',
     'compaction.sessionNotStored': 'This session is not on disk yet; save again once its first turn has started.',
     'notice.regenerated': 'Regenerated.',
     'notice.edited': 'Resent with the edited question.',
@@ -179,7 +169,7 @@ color: var(--dsw-alias-label-tertiary); cursor: pointer;
 .dsm_action svg { width: calc(15px + var(--dsh-content-font-delta, 0px)); height: calc(15px + var(--dsh-content-font-delta, 0px)); }
 .dsm_action:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); }
 .dsm_action:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-2), 0 0 0 4px var(--dsw-alias-brand-primary); }
-.dsm_scope { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.dsm_scope { margin-bottom: 18px; }
 .dsm_footerReset { margin-right: auto; }
 .dsm_rows { display: flex; flex-direction: column; gap: 16px; }
 .dsm_row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -833,7 +823,6 @@ font-family: inherit; font-size: 14px; line-height: 22px;
             state: 'ready',
             settings: shownSettings(payload.settings),
             defaults: shownSettings(payload.defaults),
-            overridden: payload.overridden === true,
           },
         }))
       }, (reason) => {
@@ -861,13 +850,6 @@ font-family: inherit; font-size: 14px; line-height: 22px;
 
     const draft = drafts[scope]
     const ready = draft?.state === 'ready'
-    const hint = !ready
-      ? ''
-      : draft.restored === true
-        ? t('compaction.restored')
-        : scope === 'global'
-          ? t(draft.overridden ? 'compaction.globalCustom' : 'compaction.globalInherited')
-          : t(draft.overridden ? 'compaction.overridden' : 'compaction.inherited')
 
     /**
      * Replace one field of the draft in view.
@@ -879,7 +861,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
       if (entry?.state !== 'ready') return drafts
       return {
         ...drafts,
-        [scope]: { ...entry, restored: false, settings: { ...entry.settings, [key]: value } },
+        [scope]: { ...entry, settings: { ...entry.settings, [key]: value } },
       }
     })
 
@@ -905,12 +887,12 @@ font-family: inherit; font-size: 14px; line-height: 22px;
      * Put the engine's own values in the fields, without writing anything.
      *
      * Resetting is an edit like any other: the values only land when the user
-     * saves them, and until then the panel says where they came from.
+     * saves them.
      */
     const restore = () => setDrafts((drafts) => {
       const entry = drafts[scope]
       if (entry?.state !== 'ready') return drafts
-      return { ...drafts, [scope]: { ...entry, restored: true, settings: { ...entry.defaults } } }
+      return { ...drafts, [scope]: { ...entry, settings: { ...entry.defaults } } }
     })
 
     const body = h(React.Fragment, null,
@@ -925,8 +907,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
           onChange: (next) => setScope(next),
           label: t('compaction.scope'),
           disabled: busy,
-        }),
-        hint === '' ? null : h('span', { className: 'dsm_rowHint' }, hint)),
+        })),
       draft === undefined || draft.state === 'loading'
         ? h('p', { className: 'dsm_rowHint' }, t('dialog.loading'))
         : draft.state === 'failed'

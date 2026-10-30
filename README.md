@@ -14,9 +14,9 @@ Install each package by tag and path; the pack itself carries only the patch tha
 creates the rows:
 
 ```sh
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.0&path:/packages/dsh-better-session" --profile web
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.0&path:/packages/dsh-session-cleanup"  --profile web
-dsh plugin add "github:catyugu/dsh-web-pack#v0.2.0"                                     --profile web
+dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1&path:/packages/dsh-better-session" --profile web
+dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1&path:/packages/dsh-session-cleanup"  --profile web
+dsh plugin add "github:catyugu/dsh-web-pack#v0.2.1"                                     --profile web
 ```
 
 The last line is the bundle: its patch inserts one row per package.
