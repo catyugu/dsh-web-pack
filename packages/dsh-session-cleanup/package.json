@@ -21,7 +21,6 @@
   "files": [
     "src",
     "client.js",
-    "cordis.patch.yml",
     "icon.svg",
     "locale",
     "README.md",
@@ -42,9 +41,6 @@
         "@deepseek-ai/dsh-client-ui-chat",
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
-    },
-    "bundle": {
-      "patch": "./cordis.patch.yml"
     }
   }
 }

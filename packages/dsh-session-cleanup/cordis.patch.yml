@@ -1,5 +1,0 @@
-# One row: this package is its own bundle, so the plugin manager shows it as one
-# card with its own icon, description, and switch.
-- insert:
-    - id: dsh-session-cleanup
-      name: dsh-session-cleanup
