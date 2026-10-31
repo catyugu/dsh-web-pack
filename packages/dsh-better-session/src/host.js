@@ -2,10 +2,10 @@
  * Session management sub-component, host side: the plugin's lifetime, and the
  * Harness services behind the routes in `routes.js`.
  *
- * What a turn is lives in `turns.js`, what the compaction engine does with a
- * context lives in `compaction.js`. This module joins those to the Harness:
- * routes, the agent of a session, and the per-session compaction settings the
- * agent takes its next step with.
+ * What a question is, and what re-sending one removes, lives in `turns.js`; what
+ * the compaction engine does with a context lives in `compaction.js`. This
+ * module joins those to the Harness: routes, the agent of a session, and the
+ * per-session compaction settings the agent takes its next step with.
  *
  * @module dsh-better-session/host
  */
@@ -23,7 +23,7 @@ import {
 } from './compaction.js'
 import { settingsFile } from './home.js'
 import { ROUTES, createRoutes } from './routes.js'
-import { TurnError, readQuestionText, regenerateFromTurn } from './turns.js'
+import { EditError, readQuestionText, resendQuestion } from './turns.js'
 
 /** The services these routes and the compaction override read. */
 export const inject = ['connection', 'agents']
@@ -115,12 +115,11 @@ function operations(ctx, state) {
   return {
     report: (line) => ctx.logger?.warn?.(line),
     prompt: ({ sessionId, messageId }) => guard(() => readQuestionText(liveSession(ctx, sessionId), messageId)),
-    regenerate: ({ sessionId, messageId, operationId, text }) => guard(async () => {
-      const result = await regenerateFromTurn(ctx, liveAgent(ctx, sessionId), messageId, operationId, text)
+    resend: ({ sessionId, messageId, operationId, text }) => guard(async () => {
+      const result = await resendQuestion(ctx, liveAgent(ctx, sessionId), messageId, operationId, text)
       return {
-        turn: result.deletion.turn,
-        endTurn: result.deletion.endTurn,
-        deletedTurns: result.deletion.deletedTurns,
+        turn: result.removal.turn,
+        endTurn: result.removal.endTurn,
         replayMessageId: result.replayMessageId,
         interrupted: result.interrupted === true,
       }
@@ -219,18 +218,17 @@ async function guard(task) {
 }
 
 /**
- * Turn a turn-level refusal into the status the browser side reads.
- * @param error - the failure the turn engine raised.
+ * Turn a conversation-editing refusal into the status the browser side reads.
+ * @param error - the failure the edit engine raised.
  * @returns the refusal to answer with, or undefined when the failure is not one.
  */
 export function refusalOf(error) {
-  if (!(error instanceof TurnError)) return undefined
+  if (!(error instanceof EditError)) return undefined
   const status = {
     AGENT_BUSY: 423,
     QUEUE_NOT_EMPTY: 409,
     TARGET_NOT_FOUND: 404,
-    TURN_NOT_CLOSED: 409,
-    TURN_COMPACTED: 409,
+    RANGE_COMPACTED: 409,
     PROMPT_NOT_FOUND: 404,
     PROMPT_UNSUPPORTED: 409,
   }[error.code]

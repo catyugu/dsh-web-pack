@@ -6,7 +6,7 @@
  *
  * A question is addressed by its message identity, never by a turn number: one
  * turn may hold several questions, and only the one the user clicked may be
- * replayed.
+ * re-sent.
  *
  * @module dsh-better-session/manage/routes
  */
@@ -15,13 +15,12 @@ import { Refusal, answered, jsonBody, reply } from './http.js'
 /** The exact Fetch routes the browser side talks to. */
 export const ROUTES = {
   prompt: '/api/sessionManage/prompt',
-  regenerate: '/api/sessionManage/turns/regenerate',
+  resend: '/api/sessionManage/questions/resend',
   compaction: '/api/sessionManage/compaction',
   defaults: '/api/sessionManage/defaults',
-  hidden: '/api/sessionManage/hidden',
 }
 
-/** The operation identity a regeneration carries. */
+/** The operation identity a resend carries. */
 const OPERATION_ID = /^[a-zA-Z0-9_-]{8,40}$/
 
 /**
@@ -32,10 +31,9 @@ const OPERATION_ID = /^[a-zA-Z0-9_-]{8,40}$/
 export function createRoutes(operations) {
   return [
     promptRoute(operations),
-    regenerateRoute(operations),
+    resendRoute(operations),
     compactionRoute(operations),
     defaultsRoute(operations),
-    hiddenRoute(operations),
   ]
 }
 
@@ -64,15 +62,15 @@ function promptRoute({ prompt, report }) {
 }
 
 /**
- * Remove one question's turn and re-send that question.
+ * Remove one question and everything after it, then re-send that question.
  * @param operations - the composed operations.
  */
-function regenerateRoute({ regenerate, report }) {
+function resendRoute({ resend, report }) {
   return {
-    path: ROUTES.regenerate,
+    path: ROUTES.resend,
     methods: ['POST'],
     requestBody: 'buffered',
-    fetch: (request) => answered(report, 'regenerating the turn failed', 'regenerate-failed', async () => {
+    fetch: (request) => answered(report, 'resending the question failed', 'resend-failed', async () => {
       const payload = await jsonBody(request)
       const target = questionRequest(payload)
       if (typeof payload.operationId !== 'string' || !OPERATION_ID.test(payload.operationId)) {
@@ -86,7 +84,7 @@ function regenerateRoute({ regenerate, report }) {
       }
       return reply(200, {
         ok: true,
-        ...(await regenerate({
+        ...(await resend({
           ...target,
           operationId: payload.operationId,
           ...(payload.text === undefined ? {} : { text: payload.text }),
@@ -130,25 +128,6 @@ function defaultsRoute({ readGlobal, saveGlobal, report }) {
       if (request.method === 'GET') return reply(200, { ok: true, ...(await readGlobal()) })
       const payload = await jsonBody(request)
       return reply(200, { ok: true, ...(await saveGlobal({ payload })) })
-    }),
-  }
-}
-
-/**
- * Read the turns a session no longer has.
- * @param operations - the composed operations.
- */
-function hiddenRoute({ hidden, report }) {
-  return {
-    path: ROUTES.hidden,
-    methods: ['GET'],
-    requestBody: 'buffered',
-    fetch: (request) => answered(report, 'reading the removed turns failed', 'hidden-failed', async () => {
-      const sessionId = new URL(request.url).searchParams.get('sessionId')
-      if (typeof sessionId !== 'string' || sessionId.length === 0) {
-        throw new Refusal(400, 'bad-request', 'the request must name one session')
-      }
-      return reply(200, { ok: true, ranges: await hidden({ sessionId }) })
     }),
   }
 }

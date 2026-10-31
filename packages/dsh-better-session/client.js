@@ -24,19 +24,19 @@ window.__ModuleLoader__.load({
   const h = React.createElement
   const NS = 'sessionManage'
   const PROMPT_ROUTE = 'api/sessionManage/prompt'
-  const REGENERATE_ROUTE = 'api/sessionManage/turns/regenerate'
+  const RESEND_ROUTE = 'api/sessionManage/questions/resend'
   const COMPACTION_ROUTE = 'api/sessionManage/compaction'
   const DEFAULTS_ROUTE = 'api/sessionManage/defaults'
   const STYLE_ID = 'dsh-better-session/styles.css'
-  /** How long one turn operation may take before the page gives up on it. */
+  /** How long one conversation operation may take before the page gives up on it. */
   const REQUEST_TIMEOUT_MS = 30000
   /** The rows a question is rendered in. */
   const QUESTION_ROW = '[data-chat-flow-kind="user"], [data-chat-flow-kind="steering"]'
   /** The element this sub-component mounts its buttons in. */
   const ACTION_HOST = 'data-dsh-better-session-actions'
-  /** The attribute that marks a row of a removed turn. */
+  /** The attribute that marks a row the conversation no longer holds. */
   const HIDDEN_ATTR = 'data-dsh-better-session-hidden'
-  /** Where the removed turns of one session are remembered. */
+  /** Where the removed ranges of one session are remembered. */
   const HIDDEN_KEY = 'dsh-better-session:hidden:'
 
   const ZH = {
@@ -45,15 +45,15 @@ window.__ModuleLoader__.load({
     'action.compaction': '上下文压缩配置',
     'dialog.close': '关闭',
     'dialog.cancel': '取消',
-    'dialog.regenerateTitle': '重新生成本轮',
-    'dialog.regenerateDescription': '将删除本轮及之后的所有内容，并用这一轮原来的提问重新提问。',
+    'dialog.regenerateTitle': '重新生成',
+    'dialog.regenerateDescription': '将删除这条提问及之后的所有内容，再用这条提问重新提问。',
     'dialog.regenerateConfirm': '重新生成',
     'dialog.editTitle': '编辑提问并重发',
-    'dialog.editDescription': '将删除本轮及之后的所有内容，并用下面的文字重新提问。',
+    'dialog.editDescription': '将删除这条提问及之后的所有内容，再用下面的文字重新提问。',
     'dialog.editConfirm': '重发',
     'dialog.running': '这个会话正在生成回答，确认后会先中断它。',
-    'dialog.loading': '正在读取这一轮的提问…',
-    'dialog.loadFailed': '读取这一轮的提问失败，请查看 Harness 日志。',
+    'dialog.loading': '正在读取这条提问…',
+    'dialog.loadFailed': '读取这条提问失败，请查看 Harness 日志。',
     'compaction.title': '上下文压缩配置',
     'compaction.scope': '配置范围',
     'compaction.scopeSession': '本会话',
@@ -88,11 +88,10 @@ window.__ModuleLoader__.load({
     'notice.editedInterrupted': '已中断正在生成的回答，并用新的提问重发。',
     'error.busy': '这个会话正在运行或还有排队的输入，请等它空闲后再试。',
     'error.queue': '这个会话还有排队的输入，请等队列清空后再试。',
-    'error.compacted': '这一轮已经和压缩过的内容混在一起，无法单独处理。',
-    'error.notClosed': '这一轮还没有结束，无法处理。',
-    'error.notFound': '没有找到这一轮的内容。',
-    'error.promptMissing': '这一轮没有可重发的文字提问。',
-    'error.promptUnsupported': '这一轮的提问不是纯文本，无法重发。',
+    'error.compacted': '这条提问已经和压缩过的内容混在一起，无法单独处理。',
+    'error.notFound': '没有找到这条提问。',
+    'error.promptMissing': '这条提问没有可重发的文字。',
+    'error.promptUnsupported': '这条提问不是纯文本，无法重发。',
     'error.failed': '操作失败，请查看 Harness 日志。',
     'error.timeout': 'Host 没有在规定时间内回答，刷新一次再试。',
     'error.routeMissing': '这一端还没有加载这些路由：重启一次 Harness 后可用。',
@@ -104,15 +103,15 @@ window.__ModuleLoader__.load({
     'action.compaction': 'Context compaction',
     'dialog.close': 'Close',
     'dialog.cancel': 'Cancel',
-    'dialog.regenerateTitle': 'Regenerate this turn',
-    'dialog.regenerateDescription': 'This removes this turn and everything after it, then asks the original question again.',
+    'dialog.regenerateTitle': 'Regenerate this question',
+    'dialog.regenerateDescription': 'This removes this question and everything after it, then asks the question again.',
     'dialog.regenerateConfirm': 'Regenerate',
     'dialog.editTitle': 'Edit the question and resend it',
-    'dialog.editDescription': 'This removes this turn and everything after it, then asks the text below instead.',
+    'dialog.editDescription': 'This removes this question and everything after it, then asks the text below instead.',
     'dialog.editConfirm': 'Resend',
     'dialog.running': 'This session is generating an answer; confirming interrupts it first.',
-    'dialog.loading': 'Reading the question of this turn…',
-    'dialog.loadFailed': 'Reading the question failed; check the Harness log.',
+    'dialog.loading': 'Reading this question…',
+    'dialog.loadFailed': 'Reading this question failed; check the Harness log.',
     'compaction.title': 'Context compaction',
     'compaction.scope': 'Configuration',
     'compaction.scopeSession': 'This session',
@@ -147,11 +146,10 @@ window.__ModuleLoader__.load({
     'notice.editedInterrupted': 'Interrupted the running answer and resent the edited question.',
     'error.busy': 'This session is running or still has queued input; retry when it is idle.',
     'error.queue': 'This session still has queued input; retry when the queue is empty.',
-    'error.compacted': 'This turn shares a compacted range, so it cannot be handled on its own.',
-    'error.notClosed': 'This turn has not ended yet, so it cannot be handled.',
-    'error.notFound': 'Nothing was found for this turn.',
-    'error.promptMissing': 'This turn has no text question to resend.',
-    'error.promptUnsupported': 'The question of this turn is not plain text, so it cannot be resent.',
+    'error.compacted': 'This question shares a compacted range, so it cannot be handled on its own.',
+    'error.notFound': 'Nothing was found for this question.',
+    'error.promptMissing': 'This question has no text to resend.',
+    'error.promptUnsupported': 'This question is not plain text, so it cannot be resent.',
     'error.failed': 'The operation failed; check the Harness log.',
     'error.timeout': 'The Host did not answer in time; reload and retry.',
     'error.routeMissing': 'This sub-component has not loaded these routes yet: restart the Harness once.',
@@ -229,55 +227,92 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
-   * The turns one session has removed, as remembered by the page.
+   * The ranges one session has removed, as remembered by the page.
    *
-   * The log keeps the removed events — the log is append-only — so the page
-   * has to remember which turns are gone to keep showing the conversation as
-   * it is now.
+   * The log keeps the removed events — the log is append-only — so the page has
+   * to remember which range is gone to keep showing the conversation as it is
+   * now. A range starts at one question and runs to the end of a turn, so it
+   * remembers that question's identity: one turn can hold several questions the
+   * user sent while the agent worked, and only the ones after the clicked one are
+   * gone.
    * @param sessionId - the session the ranges belong to.
-   * @returns the removed ranges, as `[startTurn, endTurn]` pairs.
+   * @returns the removed ranges, as `{ turn, endTurn, messageId }` records.
    */
-  function hiddenRanges(sessionId) {
+  function hiddenRemovals(sessionId) {
     try {
       const raw = window.localStorage.getItem(HIDDEN_KEY + sessionId)
       const parsed = raw === null ? [] : JSON.parse(raw)
       if (!Array.isArray(parsed)) return []
-      return parsed.filter((range) => Array.isArray(range) && range.length === 2 && range.every(Number.isInteger))
+      return parsed.filter((removal) => typeof removal === 'object' && removal !== null
+        && Number.isInteger(removal.turn)
+        && Number.isInteger(removal.endTurn)
+        && typeof removal.messageId === 'string'
+        && removal.messageId.length > 0)
     } catch {
       return []
     }
   }
 
   /**
-   * Remember that a turn range is gone.
+   * Remember that a range is gone, and hide it.
    * @param sessionId - the session the range belongs to.
-   * @param startTurn - first removed turn.
-   * @param endTurn - last removed turn.
+   * @param removal - the question the range starts at, and the turn it ends at.
    */
-  function rememberHiddenRange(sessionId, startTurn, endTurn) {
-    if (!Number.isInteger(startTurn) || !Number.isInteger(endTurn)) return
-    const ranges = hiddenRanges(sessionId)
-    ranges.push([startTurn, endTurn])
+  function rememberRemoval(sessionId, removal) {
+    const removals = hiddenRemovals(sessionId)
+    removals.push(removal)
     try {
-      window.localStorage.setItem(HIDDEN_KEY + sessionId, JSON.stringify(ranges))
+      window.localStorage.setItem(HIDDEN_KEY + sessionId, JSON.stringify(removals))
     } catch {
       // A page without storage still hides the range until it reloads.
     }
-    applyHiddenRanges(sessionId)
+    applyHiddenRows(sessionId)
   }
 
   /**
-   * Hide the rows of the removed turns.
+   * Hide the rows of the removed ranges.
+   *
+   * A row is gone when it sits inside a range: every turn the range covers
+   * except the first one it starts in, and within that first turn only the rows
+   * at or after the question the range starts at. The question's own row is the
+   * only anchor the page has, so a range whose anchor row is not rendered yet
+   * hides nothing of its first turn and is applied once the row appears.
    * @param sessionId - the session whose ranges apply.
    */
-  function applyHiddenRanges(sessionId) {
-    const ranges = hiddenRanges(sessionId)
+  function applyHiddenRows(sessionId) {
+    const removals = hiddenRemovals(sessionId)
+    const anchors = new Map()
+    if (removals.length > 0) {
+      for (const row of document.querySelectorAll(QUESTION_ROW)) {
+        const messageId = messageIdOf(row)
+        if (messageId !== undefined && !anchors.has(messageId)) anchors.set(messageId, row)
+      }
+    }
     for (const row of document.querySelectorAll('[data-chat-turn]')) {
       const turn = Number(row.dataset.chatTurn)
       if (!Number.isSafeInteger(turn)) continue
-      if (ranges.some(([start, end]) => turn >= start && turn <= end)) row.setAttribute(HIDDEN_ATTR, '')
+      const hidden = removals.some((removal) => isRemovedRow(removal, row, turn, anchors))
+      if (hidden) row.setAttribute(HIDDEN_ATTR, '')
       else row.removeAttribute(HIDDEN_ATTR)
     }
+  }
+
+  /**
+   * Whether one row belongs to one removed range.
+   * @param removal - the range.
+   * @param row - the candidate row.
+   * @param turn - the row's turn.
+   * @param anchors - the rendered question rows, by message identity.
+   * @returns true when the range covers the row.
+   */
+  function isRemovedRow(removal, row, turn, anchors) {
+    if (turn > removal.endTurn) return false
+    if (turn > removal.turn) return true
+    if (turn < removal.turn) return false
+    const anchor = anchors.get(removal.messageId)
+    if (anchor === undefined) return false
+    if (anchor === row) return true
+    return (anchor.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
   }
 
   /**
@@ -385,14 +420,14 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
-   * Remove one question's turn and re-send the question.
+   * Remove one question and everything after it, then re-send the question.
    * @param sessionId - the session the question belongs to.
    * @param messageId - the question's message identity.
    * @param text - the replacement question, when the user edited it.
    * @returns what the Host did.
    */
-  function regenerateTurn(sessionId, messageId, text) {
-    return requestJson(REGENERATE_ROUTE, {
+  function resendQuestion(sessionId, messageId, text) {
+    return requestJson(RESEND_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -414,8 +449,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     const code = typeof error?.code === 'string' ? error.code : undefined
     if (code === 'agent-busy') return t('error.busy')
     if (code === 'queue-not-empty') return t('error.queue')
-    if (code === 'turn-compacted') return t('error.compacted')
-    if (code === 'turn-not-closed') return t('error.notClosed')
+    if (code === 'range-compacted') return t('error.compacted')
     if (code === 'target-not-found' || code === 'session-not-active' || code === 'session-not-loaded') return t('error.notFound')
     if (code === 'prompt-not-found') return t('error.promptMissing')
     if (code === 'prompt-unsupported') return t('error.promptUnsupported')
@@ -432,14 +466,14 @@ font-family: inherit; font-size: 14px; line-height: 22px;
    * @param useSession - the session projection as a hook.
    * @param t - this plugin's translate function.
    */
-  function TurnActionButtons({ messageId, requestAction, useSession, t }) {
+  function QuestionActionButtons({ messageId, requestAction, useSession, t }) {
     const running = useSession((snapshot) => snapshot.running === true)
     /**
      * One action button, in the metrics of the strip it sits in.
      *
-     * The button stays usable while the session works: replacing a turn whose
-     * answer is still streaming is what a user asks for when the answer being
-     * written is not the one they wanted. The dialog warns that confirming
+     * The button stays usable while the session works: replacing a question
+     * whose answer is still streaming is what a user asks for when the answer
+     * being written is not the one they wanted. The dialog warns that confirming
      * interrupts the running turn, and the Host does that before it removes
      * anything.
      * @param icon - the icon component.
@@ -470,7 +504,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
    * @param useSession - the session projection as a hook.
    * @param t - this plugin's translate function.
    */
-  function UserTurnActions({ sessionId, requestAction, useSession, t }) {
+  function UserQuestionActions({ sessionId, requestAction, useSession, t }) {
     const [targets, setTargets] = React.useState([])
     const hosts = React.useRef(new Map())
 
@@ -509,7 +543,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
           record.host.remove()
           hosts.current.delete(key)
         }
-        applyHiddenRanges(sessionId)
+        applyHiddenRows(sessionId)
         setTargets((current) => sameTargets(current, found) ? current : found)
       }
       /** Run the next reconciliation on the next frame. */
@@ -559,7 +593,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     }, [sessionId])
 
     return h(React.Fragment, null, targets.map((target) => createPortal(
-      h(TurnActionButtons, { messageId: target.messageId, requestAction, useSession, t }),
+      h(QuestionActionButtons, { messageId: target.messageId, requestAction, useSession, t }),
       target.host,
       target.key,
     )))
@@ -579,15 +613,15 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
-   * The dialogs the turn actions open: the regeneration confirmation and the
+   * The dialogs the question actions open: the regeneration confirmation and the
    * editor.
-   * @param useTurnAction - the pending action as a hook.
+   * @param useQuestionAction - the pending action as a hook.
    * @param settle - dismisses the dialog.
    * @param reportNotice - shows the outcome of an operation.
    * @param t - this plugin's translate function.
    */
-  function TurnDialog({ useTurnAction, settle, reportNotice, t }) {
-    const action = useTurnAction((pending) => pending)
+  function ResendDialog({ useQuestionAction, settle, reportNotice, t }) {
+    const action = useQuestionAction((pending) => pending)
     const [draft, setDraft] = React.useState('')
     const [state, setState] = React.useState('idle')
     const [busy, setBusy] = React.useState(false)
@@ -604,7 +638,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
         setState('ready')
       }, (reason) => {
         if (!live) return
-        console.warn('better-session: reading the turn question failed:', reason)
+        console.warn('better-session: reading the question failed:', reason)
         setState('failed')
       })
       return () => {
@@ -615,7 +649,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     if (action === null) return null
 
     /**
-     * Run one turn operation and report what it did.
+     * Run one conversation operation and report what it did.
      * @param text - the replacement question, left out to reuse the original.
      * @param message - the notice of a finished operation.
      * @param interruptedMessage - the notice of an operation that interrupted a
@@ -624,11 +658,15 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     const run = (text, message, interruptedMessage) => {
       setBusy(true)
       settle()
-      regenerateTurn(action.sessionId, action.messageId, text).then((payload) => {
-        rememberHiddenRange(action.sessionId, payload.turn, payload.endTurn ?? payload.turn)
+      resendQuestion(action.sessionId, action.messageId, text).then((payload) => {
+        rememberRemoval(action.sessionId, {
+          turn: payload.turn,
+          endTurn: payload.endTurn ?? payload.turn,
+          messageId: action.messageId,
+        })
         reportNotice({ text: payload.interrupted === true ? interruptedMessage : message })
       }, (reason) => {
-        console.warn('better-session: the turn operation failed:', reason)
+        console.warn('better-session: the conversation operation failed:', reason)
         reportNotice({ text: failureText(reason, t), failed: true })
       })
     }
@@ -990,7 +1028,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   return {
     inject: ['slots', 'locale'],
     apply(ctx) {
-      const turnAction = createStore(null)
+      const questionAction = createStore(null)
       const compactionOpen = createStore(null)
       const notice = createStore(null)
       let notices = 0
@@ -1004,13 +1042,13 @@ font-family: inherit; font-size: 14px; line-height: 22px;
       ctx.effect(() => insertStyles(), 'better-session: styles')
       ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
         name: 'conversation.session.header.utilities',
-        id: 'dsh-better-session.turn-actions',
+        id: 'dsh-better-session.question-actions',
         order: 92,
         locale: NS,
         inject: (sessionId) => ({
-          requestAction: (action) => turnAction.set({ ...action, sessionId }),
+          requestAction: (action) => questionAction.set({ ...action, sessionId }),
         }),
-      }, UserTurnActions))
+      }, UserQuestionActions))
       ctx.slots.inject('conversation.input.left', () => ctx.slots.register({
         name: 'conversation.input.left',
         id: 'dsh-better-session.compaction',
@@ -1025,15 +1063,15 @@ font-family: inherit; font-size: 14px; line-height: 22px;
       }, CompactionTrigger))
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({
         name: 'shell.overlay',
-        id: 'dsh-better-session.turn-dialog',
+        id: 'dsh-better-session.question-dialog',
         order: 52,
         locale: NS,
         inject: () => ({
-          hooks: { turnAction },
-          settle: () => turnAction.set(null),
+          hooks: { questionAction },
+          settle: () => questionAction.set(null),
           reportNotice,
         }),
-      }, TurnDialog))
+      }, ResendDialog))
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({
         name: 'shell.overlay',
         id: 'dsh-better-session.compaction-dialog',
