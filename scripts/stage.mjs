@@ -1,15 +1,15 @@
 /**
- * Stage the bundle on npm.
+ * Publish the bundle on npm.
  *
  * The rows travel inside this package: they are `file:` dependencies, so the
  * tarball carries them and pnpm links them into the installed package's own
  * `node_modules`. Only this package is published.
  *
- * Staging defers the 2FA proof of presence to the approval step, so a token
- * without 2FA bypass can prepare a release that a person then approves on the
- * registry. A version the registry already serves, or already holds staged, is
- * skipped, so a retried tag run finishes the release instead of failing on the
- * version it prepared the first time.
+ * The script publishes directly when the credential may bypass
+ * proof-of-presence, and falls back to staged publishing (2FA deferred to a
+ * person approving on the registry) when the registry refuses. A version the
+ * registry already serves is a no-op, so a retried tag run finishes the
+ * release instead of failing on the version it published the first time.
  *
  * `NODE_AUTH_TOKEN` supplies the credential; this script never reads a token
  * itself and never writes one to disk.
@@ -79,9 +79,21 @@ const key = `${manifest.name}@${manifest.version}`
 
 if (publishedVersions(manifest.name).includes(manifest.version)) {
   console.log(`${key} is already published`)
-} else if (stagedVersions().has(key)) {
-  console.log(`${key} is already staged`)
 } else {
-  console.log(`staging ${key}`)
-  npm(['stage', 'publish', quoted(root), '--access', 'public'])
+  // Publish straight away when the credential is allowed to: a token that
+  // bypasses proof-of-presence finishes the release in CI. When the registry
+  // answers EOTP/E403, the same artifact is staged instead, and a person
+  // approves it with their second factor.
+  console.log(`publishing ${key}`)
+  try {
+    npm(['publish', quoted(root), '--access', 'public'])
+    console.log(`${key} is published`)
+  } catch {
+    if (stagedVersions().has(key)) {
+      console.log(`${key} is already staged`)
+    } else {
+      console.log(`staging ${key}`)
+      npm(['stage', 'publish', quoted(root), '--access', 'public'])
+    }
+  }
 }
