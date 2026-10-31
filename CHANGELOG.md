@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0
+## 0.4.1
 
 The pack takes over the remote-access row the upstream author retired — as this
 repository's own source tree, with its own tunnel binary.
