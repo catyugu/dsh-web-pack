@@ -125,7 +125,7 @@ function operations(ctx, state) {
       }
     }),
     readCompaction: async ({ sessionId }) => {
-      const defaults = controller.defaults()
+      const defaults = controller.defaultsFor(agentOf(ctx, sessionId))
       const own = await readSessionSettings(controller.home, sessionId)
       const global = await readGlobalSettings(controller.home)
       cache.set(sessionId, { settings: own ?? global })
@@ -139,7 +139,9 @@ function operations(ctx, state) {
       const submitted = compactionPayload(payload)
       const refusal = validateSettings(submitted)
       if (refusal !== undefined) throw new Refusal(400, refusal, `the compaction settings are refused: ${refusal}`)
-      const settings = normalizeSettings(submitted, controller.defaults())
+      const agent = agentOf(ctx, sessionId)
+      const defaults = controller.defaultsFor(agent)
+      const settings = normalizeSettings(submitted, defaults)
       try {
         await writeSessionSettings(controller.home, sessionId, settings)
       } catch (error) {
@@ -149,35 +151,48 @@ function operations(ctx, state) {
         throw error
       }
       cache.set(sessionId, { settings })
-      const agent = ctx.get('agents')?.get(sessionId)
       if (agent !== undefined) await applyTo(agent)
-      return { settings, defaults: controller.defaults(), overridden: true }
+      return { settings, defaults, overridden: true }
     },
     readGlobal: async () => {
-      const defaults = controller.defaults()
+      const defaults = controller.defaultsFor(undefined)
       const global = await readGlobalSettings(controller.home)
       return { settings: global ?? defaults, defaults, overridden: global !== undefined }
     },
     saveGlobal: async ({ payload }) => {
-      const refusal = validateSettings(compactionPayload(payload))
+      const submitted = compactionPayload(payload)
+      const refusal = validateSettings(submitted)
       if (refusal !== undefined) throw new Refusal(400, refusal, `the compaction settings are refused: ${refusal}`)
-      const settings = await writeGlobalSettings(controller.home, normalizeSettings(compactionPayload(payload), controller.defaults()))
+      const defaults = controller.defaultsFor(undefined)
+      const settings = await writeGlobalSettings(controller.home, normalizeSettings(submitted, defaults))
       cache.clear()
       await reapplyAll(ctx, cache, settingsFor, applyTo)
-      return { settings, defaults: controller.defaults(), overridden: true }
+      return { settings, defaults, overridden: true }
     },
   }
 }
 
 /**
+ * The agent that owns one session, when this process still holds it.
+ * @param ctx - Host context carrying the agents.
+ * @param sessionId - the session identity.
+ * @returns the agent, or undefined when the session is not live.
+ */
+function agentOf(ctx, sessionId) {
+  return ctx.get('agents')?.get(sessionId)
+}
+
+/**
  * The fields one compaction submission carries.
  * @param payload - the decoded body.
- * @returns the five settings.
+ * @returns the settings the submission names.
  */
 function compactionPayload(payload) {
   return {
     thresholdRatio: payload?.thresholdRatio,
     retainRatio: payload?.retainRatio,
+    retainTokens: payload?.retainTokens,
+    headroomTokens: payload?.headroomTokens,
     maxTokens: payload?.maxTokens,
     compactionRetries: payload?.compactionRetries,
     maxOverflowRetries: payload?.maxOverflowRetries,

@@ -57,8 +57,15 @@
     'compaction.thresholdRatio': '压缩阈值',
     'compaction.thresholdRatioHint': '上下文占用超过这个比例时开始压缩。',
     'compaction.range': '范围 {min} – {max}',
-    'compaction.retainRatio': '保留比例',
-    'compaction.retainRatioHint': '压缩后保留的最近上下文比例，必须小于压缩阈值。',
+    'compaction.retentionRatio': '保留比例',
+    'compaction.retentionRatioHint': '压缩后保留的最近上下文比例，必须小于压缩阈值。',
+    'compaction.retentionTokens': '保留 token 数',
+    'compaction.retentionTokensHint': '压缩后保留的最近上下文 token 数，按该模型的实际窗口判断是否合适。',
+    'compaction.unit': '保留方式',
+    'compaction.unitRatio': '比例',
+    'compaction.unitTokens': 'Token',
+    'compaction.headroomTokens': '压缩预留 token',
+    'compaction.headroomTokensHint': '判断压力时为输出和缓存预留的 token；越大越早开始压缩。',
     'compaction.maxTokens': '摘要最大 token',
     'compaction.maxTokensHint': '生成摘要时允许的最大输出 token 数。',
     'compaction.compactionRetries': '压缩重试次数',
@@ -70,8 +77,11 @@
     'compaction.saveFailed': '保存失败，请查看 Harness 日志。',
     'compaction.invalidThreshold': '压缩阈值必须在 0.3 – 0.9 之间。',
     'compaction.invalidRetain': '保留比例必须在 0.01 – 0.3 之间。',
+    'compaction.invalidRetainTokens': '保留 token 数必须在 256 – 1048576 之间。',
+    'compaction.retainFormConflict': '保留比例和保留 token 数只能填一个。',
     'compaction.retainAboveThreshold': '保留比例必须小于压缩阈值。',
-    'compaction.invalidMaxTokens': '摘要最大 token 必须在 256 – 65536 之间。',
+    'compaction.invalidHeadroomTokens': '压缩预留 token 必须在 0 – 1048576 之间。',
+    'compaction.invalidMaxTokens': '摘要最大 token 必须在 256 – 1048576 之间。',
     'compaction.invalidRetries': '重试次数必须在 0 – 10 之间。',
     'compaction.saved': '压缩配置已保存，从下一轮对话开始生效。',
     'compaction.reset': '恢复默认',
@@ -115,8 +125,15 @@
     'compaction.thresholdRatio': 'Compression threshold',
     'compaction.thresholdRatioHint': 'Compaction starts once the context passes this share of the window.',
     'compaction.range': 'Range {min} – {max}',
-    'compaction.retainRatio': 'Retained share',
-    'compaction.retainRatioHint': 'The share of recent context kept after compaction; it must stay below the threshold.',
+    'compaction.retentionRatio': 'Retained share',
+    'compaction.retentionRatioHint': 'The share of recent context kept after compaction; it must stay below the threshold.',
+    'compaction.retentionTokens': 'Retained tokens',
+    'compaction.retentionTokensHint': 'The token count of recent context kept after compaction; judge it against the model window.',
+    'compaction.unit': 'Retention unit',
+    'compaction.unitRatio': 'Share',
+    'compaction.unitTokens': 'Tokens',
+    'compaction.headroomTokens': 'Compaction headroom',
+    'compaction.headroomTokensHint': 'Tokens reserved for output and cache when pressure is priced; larger compacts earlier.',
     'compaction.maxTokens': 'Summary token cap',
     'compaction.maxTokensHint': 'The largest summary the compaction may produce.',
     'compaction.compactionRetries': 'Compaction retries',
@@ -128,8 +145,11 @@
     'compaction.saveFailed': 'Saving failed; check the Harness log.',
     'compaction.invalidThreshold': 'The threshold must be between 0.3 and 0.9.',
     'compaction.invalidRetain': 'The retained share must be between 0.01 and 0.3.',
+    'compaction.invalidRetainTokens': 'The retained token count must be between 256 and 1048576.',
+    'compaction.retainFormConflict': 'Set either the retained share or the retained tokens, never both.',
     'compaction.retainAboveThreshold': 'The retained share must stay below the threshold.',
-    'compaction.invalidMaxTokens': 'The summary cap must be between 256 and 65536.',
+    'compaction.invalidHeadroomTokens': 'The compaction headroom must be between 0 and 1048576.',
+    'compaction.invalidMaxTokens': 'The summary cap must be between 256 and 1048576.',
     'compaction.invalidRetries': 'The retry count must be between 0 and 10.',
     'compaction.saved': 'The compaction settings are saved and take effect from the next turn.',
     'compaction.reset': 'Reset',
@@ -177,6 +197,7 @@ color: var(--dsw-alias-label-tertiary); cursor: pointer;
 .dsm_rowSide { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .dsm_rowRange { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
 .dsm_number { flex: none; width: 108px; }
+.dsm_retentionControl { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .dsm_textarea {
 box-sizing: border-box; width: 100%; min-height: 128px; resize: vertical; padding: 8px 10px;
 border: 0.5px solid var(--dsw-alias-border-l3); border-radius: var(--dsw-radius-md);
@@ -771,6 +792,56 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
+   * The retained-context setting: one number written either as a share of the
+   * message budget or as a token count, chosen with the unit switch.
+   * @param mode - the form in force.
+   * @param label - the name of that form.
+   * @param hint - what that form means.
+   * @param range - the accepted range, written out for the reader.
+   * @param value - the current value.
+   * @param step - the step the field moves by.
+   * @param min - the smallest accepted value.
+   * @param max - the largest accepted value.
+   * @param disabled - whether the controls are locked.
+   * @param unitLabel - the accessible name of the unit switch.
+   * @param ratioLabel - the share unit.
+   * @param tokensLabel - the token unit.
+   * @param onMode - called with the requested form.
+   * @param onChange - called with the requested value.
+   */
+  function RetentionRow({ mode, label, hint, range, value, step, min, max, disabled, unitLabel, ratioLabel, tokensLabel, onMode, onChange }) {
+    return h('div', { className: 'dsm_row' },
+      h('div', { className: 'dsm_rowText' },
+        h('span', { className: 'dsm_rowLabel' }, label),
+        h('span', { className: 'dsm_rowHint' }, hint)),
+      h('div', { className: 'dsm_rowSide' },
+        h('div', { className: 'dsm_retentionControl' },
+          h(primitives.SegmentedControl, {
+            id: 'dsm-compaction-retention',
+            value: mode,
+            options: [
+              { value: 'ratio', label: ratioLabel },
+              { value: 'tokens', label: tokensLabel },
+            ],
+            onChange: onMode,
+            label: unitLabel,
+            disabled,
+          }),
+          h(primitives.Input, {
+            className: 'dsm_number',
+            type: 'number',
+            value,
+            step,
+            min,
+            max,
+            disabled,
+            'aria-label': label,
+            onChange: (event) => onChange(event.target.value),
+          })),
+        h('span', { className: 'dsm_rowRange' }, range)))
+  }
+
+  /**
    * Map a refused save onto its localized reason; anything else stays generic.
    * @param error - the refusal the Host answered with.
    * @param t - this plugin's translate function.
@@ -780,7 +851,10 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     const code = typeof error?.code === 'string' ? error.code : undefined
     if (code === 'invalid-threshold-ratio') return t('compaction.invalidThreshold')
     if (code === 'invalid-retain-ratio') return t('compaction.invalidRetain')
+    if (code === 'invalid-retain-tokens') return t('compaction.invalidRetainTokens')
+    if (code === 'retain-form-conflict') return t('compaction.retainFormConflict')
     if (code === 'retain-ratio-not-less-than-threshold') return t('compaction.retainAboveThreshold')
+    if (code === 'invalid-headroom-tokens') return t('compaction.invalidHeadroomTokens')
     if (code === 'invalid-max-tokens') return t('compaction.invalidMaxTokens')
     if (code === 'invalid-compaction-retries' || code === 'invalid-max-overflow-retries') return t('compaction.invalidRetries')
     if (code === 'session-not-stored') return t('compaction.sessionNotStored')
@@ -801,18 +875,55 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
-   * The five fields one save carries.
+   * The fields one save carries: the pressure threshold, one of the two
+   * retained-context forms, the headroom and summary budgets, and the retry
+   * counts.
    * @param settings - the settings as the fields hold them, strings included.
+   * @param mode - the retained-context form the panel shows.
    * @returns the body of a save.
    */
-  function compactionBody(settings) {
+  function compactionBody(settings, mode) {
+    const retention = mode === 'tokens'
+      ? { retainTokens: Math.trunc(Number(settings.retainTokens)) }
+      : { retainRatio: Number(settings.retainRatio) }
     return {
       thresholdRatio: Number(settings.thresholdRatio),
-      retainRatio: Number(settings.retainRatio),
+      ...retention,
+      headroomTokens: Math.trunc(Number(settings.headroomTokens)),
       maxTokens: Math.trunc(Number(settings.maxTokens)),
       compactionRetries: Math.trunc(Number(settings.compactionRetries)),
       maxOverflowRetries: Math.trunc(Number(settings.maxOverflowRetries)),
     }
+  }
+
+  /**
+   * The retained-context form one settings object uses.
+   * @param settings - the settings to read.
+   * @returns 'tokens' when the object carries a token count, otherwise 'ratio'.
+   */
+  function retentionModeOf(settings) {
+    return settings?.retainTokens !== undefined ? 'tokens' : 'ratio'
+  }
+
+  /**
+   * The number one retained-context form holds.
+   * @param settings - the settings to read.
+   * @param mode - the form to read.
+   * @returns the value, or undefined when the draft has not written it yet.
+   */
+  function retentionValue(settings, mode) {
+    return mode === 'tokens' ? settings.retainTokens : settings.retainRatio
+  }
+
+  /**
+   * The value a form starts from when the draft has none of its own.
+   * @param entry - the ready draft.
+   * @param mode - the form to seed.
+   * @returns the engine's value for that form, or its headroom as the token seed.
+   */
+  function retentionStart(entry, mode) {
+    if (mode === 'tokens') return entry.defaults.retainTokens ?? entry.settings.headroomTokens ?? 65536
+    return entry.defaults.retainRatio ?? 0.16
   }
 
   /**
@@ -828,17 +939,29 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     return {
       ...settings,
       thresholdRatio: rounded(settings.thresholdRatio),
-      retainRatio: rounded(settings.retainRatio),
+      ...(settings.retainRatio === undefined ? {} : { retainRatio: rounded(settings.retainRatio) }),
     }
   }
 
-  /** The settings fields, in the order the panel shows them. */
-  const COMPACTION_FIELDS = Object.freeze([    { key: 'thresholdRatio', label: 'compaction.thresholdRatio', hint: 'compaction.thresholdRatioHint', min: 0.3, max: 0.9, step: 0.01 },
-    { key: 'retainRatio', label: 'compaction.retainRatio', hint: 'compaction.retainRatioHint', min: 0.01, max: 0.3, step: 0.01 },
-    { key: 'maxTokens', label: 'compaction.maxTokens', hint: 'compaction.maxTokensHint', min: 256, max: 65536, step: 256 },
+  /** The pressure-threshold row, shown above the retained-context row. */
+  const THRESHOLD_FIELD = Object.freeze({
+    key: 'thresholdRatio', label: 'compaction.thresholdRatio', hint: 'compaction.thresholdRatioHint',
+    min: 0.3, max: 0.9, step: 0.01,
+  })
+
+  /** The number rows shown below the retained-context row. */
+  const COMPACTION_FIELDS = Object.freeze([
+    { key: 'headroomTokens', label: 'compaction.headroomTokens', hint: 'compaction.headroomTokensHint', min: 0, max: 1048576, step: 256 },
+    { key: 'maxTokens', label: 'compaction.maxTokens', hint: 'compaction.maxTokensHint', min: 256, max: 1048576, step: 256 },
     { key: 'compactionRetries', label: 'compaction.compactionRetries', hint: 'compaction.compactionRetriesHint', min: 0, max: 10, step: 1 },
     { key: 'maxOverflowRetries', label: 'compaction.maxOverflowRetries', hint: 'compaction.maxOverflowRetriesHint', min: 0, max: 10, step: 1 },
   ])
+
+  /** The range each retained-context form accepts. */
+  const RETENTION_BOUNDS = Object.freeze({
+    ratio: { min: 0.01, max: 0.3, step: 0.01 },
+    tokens: { min: 256, max: 1048576, step: 256 },
+  })
 
   /**
    * The compaction settings of one session, or of the whole install.
@@ -875,6 +998,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
             state: 'ready',
             settings: shownSettings(payload.settings),
             defaults: shownSettings(payload.defaults),
+            retentionMode: retentionModeOf(payload.settings),
           },
         }))
       }, (reason) => {
@@ -902,6 +1026,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
 
     const draft = drafts[scope]
     const ready = draft?.state === 'ready'
+    const retentionMode = draft?.retentionMode ?? 'ratio'
 
     /**
      * Replace one field of the draft in view.
@@ -917,13 +1042,37 @@ font-family: inherit; font-size: 14px; line-height: 22px;
       }
     })
 
+    /**
+     * Write the retained-context number in the form in force.
+     * @param mode - the form the field writes.
+     * @param value - the value the field holds.
+     */
+    const patchRetention = (mode, value) => patch(mode === 'tokens' ? 'retainTokens' : 'retainRatio', value)
+
+    /**
+     * Switch the retained-context form, seeding it from the engine's own value
+     * for that form the first time it is shown.
+     * @param nextMode - the form to show.
+     */
+    const switchRetention = (nextMode) => setDrafts((drafts) => {
+      const entry = drafts[scope]
+      if (entry?.state !== 'ready') return drafts
+      const current = entry.retentionMode ?? 'ratio'
+      if (current === nextMode) return drafts
+      const key = nextMode === 'tokens' ? 'retainTokens' : 'retainRatio'
+      const settings = entry.settings[key] === undefined
+        ? { ...entry.settings, [key]: retentionStart(entry, nextMode) }
+        : entry.settings
+      return { ...drafts, [scope]: { ...entry, settings, retentionMode: nextMode } }
+    })
+
     const save = () => {
       if (draft?.state !== 'ready') return
       setBusy(true)
       requestJson(compactionPath(scope, sessionId), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(compactionBody(draft.settings)),
+        body: JSON.stringify(compactionBody(draft.settings, retentionMode)),
       }).then(() => {
         setBusy(false)
         closeCompaction()
@@ -944,8 +1093,18 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     const restore = () => setDrafts((drafts) => {
       const entry = drafts[scope]
       if (entry?.state !== 'ready') return drafts
-      return { ...drafts, [scope]: { ...entry, settings: { ...entry.defaults } } }
+      return {
+        ...drafts,
+        [scope]: {
+          ...entry,
+          settings: { ...entry.defaults },
+          retentionMode: retentionModeOf(entry.defaults),
+        },
+      }
     })
+
+    const bounds = RETENTION_BOUNDS[retentionMode]
+    const retentionLabel = retentionMode === 'tokens' ? 'compaction.retentionTokens' : 'compaction.retentionRatio'
 
     const body = h(React.Fragment, null,
       h('div', { className: 'dsm_scope' },
@@ -964,18 +1123,48 @@ font-family: inherit; font-size: 14px; line-height: 22px;
         ? h('p', { className: 'dsm_rowHint' }, t('dialog.loading'))
         : draft.state === 'failed'
           ? h('p', { className: 'dsm_rowHint' }, t('dialog.loadFailed'))
-          : h('div', { className: 'dsm_rows' }, COMPACTION_FIELDS.map((field) => h(NumberRow, {
-            key: field.key,
-            label: t(field.label),
-            hint: t(field.hint),
-            range: t('compaction.range', { min: field.min, max: field.max }),
-            value: draft.settings[field.key],
-            step: field.step,
-            min: field.min,
-            max: field.max,
-            disabled: busy,
-            onChange: (value) => patch(field.key, value),
-          }))))
+          : h('div', { className: 'dsm_rows' },
+            h(NumberRow, {
+              key: THRESHOLD_FIELD.key,
+              label: t(THRESHOLD_FIELD.label),
+              hint: t(THRESHOLD_FIELD.hint),
+              range: t('compaction.range', { min: THRESHOLD_FIELD.min, max: THRESHOLD_FIELD.max }),
+              value: draft.settings[THRESHOLD_FIELD.key],
+              step: THRESHOLD_FIELD.step,
+              min: THRESHOLD_FIELD.min,
+              max: THRESHOLD_FIELD.max,
+              disabled: busy,
+              onChange: (value) => patch(THRESHOLD_FIELD.key, value),
+            }),
+            h(RetentionRow, {
+              key: 'retention',
+              mode: retentionMode,
+              label: t(retentionLabel),
+              hint: t(`${retentionLabel}Hint`),
+              range: t('compaction.range', { min: bounds.min, max: bounds.max }),
+              value: retentionValue(draft.settings, retentionMode),
+              step: bounds.step,
+              min: bounds.min,
+              max: bounds.max,
+              disabled: busy,
+              unitLabel: t('compaction.unit'),
+              ratioLabel: t('compaction.unitRatio'),
+              tokensLabel: t('compaction.unitTokens'),
+              onMode: switchRetention,
+              onChange: (value) => patchRetention(retentionMode, value),
+            }),
+            COMPACTION_FIELDS.map((field) => h(NumberRow, {
+              key: field.key,
+              label: t(field.label),
+              hint: t(field.hint),
+              range: t('compaction.range', { min: field.min, max: field.max }),
+              value: draft.settings[field.key],
+              step: field.step,
+              min: field.min,
+              max: field.max,
+              disabled: busy,
+              onChange: (value) => patch(field.key, value),
+            }))))
 
     return h(primitives.Modal, {
       open: true,

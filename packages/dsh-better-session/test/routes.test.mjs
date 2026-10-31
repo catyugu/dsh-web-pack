@@ -60,12 +60,14 @@ try {
   assert.equal(settings.status, 200, JSON.stringify(settings.body))
   assert.equal(settings.body.overridden, false)
   assert.equal(settings.body.settings.thresholdRatio, 0.8)
+  assert.equal(settings.body.settings.headroomTokens, 65536)
   assert.deepEqual(settings.body.defaults, settings.body.settings, 'an unpatched engine has no other defaults')
 
   // The global base is the second place a session can inherit from.
   const global = await call(host.routes, ROUTES.defaults, {
     thresholdRatio: 0.7,
     retainRatio: 0.2,
+    headroomTokens: 65536,
     maxTokens: 4096,
     compactionRetries: 1,
     maxOverflowRetries: 1,
@@ -76,6 +78,23 @@ try {
   assert.equal(inherited.body.settings.thresholdRatio, 0.7)
   assert.equal(inherited.body.overridden, false)
 
+  // The token form is a valid submission; a session without a directory refuses
+  // it after validation, not before.
+  const notStored = await request(host.routes, ROUTES.compaction, {
+    method: 'POST',
+    query: '?sessionId=session-turn',
+    body: {
+      thresholdRatio: 0.6,
+      retainTokens: 8192,
+      headroomTokens: 65536,
+      maxTokens: 4096,
+      compactionRetries: 1,
+      maxOverflowRetries: 1,
+    },
+  })
+  assert.equal(notStored.status, 409, JSON.stringify(notStored.body))
+  assert.equal(notStored.body.code, 'session-not-stored')
+
   // A submission outside a range is refused with the reason the dictionary knows.
   const refused = await request(host.routes, ROUTES.compaction, {
     method: 'POST',
@@ -83,6 +102,7 @@ try {
     body: {
       thresholdRatio: 0.95,
       retainRatio: 0.2,
+      headroomTokens: 65536,
       maxTokens: 4096,
       compactionRetries: 1,
       maxOverflowRetries: 1,
