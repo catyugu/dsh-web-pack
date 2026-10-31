@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.4
+
+The dialog says what it does: it sends the message again, it does not ask the
+question again.
+
+### Changed
+
+- `dsh-better-session` 0.3.4: both confirmation dialogs name the message and the
+  send. "This removes this message and everything after it, then sends the
+  message again." The editor variant says it sends the text below instead, and
+  the title, the reading hint and its failure line follow the same wording.
+- `dsh-session-cleanup` 0.3.4: unchanged code, released with the family.
+
 ## 0.3.3
 
 Re-sending a question removes that question, not the whole turn it lives in.

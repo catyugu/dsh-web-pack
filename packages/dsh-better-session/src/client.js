@@ -39,15 +39,15 @@
     'action.compaction': '上下文压缩配置',
     'dialog.close': '关闭',
     'dialog.cancel': '取消',
-    'dialog.regenerateTitle': '重新生成',
-    'dialog.regenerateDescription': '将删除这条提问及之后的所有内容，再用这条提问重新提问。',
+    'dialog.regenerateTitle': '重新生成这条消息',
+    'dialog.regenerateDescription': '将删除这条消息及之后的所有内容，然后重新发送这条消息。',
     'dialog.regenerateConfirm': '重新生成',
-    'dialog.editTitle': '编辑提问并重发',
-    'dialog.editDescription': '将删除这条提问及之后的所有内容，再用下面的文字重新提问。',
+    'dialog.editTitle': '编辑这条消息并重发',
+    'dialog.editDescription': '将删除这条消息及之后的所有内容，然后改为发送下面的文字。',
     'dialog.editConfirm': '重发',
     'dialog.running': '这个会话正在生成回答，确认后会先中断它。',
-    'dialog.loading': '正在读取这条提问…',
-    'dialog.loadFailed': '读取这条提问失败，请查看 Harness 日志。',
+    'dialog.loading': '正在读取这条消息…',
+    'dialog.loadFailed': '读取这条消息失败，请查看 Harness 日志。',
     'compaction.title': '上下文压缩配置',
     'compaction.scope': '配置范围',
     'compaction.scopeSession': '本会话',
@@ -97,15 +97,15 @@
     'action.compaction': 'Context compaction',
     'dialog.close': 'Close',
     'dialog.cancel': 'Cancel',
-    'dialog.regenerateTitle': 'Regenerate this question',
-    'dialog.regenerateDescription': 'This removes this question and everything after it, then asks the question again.',
+    'dialog.regenerateTitle': 'Regenerate this message',
+    'dialog.regenerateDescription': 'This removes this message and everything after it, then sends the message again.',
     'dialog.regenerateConfirm': 'Regenerate',
-    'dialog.editTitle': 'Edit the question and resend it',
-    'dialog.editDescription': 'This removes this question and everything after it, then asks the text below instead.',
+    'dialog.editTitle': 'Edit the message and resend it',
+    'dialog.editDescription': 'This removes this message and everything after it, then sends the text below instead.',
     'dialog.editConfirm': 'Resend',
     'dialog.running': 'This session is generating an answer; confirming interrupts it first.',
-    'dialog.loading': 'Reading this question…',
-    'dialog.loadFailed': 'Reading this question failed; check the Harness log.',
+    'dialog.loading': 'Reading this message…',
+    'dialog.loadFailed': 'Reading this message failed; check the Harness log.',
     'compaction.title': 'Context compaction',
     'compaction.scope': 'Configuration',
     'compaction.scopeSession': 'This session',
@@ -467,9 +467,9 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   }
 
   /**
-   * The actions of one question: ask it again, or ask it again with edited
+   * The actions of one message: send it again, or send it again with edited
    * words. Both run the same removal, so both live behind one confirmation.
-   * @param messageId - the question's message identity.
+   * @param messageId - the message identity.
    * @param requestAction - opens the dialog of the chosen action.
    * @param useSession - the session projection as a hook.
    * @param t - this plugin's translate function.

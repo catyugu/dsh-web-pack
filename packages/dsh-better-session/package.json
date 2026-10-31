@@ -1,6 +1,6 @@
 {
   "name": "@catyugu/dsh-better-session",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "type": "module",
   "description": "Regenerate or edit any question, and tune what the Harness compacts.",
   "license": "MIT",
