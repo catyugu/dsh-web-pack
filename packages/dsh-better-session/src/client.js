@@ -229,19 +229,32 @@ font-family: inherit; font-size: 14px; line-height: 22px;
    * remembers that question's identity: one turn can hold several questions the
    * user sent while the agent worked, and only the ones after the clicked one are
    * gone.
+   *
+   * A record written before this release names no question, because the page used
+   * to hide whole turns; it is read as such and rewritten in the current shape the
+   * next time a range is remembered.
    * @param sessionId - the session the ranges belong to.
-   * @returns the removed ranges, as `{ turn, endTurn, messageId }` records.
+   * @returns the removed ranges, as `{ turn, endTurn, messageId }` records, with
+   *   a null `messageId` for a range that covers whole turns.
    */
   function hiddenRemovals(sessionId) {
     try {
       const raw = window.localStorage.getItem(HIDDEN_KEY + sessionId)
       const parsed = raw === null ? [] : JSON.parse(raw)
       if (!Array.isArray(parsed)) return []
-      return parsed.filter((removal) => typeof removal === 'object' && removal !== null
-        && Number.isInteger(removal.turn)
-        && Number.isInteger(removal.endTurn)
-        && typeof removal.messageId === 'string'
-        && removal.messageId.length > 0)
+      const removals = []
+      for (const entry of parsed) {
+        if (Array.isArray(entry)) {
+          if (entry.length !== 2 || !entry.every(Number.isInteger)) continue
+          removals.push({ turn: entry[0], endTurn: entry[1], messageId: null })
+          continue
+        }
+        if (typeof entry !== 'object' || entry === null) continue
+        if (!Number.isInteger(entry.turn) || !Number.isInteger(entry.endTurn)) continue
+        if (typeof entry.messageId !== 'string' || entry.messageId.length === 0) continue
+        removals.push(entry)
+      }
+      return removals
     } catch {
       return []
     }
@@ -303,6 +316,7 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     if (turn > removal.endTurn) return false
     if (turn > removal.turn) return true
     if (turn < removal.turn) return false
+    if (removal.messageId === null) return true
     const anchor = anchors.get(removal.messageId)
     if (anchor === undefined) return false
     if (anchor === row) return true

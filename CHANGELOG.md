@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.3.2
+## 0.3.3
 
 Re-sending a question removes that question, not the whole turn it lives in.
 
 ### Fixed
 
-- `dsh-better-session` 0.3.2: input a user sends while the agent works is
+- `dsh-better-session` 0.3.3: input a user sends while the agent works is
   delivered inside the running turn, so one turn can hold several questions.
   Re-sending one of them removed the turn from its first question on, so the
   questions sent before it and every operation between them left the model
@@ -14,14 +14,21 @@ Re-sending a question removes that question, not the whole turn it lives in.
   removal now starts at the clicked question's own log position: the questions
   before it, and the work they caused, stay.
 - The replacement records which question its range starts at, and the page hides
-  rows from that question's row instead of hiding every row of the turn.
+  rows from that question's row instead of hiding every row of the turn. The
+  ranges this page remembered before the release still hide their turns: a record
+  without a question covers whole turns, and is rewritten with one the next time
+  a range is remembered.
 
 ### Changed
 
 - Re-sending a question is `POST /api/sessionManage/questions/resend`. The
   `/api/sessionManage/hidden` route, which no caller used and which answered
   every request with an error, is gone.
-- `dsh-session-cleanup` 0.3.2: unchanged code, released with the family.
+- `dsh-session-cleanup` 0.3.3: unchanged code, released with the family.
+
+## 0.3.2
+
+Not published: 0.3.3 carries everything this version was staged with.
 
 ## 0.3.1
 

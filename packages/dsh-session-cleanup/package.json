@@ -1,6 +1,6 @@
 {
   "name": "@catyugu/dsh-session-cleanup",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "description": "Delete sessions, clear archived ones, and reclaim attachment bytes.",
   "license": "MIT",
