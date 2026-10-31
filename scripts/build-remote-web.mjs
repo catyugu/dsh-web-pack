@@ -30,8 +30,13 @@ const packageDirectory = join(root, 'packages', 'dsh-remote-web')
 const source = join(packageDirectory, 'src')
 const manifest = JSON.parse(await readFile(join(packageDirectory, 'package.json'), 'utf8'))
 
-/** Packages the Harness provides at runtime and the build must not inline. */
-const HOST_EXTERNAL = ['@deepseek-ai/*', 'cloudflared', 'yaml', 'zod']
+/**
+ * The Host half is bundled self-contained: a row travels inside the pack's
+ * tarball, and pnpm does not install the nested `file:` dependencies of a
+ * tarball dependency, so every runtime import has to be inlined here. Node
+ * builtins stay external through `platform: 'node'`.
+ */
+const HOST_EXTERNAL = ['@deepseek-ai/cordis']
 /** Modules the shell's client module loader hands to the bundle. */
 const CLIENT_EXTERNAL = ['@deepseek-ai/*', 'react', 'react-dom', 'react-dom/client', 'react/jsx-runtime']
 
@@ -134,6 +139,13 @@ await build({
   target: 'node22',
   external: HOST_EXTERNAL,
   entryNames: '[name]',
+  // yaml ships CommonJS; inlining it into an ESM bundle leaves esbuild's
+  // `__require` shim without a real `require`, which throws at load time.
+  // One createRequire binding gives the inlined CJS the module loader it
+  // expects.
+  banner: {
+    js: "import { createRequire as __dshCreateRequire } from 'node:module';\nconst require = __dshCreateRequire(import.meta.url);",
+  },
   logLevel: 'warning',
 })
 

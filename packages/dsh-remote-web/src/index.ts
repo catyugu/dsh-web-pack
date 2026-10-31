@@ -23,7 +23,7 @@ import type {} from '@deepseek-ai/dsh-client-connection'
 import { DEFAULT_IDLE_EXPIRE_MS, PairingService, type PairingConfig } from './pairing/pairing.ts'
 import { dshHome } from './state/dsh-home.ts'
 import { isPairedDeviceRequest, makeGateListener } from './pairing/gate.ts'
-import { RemoteWebUiPairing } from './pairing/pairing-access.ts'
+import { providePairingAccess } from './pairing/pairing-access.ts'
 import { isTrustedApiRequest, makeRoutes } from './http/routes.ts'
 import { makeRemoteApiRoutes, makeRemoteApiUpgradeRoutes } from './http/remote-api.ts'
 import { startRemotePresencePet, type PresencePetSeam } from './pairing/remote-presence-pet.ts'
@@ -702,7 +702,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   ctx.effect(() => () => { clearTimeout(initialPostureTimer) }, 'remote-web-ui: posture probe boot')
   // Sibling plugins (dsh-better-sidebar, …) look this up by name. Absent when this
   // plugin is not installed; stop() / enabled=false still refuse cookies.
-  new RemoteWebUiPairing(ctx, (request) => {
+  providePairingAccess(ctx, (request) => {
     if (!resolve().enabled) return false
     return isPairedDeviceRequest(service, request)
   })

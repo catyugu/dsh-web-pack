@@ -28,6 +28,17 @@ repository's own source tree, with its own tunnel binary.
 - The row mounts as `web-pack-remote-web` from this pack's patch.
 - Sources are built from `src` by `scripts/build-remote-web.mjs` (esbuild plus a
   CSS-modules loader); the prebuilt upstream bundle is no longer vendored.
+- The row's Host half is bundled self-contained (schemastery, yaml and zod
+  inlined, no package imports). A row inside the pack's tarball has no
+  resolvable `node_modules` of its own, and pnpm does not install the nested
+  `file:` dependencies of a tarball dependency, so a row that imported a package
+  failed to mount on a clean install.
+
+### Fixed
+
+- The pairing service other plugins read through `ctx.get('remoteWebUiPairing')`
+  is registered with `ctx.provide` instead of a cordis `Service` subclass, which
+  removes the last runtime import the hosted row could not resolve.
 
 ### Removed
 

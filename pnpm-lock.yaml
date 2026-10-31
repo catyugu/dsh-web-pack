@@ -31,7 +31,7 @@ importers:
   packages/dsh-better-session: {}
 
   packages/dsh-remote-web:
-    dependencies:
+    devDependencies:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.4
         version: 3.18.5
