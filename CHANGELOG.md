@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.5
+
+The compaction panel tunes the policy the engine actually reads, and the pack
+states the Harness it runs on.
+
+### Added
+
+- Both rows declare `engines.dsh` (`>=0.2.1-rc.4 <0.3.0-0`). The Harness checks
+  that range before mounting a profile bundle, so a release it does not target
+  is refused instead of loading a row against APIs it does not have.
+
+### Changed
+
+- `dsh-better-session` 0.3.5: the panel edits the retained context as a share
+  of the message budget or as a token count, chosen with a unit switch, and
+  edits the compaction headroom beside the pressure threshold, the summary cap,
+  and the retry counts. Saving keeps the engine fields the panel does not own.
+- "Reset" shows the configuration of the engine the session actually steps
+  with, which belongs to its agent preset rather than to the profile-level
+  service, and a configuration the engine refuses is reported instead of
+  silently dropped.
+- The summary cap falls back to the engine's 65536 rather than 8192.
+- `dsh.client.external` no longer lists `react`, `react-dom` and the
+  primitives: they are platform-baseline modules the shell seeds.
+- `dsh-session-cleanup` 0.3.5: unchanged code, released with the family.
+
 ## 0.3.4
 
 The dialog says what it does: it sends the message again, it does not ask the
