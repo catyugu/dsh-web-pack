@@ -6,7 +6,8 @@
   "license": "MIT",
   "icon": "./icon.svg",
   "engines": {
-    "node": ">=22.15.0"
+    "node": ">=22.15.0",
+    "dsh": ">=0.2.1-rc.4 <0.3.0-0"
   },
   "meta": {
     "title": "dsh-better-session",
@@ -30,11 +31,6 @@
     "client": {
       "platform": "web",
       "immediately": true,
-      "external": [
-        "react",
-        "react-dom",
-        "@deepseek-ai/dsh-client-ui-primitives"
-      ],
       "inject": [
         "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-client-ui-sidebar",
