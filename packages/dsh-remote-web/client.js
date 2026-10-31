@@ -2286,20 +2286,6 @@ function BooleanField(props) {
   ] });
 }
 
-// packages/dsh-remote-web/src/client/entry/PhoneIcon.tsx
-var import_jsx_runtime3 = require("react/jsx-runtime");
-function PhoneIcon({ size = 16, className }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-    "path",
-    {
-      d: "M4.2 1.8h2.4l.9 2.4-1.5 1.1a7.4 7.4 0 0 0 4.7 4.7l1.1-1.5 2.4.9v2.4a.9.9 0 0 1-1 .9A11.4 11.4 0 0 1 3.3 2.8a.9.9 0 0 1 .9-1Z",
-      stroke: "currentColor",
-      strokeWidth: "1.3",
-      strokeLinejoin: "round"
-    }
-  ) });
-}
-
 // packages/dsh-remote-web/src/client/settings/settings-form.ts
 var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
 function numberField(field, constraints = {}) {
@@ -2570,7 +2556,7 @@ var CardForm = class {
 };
 
 // packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime3 = require("react/jsx-runtime");
 var RemoteSettingsCardController = class {
   form;
   store;
@@ -2580,14 +2566,12 @@ var RemoteSettingsCardController = class {
       booleanField("enabled"),
       numberField("tokenTtlMs"),
       numberField("offlineAfterMs"),
-      numberField("maxDevices"),
       numberField("idleExpireMs"),
       textField("cookieName"),
       booleanField("requirePairingForLan"),
       textField("publicBaseUrl"),
       booleanField("autoTunnel"),
       secretField("tunnelToken"),
-      booleanField("relay"),
       booleanField("lanBind")
     ]);
     this.store = this.form.bind(() => this.projection());
@@ -2598,14 +2582,12 @@ var RemoteSettingsCardController = class {
       enabled: this.form.field("enabled"),
       tokenTtlMs: this.form.field("tokenTtlMs"),
       offlineAfterMs: this.form.field("offlineAfterMs"),
-      maxDevices: this.form.field("maxDevices"),
       idleExpireMs: this.form.field("idleExpireMs"),
       cookieName: this.form.field("cookieName"),
       requirePairingForLan: this.form.field("requirePairingForLan"),
       publicBaseUrl: this.form.field("publicBaseUrl"),
       autoTunnel: this.form.field("autoTunnel"),
       tunnelToken: this.form.field("tunnelToken"),
-      relay: this.form.field("relay"),
       lanBind: this.form.field("lanBind")
     };
   }
@@ -2634,19 +2616,18 @@ function RemoteSettingsCard(props) {
     invalidLabel: t("settings.invalidNumber"),
     disabled
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
     PluginSettingsCard,
     {
       t,
       titleKey: "settings.title",
       descriptionKey: "settings.description",
-      icon: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(PhoneIcon, { size: 18 }),
-      defaultOpen: true,
+      defaultOpen: false,
       state,
       onSave: props.save,
       onDiscard: props.discard,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           BooleanField,
           {
             id: "settings-remote-enabled",
@@ -2665,7 +2646,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-token-ttl",
@@ -2682,7 +2663,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-offline",
@@ -2699,24 +2680,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-max-devices",
-            label: t("settings.maxDevices"),
-            hint: t("settings.maxDevicesHint"),
-            numeric: true,
-            ...fieldProps,
-            ...state.maxDevices,
-            onEdit: (text) => {
-              props.edit("maxDevices", text);
-            },
-            onReset: () => {
-              props.resetField("maxDevices");
-            }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-idle-expire",
@@ -2733,7 +2697,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-cookie",
@@ -2749,7 +2713,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           BooleanField,
           {
             id: "settings-remote-fence",
@@ -2768,7 +2732,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-public-base",
@@ -2785,7 +2749,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           BooleanField,
           {
             id: "settings-remote-auto-tunnel",
@@ -2804,7 +2768,7 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           ValueField,
           {
             id: "settings-remote-tunnel-token",
@@ -2821,27 +2785,8 @@ function RemoteSettingsCard(props) {
             }
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-          BooleanField,
-          {
-            id: "settings-remote-relay",
-            label: t("settings.relay"),
-            hint: t("settings.relayHint"),
-            inheritLabel: t("settings.inherit"),
-            onLabel: t("settings.on"),
-            offLabel: t("settings.off"),
-            ...fieldProps,
-            ...state.relay,
-            onEdit: (text) => {
-              props.edit("relay", text);
-            },
-            onReset: () => {
-              props.resetField("relay");
-            }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(LanBindStatus, { t }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(LanBindStatus, { t }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
           BooleanField,
           {
             id: "settings-remote-lan-bind",
@@ -2900,7 +2845,7 @@ function LanBindStatus({ t }) {
   if (frame.pendingRestart === true) {
     lines.push(t("lan.pendingRestart"));
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 2, fontSize: 12, lineHeight: "18px", opacity: 0.85 }, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { style: { wordBreak: "break-all" }, children: line }, index)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 2, fontSize: 12, lineHeight: "18px", opacity: 0.85 }, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { wordBreak: "break-all" }, children: line }, index)) });
 }
 
 // packages/dsh-remote-web/src/client/settings/settings-face.ts
@@ -2910,6 +2855,20 @@ function publishSettingsFace(face) {
 }
 function currentSettingsFace() {
   return published;
+}
+
+// packages/dsh-remote-web/src/client/entry/PhoneIcon.tsx
+var import_jsx_runtime4 = require("react/jsx-runtime");
+function PhoneIcon({ size = 16, className }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    "path",
+    {
+      d: "M4.2 1.8h2.4l.9 2.4-1.5 1.1a7.4 7.4 0 0 0 4.7 4.7l1.1-1.5 2.4.9v2.4a.9.9 0 0 1-1 .9A11.4 11.4 0 0 1 3.3 2.8a.9.9 0 0 1 .9-1Z",
+      stroke: "currentColor",
+      strokeWidth: "1.3",
+      strokeLinejoin: "round"
+    }
+  ) });
 }
 
 // packages/dsh-remote-web/src/client/entry/RemoteEntry.tsx
@@ -3231,7 +3190,7 @@ var zh = {
   "relay.failed": "\u56FA\u5B9A\u57DF\u540D\u540C\u6B65\u5931\u8D25\uFF1A{error}\u3002\u6B63\u5728\u81EA\u52A8\u91CD\u8BD5\uFF0C\u671F\u95F4\u4E8C\u7EF4\u7801\u53EF\u80FD\u4F7F\u7528\u4E34\u65F6\u5730\u5740\u3002",
   "close.label": "\u5173\u95ED\u8FDC\u7A0B\u8BBF\u95EE\u9762\u677F",
   // 插件设置卡片（家族 list 席位，或官方 plugins.bundle.config 席位）。
-  "settings.title": "\u8FDC\u7A0B\u8BBF\u95EE",
+  "settings.title": "\u8FDC\u7A0B\u8FDE\u63A5\u8BBE\u7F6E",
   "settings.description": "\u624B\u673A\u914D\u5BF9\u3001\u516C\u7F51\u96A7\u9053\u4E0E\u8BBE\u5907\u9650\u989D\u3002",
   "settings.enabled": "\u542F\u7528\u8FDC\u7A0B\u8BBF\u95EE",
   "settings.enabledHint": "\u5173\u95ED\u540E\u79FB\u9664\u4FA7\u8FB9\u680F\u5165\u53E3\u5E76\u505C\u7528\u914D\u5BF9\u8DEF\u7531\u4E0E\u5C40\u57DF\u7F51\u6805\u680F\u3002",
@@ -3239,8 +3198,6 @@ var zh = {
   "settings.tokenTtlMsHint": "\u65B0\u751F\u6210\u7684\u4E8C\u7EF4\u7801\u94FE\u63A5\u5728\u6B64\u65F6\u95F4\u540E\u5931\u6548\u3002",
   "settings.offlineAfterMs": "\u8BBE\u5907\u79BB\u7EBF\u5224\u5B9A\uFF08\u6BEB\u79D2\uFF09",
   "settings.offlineAfterMsHint": "\u914D\u5BF9\u8BBE\u5907\u8D85\u8FC7\u8BE5\u65F6\u957F\u672A\u4E0A\u62A5\u5FC3\u8DF3\u5373\u89C6\u4E3A\u79BB\u7EBF\u3002",
-  "settings.maxDevices": "\u5DF2\u914D\u5BF9\u8BBE\u5907\u4E0A\u9650",
-  "settings.maxDevicesHint": "\u8D85\u8FC7\u4E0A\u9650\u65F6\u6DD8\u6C70\u6700\u65E7\u7684\u8BBE\u5907\u4F1A\u8BDD\u3002",
   "settings.idleExpireMs": "\u7A7A\u95F2\u8FC7\u671F\uFF08\u6BEB\u79D2\uFF09",
   "settings.idleExpireMsHint": "\u8D85\u8FC7\u8BE5\u65F6\u957F\u6CA1\u6709\u4EFB\u4F55\u5FC3\u8DF3\u6216\u8BF7\u6C42\u7684\u5DF2\u914D\u5BF9\u8BBE\u5907\u4F1A\u88AB\u5220\u9664\uFF0C\u5FC5\u987B\u91CD\u65B0\u626B\u7801\u3002\u9ED8\u8BA4 7 \u5929\u3002",
   "settings.cookieName": "\u8BBE\u5907 Cookie \u540D",
@@ -3253,8 +3210,6 @@ var zh = {
   "settings.autoTunnelHint": "\u5F00\u542F\u540E\u63D2\u4EF6\u81EA\u52A8\u542F\u52A8 Cloudflare quick tunnel\uFF08\u65E0\u9700\u5B89\u88C5\u4EFB\u4F55\u5DE5\u5177\uFF09\uFF0C\u5E76\u81EA\u52A8\u66F4\u65B0\u516C\u7F51\u5730\u5740\u4E0E\u4FE1\u4EFB\u914D\u7F6E\uFF0C\u624B\u673A\u968F\u65F6\u53EF\u7528\u516C\u7F51\u914D\u5BF9\uFF1B\u6CE8\u610F\u4E34\u65F6\u57DF\u540D\u6BCF\u6B21\u91CD\u542F\u90FD\u4F1A\u53D8\u5316\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u626B\u7801\u3002\u5F00\u542F\u65F6\u5FFD\u7565\u4E0B\u65B9\u56FA\u5B9A\u96A7\u9053\u4EE4\u724C\u4E0E\u4E0A\u65B9\u624B\u52A8\u516C\u7F51\u5730\u5740\u3002",
   "settings.tunnelToken": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\u4EE4\u724C\uFF08Cloudflare Tunnel\uFF09",
   "settings.tunnelTokenHint": '\u586B\u5165 Cloudflare \u547D\u540D\u96A7\u9053\u7684 Token\uFF08\u5373 cloudflared tunnel run --token \u7684\u503C\uFF09\uFF0C\u63D2\u4EF6\u4F1A\u81EA\u52A8\u8FD0\u884C\u8BE5\u96A7\u9053\uFF1A\u516C\u5171\u4E3B\u673A\u540D\u56FA\u5B9A\u4E0D\u53D8\uFF0C\u624B\u673A\u914D\u5BF9\u4E00\u6B21\u540E\u91CD\u542F\u4E5F\u65E0\u9700\u91CD\u65B0\u914D\u5BF9\u3002\u9700\u5148\u5728 Cloudflare \u63A7\u5236\u53F0\u628A\u516C\u5171\u4E3B\u673A\u540D\u6620\u5C04\u5230 http://127.0.0.1:<\u7AEF\u53E3>\uFF0C\u5E76\u5728\u4E0A\u65B9"\u516C\u7F51\u5730\u5740"\u586B\u5199\u540C\u4E00\u57DF\u540D\u3002\u4F18\u5148\u7EA7\u4F4E\u4E8E"\u81EA\u52A8\u516C\u7F51\u96A7\u9053"\u3002',
-  "settings.relay": "\u56FA\u5B9A\u57DF\u540D\u4E2D\u7EE7\uFF08\u63A8\u8350\u5F00\u542F\uFF09",
-  "settings.relayHint": '\u5F00\u542F\u540E\u81EA\u52A8\u96A7\u9053\u4F1A\u989D\u5916\u6CE8\u518C\u4E00\u4E2A\u56FA\u5B9A\u4E0D\u53D8\u7684\u516C\u7F51\u5B50\u57DF\u540D\uFF08<id>.dsh-market.com\uFF0C\u7531 dsh-market \u8FB9\u7F18\u4E2D\u7EE7\u5230\u4F60\u7684\u4E34\u65F6\u96A7\u9053\uFF09\uFF0C\u624B\u673A\u914D\u5BF9\u4E00\u6B21\u540E\u91CD\u542F\u65E0\u9700\u91CD\u65B0\u626B\u7801\uFF0C\u4E8C\u7EF4\u7801\u4E0E\u4E66\u7B7E\u5730\u5740\u6C38\u8FDC\u4E0D\u53D8\u3002\u6D41\u91CF\u7ECF\u7531 dsh-market \u8FB9\u7F18\u8F6C\u53D1\uFF08\u4E0E\u4E34\u65F6\u96A7\u9053\u76F8\u540C\u7684\u4FE1\u4EFB\u9762\uFF09\uFF1B\u5173\u95ED\u5219\u56DE\u9000\u4E3A\u7EAF\u4E34\u65F6\u5730\u5740\uFF0C\u6BCF\u6B21\u91CD\u542F\u9700\u91CD\u65B0\u914D\u5BF9\u3002\u4EC5\u5BF9"\u81EA\u52A8\u516C\u7F51\u96A7\u9053"\u751F\u6548\u3002',
   "settings.lanBind": "\u5C40\u57DF\u7F51\u8BBF\u95EE\uFF08\u7ED1\u5B9A 0.0.0.0\uFF09",
   "settings.lanBindHint": "\u5F00\u542F\u540E\u63D2\u4EF6\u628A\u7ED1\u5B9A\u9ED8\u8BA4\u6539\u5199\u4E3A 0.0.0.0 \u5E76\u5199\u5165 profile \u8865\u4E01\uFF08\u663E\u5F0F --host \u4ECD\u4F18\u5148\uFF09\uFF0C\u540C\u65F6\u7EF4\u62A4\u4E3B\u673A\u9632\u706B\u5899\u653E\u884C\uFF08Windows/Linux\uFF1BmacOS \u65E0\u9700\u7BA1\u7406\uFF09\uFF1B\u5173\u95ED\u56DE\u9000 127.0.0.1\u3002\u7ED1\u5B9A\u53D8\u5316\u901A\u5E38\u5728\u91CD\u542F dsh web \u540E\u751F\u6548\u3002",
   "lan.cardTitle": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
@@ -3352,7 +3307,7 @@ var en = {
   "relay.failed": "Stable-hostname sync failed: {error}. Retrying automatically; the QR may use the ephemeral address meanwhile.",
   "close.label": "Close remote access panel",
   // Plugin settings card (the family list seat, or the official bundle-config seat).
-  "settings.title": "Remote access",
+  "settings.title": "Remote connection settings",
   "settings.description": "Phone pairing, public tunnel and device limits.",
   "settings.enabled": "Enable remote access",
   "settings.enabledHint": "When off, the sidebar entry is removed and pairing routes plus the LAN fence stop.",
@@ -3360,8 +3315,6 @@ var en = {
   "settings.tokenTtlMsHint": "How long a minted QR link stays valid before it dies.",
   "settings.offlineAfterMs": "Device offline threshold (ms)",
   "settings.offlineAfterMsHint": "A paired device flips to offline when it has not been seen for this long.",
-  "settings.maxDevices": "Paired device cap",
-  "settings.maxDevicesHint": "Hard cap on paired device sessions; the oldest is evicted when full.",
   "settings.idleExpireMs": "Idle expiry (ms)",
   "settings.idleExpireMsHint": "A paired device with no heartbeat or request for this long is deleted and must scan again. Default is 7 days.",
   "settings.cookieName": "Device cookie name",
@@ -3374,8 +3327,6 @@ var en = {
   "settings.autoTunnelHint": "When on, the plugin runs its own Cloudflare quick tunnel (no tool installation needed) and keeps the public address and trust config in sync automatically, so a phone anywhere can pair at any time; note the ephemeral hostname changes on every restart, so phones must scan again. The named-tunnel token below and the manual public address above are ignored while this is on.",
   "settings.tunnelToken": "Fixed-hostname tunnel token (Cloudflare Tunnel)",
   "settings.tunnelTokenHint": "Paste a Cloudflare named-tunnel token (the value of cloudflared tunnel run --token) and the plugin runs the tunnel itself: the public hostname stays fixed, so a phone pairs once and never again across restarts. First map the public hostname to http://127.0.0.1:<port> in the Cloudflare dashboard and enter the same hostname as the public address above. Lower precedence than the auto quick tunnel.",
-  "settings.relay": "Stable-hostname relay (recommended)",
-  "settings.relayHint": "When on, the auto tunnel additionally registers a never-changing public subdomain (<id>.dsh-market.com, relayed by the dsh-market edge to your ephemeral tunnel), so a phone pairs once and the QR and bookmark stay valid across restarts. Traffic transits the dsh-market edge (the same trust point as the ephemeral tunnel); turn off to fall back to the raw ephemeral address, which needs re-pairing after every restart. Applies to the auto public tunnel only.",
   "settings.lanBind": "LAN access (bind 0.0.0.0)",
   "settings.lanBindHint": "When on, the plugin writes a managed block into the profile patch defaulting the bind to 0.0.0.0 (an explicit --host flag still wins), and maintains the matching host firewall rule (Windows/Linux; other platforms need none). When off, the block pins 127.0.0.1. The bind change usually takes effect after dsh web restarts.",
   "lan.cardTitle": "LAN access",

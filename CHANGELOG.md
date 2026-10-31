@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.2
+
+The row's settings are one collapsible section, titled for what it configures,
+and the two knobs nobody needs are gone.
+
+### Changed
+
+- The settings section inside the pairing popup is titled "远程连接设置" /
+  "Remote connection settings" and starts collapsed. It carries no icon, so the
+  section reads as one more block of the popup rather than a second surface.
+
+### Removed
+
+- The paired-device cap. Pairing no longer evicts the oldest device when a new
+  one is admitted; sessions end by idle expiry or explicit revocation.
+- The stable-hostname relay switch. The relay is what makes a quick tunnel's
+  address survive a restart, so it is no longer something a user has to find
+  and turn on.
+
 ## 0.4.1
 
 The pack takes over the remote-access row the upstream author retired — as this

@@ -147,8 +147,6 @@ export interface PairingConfig {
   tokenTtlMs: number
   /** A device is "online" while its lastSeenAt is newer than this. */
   offlineAfterMs: number
-  /** Hard cap on paired device sessions (oldest-evicted when full). */
-  maxDevices: number
   /** Cookie name carrying the device id. */
   cookieName: string
   /**
@@ -249,13 +247,9 @@ export class PairingService {
    * or missing file is tolerated (an empty device table, never a throw) —
    * persistence is an availability convenience, not a security boundary.
    *
-   * Every still-valid session is restored, deliberately without applying
-   * `maxDevices`: the constructor runs with whatever cap the configuration
-   * layer has delivered so far (the schema default until the saved settings
-   * row is applied), and trimming here would permanently drop authorizations
-   * the user never revoked — the trimmed table reaches disk on the next
-   * heartbeat/sweep write. The cap is enforced where a device is admitted
-   * (see `accept`), against the configuration in force at that moment.
+   * Every still-valid session is restored; nothing is trimmed here, because
+   * the store has no cap to trim against — an authorization the user never
+   * revoked stays until it idles out.
    */
   private loadPersisted(): void {
     const file = this.config.devicesFile
@@ -456,19 +450,6 @@ export class PairingService {
     }
     const deviceId = this.clock.randomToken()
     const now = this.clock.now()
-    // FIFO-evict until a slot is free. The loop (not a single delete) covers a
-    // table that is already over the cap: restore keeps every persisted session
-    // (see loadPersisted), so the excess is collected here, once the store is
-    // actually asked to admit a new device, rather than at startup on a cap the
-    // configuration may not have delivered yet.
-    while (this.devices.size >= this.config.maxDevices) {
-      let oldest: { id: string; createdAt: number } | undefined
-      for (const [id, session] of this.devices) {
-        if (oldest === undefined || session.createdAt < oldest.createdAt) oldest = { id, createdAt: session.createdAt }
-      }
-      if (oldest === undefined) break
-      this.devices.delete(oldest.id)
-    }
     const label = sanitizeUserAgent(userAgent)
     this.devices.set(deviceId, {
       createdAt: now,

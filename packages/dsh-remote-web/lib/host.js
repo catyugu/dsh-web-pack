@@ -8296,13 +8296,9 @@ var PairingService = class {
    * or missing file is tolerated (an empty device table, never a throw) —
    * persistence is an availability convenience, not a security boundary.
    *
-   * Every still-valid session is restored, deliberately without applying
-   * `maxDevices`: the constructor runs with whatever cap the configuration
-   * layer has delivered so far (the schema default until the saved settings
-   * row is applied), and trimming here would permanently drop authorizations
-   * the user never revoked — the trimmed table reaches disk on the next
-   * heartbeat/sweep write. The cap is enforced where a device is admitted
-   * (see `accept`), against the configuration in force at that moment.
+   * Every still-valid session is restored; nothing is trimmed here, because
+   * the store has no cap to trim against — an authorization the user never
+   * revoked stays until it idles out.
    */
   loadPersisted() {
     const file2 = this.config.devicesFile;
@@ -8484,14 +8480,6 @@ var PairingService = class {
     }
     const deviceId = this.clock.randomToken();
     const now = this.clock.now();
-    while (this.devices.size >= this.config.maxDevices) {
-      let oldest;
-      for (const [id, session] of this.devices) {
-        if (oldest === void 0 || session.createdAt < oldest.createdAt) oldest = { id, createdAt: session.createdAt };
-      }
-      if (oldest === void 0) break;
-      this.devices.delete(oldest.id);
-    }
     const label = sanitizeUserAgent(userAgent);
     this.devices.set(deviceId, {
       createdAt: now,
@@ -30954,7 +30942,6 @@ var REMOTE_WEB_UI_SETTINGS_NAMESPACE = "remote-web-ui";
 var Config = Schema.object({
   tokenTtlMs: Schema.number().step(1).min(6e4).default(10 * 6e4).volatile(),
   offlineAfterMs: Schema.number().step(1).min(5e3).default(25e3).volatile(),
-  maxDevices: Schema.number().step(1).min(1).max(64).default(4).volatile(),
   idleExpireMs: Schema.number().step(1).min(6e4).default(DEFAULT_IDLE_EXPIRE_MS).volatile(),
   cookieName: Schema.string().min(1).default("dsh_pair").volatile(),
   requirePairingForLan: Schema.boolean().default(true).volatile(),
@@ -30963,7 +30950,6 @@ var Config = Schema.object({
   devicesFile: Schema.string(),
   autoTunnel: Schema.boolean().default(false).volatile(),
   tunnelToken: Schema.string().role("secret").volatile(),
-  relay: Schema.boolean().default(true).volatile(),
   lanBind: Schema.boolean().volatile(),
   profile: Schema.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
   enabled: Schema.boolean().default(true).volatile()
@@ -30988,7 +30974,6 @@ function pairingConfigOf(resolved) {
   return {
     tokenTtlMs: resolved.tokenTtlMs,
     offlineAfterMs: resolved.offlineAfterMs,
-    maxDevices: resolved.maxDevices,
     idleExpireMs: resolved.idleExpireMs,
     cookieName: resolved.cookieName,
     devicesFile: resolved.devicesFile
@@ -31000,7 +30985,6 @@ function defaultDevicesFile(home = dshHome()) {
 var DEFAULTS = {
   tokenTtlMs: 10 * 6e4,
   offlineAfterMs: 25e3,
-  maxDevices: 4,
   idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
   cookieName: "dsh_pair",
   requirePairingForLan: true,
@@ -31009,7 +30993,6 @@ var DEFAULTS = {
   devicesFile: defaultDevicesFile(),
   autoTunnel: false,
   tunnelToken: void 0,
-  relay: true,
   lanBind: void 0,
   profile: resolveManagedProfile(void 0, void 0, process.env.DSH_PROFILE),
   enabled: true
@@ -31024,7 +31007,6 @@ function applyImpl(ctx, config2) {
   const resolve3 = () => ({
     tokenTtlMs: readConfigField(config2?.tokenTtlMs, DEFAULTS.tokenTtlMs),
     offlineAfterMs: readConfigField(config2?.offlineAfterMs, DEFAULTS.offlineAfterMs),
-    maxDevices: readConfigField(config2?.maxDevices, DEFAULTS.maxDevices),
     idleExpireMs: readConfigField(config2?.idleExpireMs, DEFAULTS.idleExpireMs),
     cookieName: readConfigField(config2?.cookieName, DEFAULTS.cookieName),
     requirePairingForLan: readConfigField(config2?.requirePairingForLan, DEFAULTS.requirePairingForLan),
@@ -31033,7 +31015,6 @@ function applyImpl(ctx, config2) {
     devicesFile: readConfigField(config2?.devicesFile, DEFAULTS.devicesFile),
     autoTunnel: readConfigField(config2?.autoTunnel, DEFAULTS.autoTunnel),
     tunnelToken: readOptionalConfigField(config2?.tunnelToken),
-    relay: readConfigField(config2?.relay, DEFAULTS.relay),
     lanBind: readOptionalConfigField(config2?.lanBind),
     profile: resolveManagedProfile(readOptionalConfigField(config2?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
     enabled: readConfigField(config2?.enabled, DEFAULTS.enabled)
@@ -31055,7 +31036,6 @@ function applyImpl(ctx, config2) {
     registrar.dispose();
   };
   const ensureRelayRegistrar = () => {
-    if (resolve3().relay === false) return void 0;
     if (relayRegistrar === void 0) {
       try {
         const identity = loadRelayIdentity(resolve3().profile);
@@ -31334,9 +31314,6 @@ function applyImpl(ctx, config2) {
     if (plan.mode !== "quick") {
       disposeRelayRegistrar();
       if (plan.mode !== "named") publicBase.refresh();
-    } else if (value.relay === false) {
-      disposeRelayRegistrar(true);
-      publicBase.refresh();
     } else if (liveTunnelUrl !== void 0) {
       const registrar = ensureRelayRegistrar();
       if (registrar !== void 0) announceRelay(registrar, liveTunnelUrl);

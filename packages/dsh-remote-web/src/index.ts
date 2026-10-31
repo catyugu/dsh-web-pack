@@ -97,8 +97,6 @@ export interface Config {
   tokenTtlMs?: number
   /** A device is "online" while its lastSeenAt is newer than this (ms). */
   offlineAfterMs?: number
-  /** Hard cap on paired device sessions (oldest evicted when full). */
-  maxDevices?: number
   /**
    * Idle sessions older than this (ms) are deleted from memory and disk.
    * Default is 30 days; a leftover cookie no longer authorizes after expiry.
@@ -172,16 +170,6 @@ export interface Config {
    */
   tunnelToken?: string
   /**
-   * Stable-origin relay: when on (default), the quick tunnel is fronted by a
-   * fixed `https://<id>.dsh-market.com` subdomain (the dsh-market worker's
-   * registry), so the phone's bookmark and pairing cookie survive `dsh web`
-   * restarts without any user setup. Traffic transits the dsh-market edge
-   * (the same trust point as the quick tunnel itself); turn off to fall back
-   * to the raw ephemeral quick URL. Named tunnels keep their dashboard
-   * hostname and never touch the relay.
-   */
-  relay?: boolean
-  /**
    * LAN bind toggle. When the user flips it (true or false) the plugin
    * writes the managed webserver block into the profile patch — true pins
    * the bind default to 0.0.0.0 (an explicit --host flag still wins), false
@@ -232,7 +220,6 @@ export interface Config {
 export const Config = z.object({
   tokenTtlMs: z.number().step(1).min(60_000).default(10 * 60_000).volatile(),
   offlineAfterMs: z.number().step(1).min(5_000).default(25_000).volatile(),
-  maxDevices: z.number().step(1).min(1).max(64).default(4).volatile(),
   idleExpireMs: z.number().step(1).min(60_000).default(DEFAULT_IDLE_EXPIRE_MS).volatile(),
   cookieName: z.string().min(1).default('dsh_pair').volatile(),
   requirePairingForLan: z.boolean().default(true).volatile(),
@@ -241,7 +228,6 @@ export const Config = z.object({
   devicesFile: z.string(),
   autoTunnel: z.boolean().default(false).volatile(),
   tunnelToken: z.string().role('secret').volatile(),
-  relay: z.boolean().default(true).volatile(),
   lanBind: z.boolean().volatile(),
   profile: z.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
   enabled: z.boolean().default(true).volatile(),
@@ -281,7 +267,6 @@ type ConfigField<T> = ConfigRef<T> | T
 export interface ResolvedConfigFields {
   tokenTtlMs?: ConfigField<number>
   offlineAfterMs?: ConfigField<number>
-  maxDevices?: ConfigField<number>
   idleExpireMs?: ConfigField<number>
   cookieName?: ConfigField<string>
   requirePairingForLan?: ConfigField<boolean>
@@ -290,7 +275,6 @@ export interface ResolvedConfigFields {
   devicesFile?: ConfigField<string>
   autoTunnel?: ConfigField<boolean>
   tunnelToken?: ConfigField<string>
-  relay?: ConfigField<boolean>
   lanBind?: ConfigField<boolean>
   profile?: ConfigField<string>
   enabled?: ConfigField<boolean>
@@ -326,12 +310,11 @@ function readOptionalConfigField<T>(field: ConfigField<T> | undefined): T | unde
  */
 export function pairingConfigOf(resolved: Pick<
   ResolvedConfig,
-  'tokenTtlMs' | 'offlineAfterMs' | 'maxDevices' | 'idleExpireMs' | 'cookieName' | 'devicesFile'
+  'tokenTtlMs' | 'offlineAfterMs' | 'idleExpireMs' | 'cookieName' | 'devicesFile'
 >): PairingConfig {
   return {
     tokenTtlMs: resolved.tokenTtlMs,
     offlineAfterMs: resolved.offlineAfterMs,
-    maxDevices: resolved.maxDevices,
     idleExpireMs: resolved.idleExpireMs,
     cookieName: resolved.cookieName,
     devicesFile: resolved.devicesFile,
@@ -347,7 +330,6 @@ export function defaultDevicesFile(home: string = dshHome()): string {
 const DEFAULTS: ResolvedConfig = {
   tokenTtlMs: 10 * 60_000,
   offlineAfterMs: 25_000,
-  maxDevices: 4,
   idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
   cookieName: 'dsh_pair',
   requirePairingForLan: true,
@@ -356,7 +338,6 @@ const DEFAULTS: ResolvedConfig = {
   devicesFile: defaultDevicesFile(),
   autoTunnel: false,
   tunnelToken: undefined,
-  relay: true,
   lanBind: undefined,
   profile: resolveManagedProfile(undefined, undefined, process.env.DSH_PROFILE),
   enabled: true,
@@ -393,7 +374,6 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   const resolve = (): ResolvedConfig => ({
     tokenTtlMs: readConfigField(config?.tokenTtlMs, DEFAULTS.tokenTtlMs),
     offlineAfterMs: readConfigField(config?.offlineAfterMs, DEFAULTS.offlineAfterMs),
-    maxDevices: readConfigField(config?.maxDevices, DEFAULTS.maxDevices),
     idleExpireMs: readConfigField(config?.idleExpireMs, DEFAULTS.idleExpireMs),
     cookieName: readConfigField(config?.cookieName, DEFAULTS.cookieName),
     requirePairingForLan: readConfigField(config?.requirePairingForLan, DEFAULTS.requirePairingForLan),
@@ -402,7 +382,6 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     devicesFile: readConfigField(config?.devicesFile, DEFAULTS.devicesFile),
     autoTunnel: readConfigField(config?.autoTunnel, DEFAULTS.autoTunnel),
     tunnelToken: readOptionalConfigField(config?.tunnelToken),
-    relay: readConfigField(config?.relay, DEFAULTS.relay),
     lanBind: readOptionalConfigField(config?.lanBind),
     profile: resolveManagedProfile(readOptionalConfigField(config?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
     enabled: readConfigField(config?.enabled, DEFAULTS.enabled),
@@ -444,7 +423,6 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     registrar.dispose()
   }
   const ensureRelayRegistrar = (): RelayRegistrar | undefined => {
-    if (resolve().relay === false) return undefined
     if (relayRegistrar === undefined) {
       try {
         const identity = loadRelayIdentity(resolve().profile)
@@ -853,11 +831,6 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       // dashboard hostname and the off mode has no public base at all.
       disposeRelayRegistrar()
       if (plan.mode !== 'named') publicBase.refresh()
-    } else if (value.relay === false) {
-      // The relay toggle is off: no stable origin, the raw quick URL is the
-      // QR base exactly as before the relay existed.
-      disposeRelayRegistrar(true)
-      publicBase.refresh()
     } else if (liveTunnelUrl !== undefined) {
       // The relay just turned on (or the registrar is new) while the tunnel
       // already runs: announce now — no phase event will fire for an
