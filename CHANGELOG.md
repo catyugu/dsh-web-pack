@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.3
+
+The card's subtitle stops promising a device limit the row no longer has.
+
+### Changed
+
+- The settings section inside the pairing popup is titled "远程连接设置" /
+  "Remote connection settings", starts collapsed, and carries no icon, so it
+  reads as one more block of the popup rather than a second surface. Its
+  subtitle names what it actually governs: pairing, the public tunnel and LAN
+  access.
+
+### Removed
+
+- The paired-device cap. Pairing no longer evicts the oldest device when a new
+  one is admitted; sessions end by idle expiry or explicit revocation.
+- The stable-hostname relay switch. The relay is what makes a quick tunnel's
+  address survive a restart, so it is no longer something a user has to find
+  and turn on.
+
 ## 0.4.2
 
 The row's settings are one collapsible section, titled for what it configures,

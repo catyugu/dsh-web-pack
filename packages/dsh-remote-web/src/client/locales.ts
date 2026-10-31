@@ -71,7 +71,7 @@ export const zh = {
   'close.label': '关闭远程访问面板',
   // 插件设置卡片（家族 list 席位，或官方 plugins.bundle.config 席位）。
   'settings.title': '远程连接设置',
-  'settings.description': '手机配对、公网隧道与设备限额。',
+  'settings.description': '手机配对、公网隧道与局域网访问。',
   'settings.enabled': '启用远程访问',
   'settings.enabledHint': '关闭后移除侧边栏入口并停用配对路由与局域网栅栏。',
   'settings.tokenTtlMs': '配对令牌有效期（毫秒）',
@@ -196,7 +196,7 @@ export const en = {
   'close.label': 'Close remote access panel',
   // Plugin settings card (the family list seat, or the official bundle-config seat).
   'settings.title': 'Remote connection settings',
-  'settings.description': 'Phone pairing, public tunnel and device limits.',
+  'settings.description': 'Phone pairing, the public tunnel and LAN access.',
   'settings.enabled': 'Enable remote access',
   'settings.enabledHint': 'When off, the sidebar entry is removed and pairing routes plus the LAN fence stop.',
   'settings.tokenTtlMs': 'Pairing token lifetime (ms)',

@@ -3191,7 +3191,7 @@ var zh = {
   "close.label": "\u5173\u95ED\u8FDC\u7A0B\u8BBF\u95EE\u9762\u677F",
   // 插件设置卡片（家族 list 席位，或官方 plugins.bundle.config 席位）。
   "settings.title": "\u8FDC\u7A0B\u8FDE\u63A5\u8BBE\u7F6E",
-  "settings.description": "\u624B\u673A\u914D\u5BF9\u3001\u516C\u7F51\u96A7\u9053\u4E0E\u8BBE\u5907\u9650\u989D\u3002",
+  "settings.description": "\u624B\u673A\u914D\u5BF9\u3001\u516C\u7F51\u96A7\u9053\u4E0E\u5C40\u57DF\u7F51\u8BBF\u95EE\u3002",
   "settings.enabled": "\u542F\u7528\u8FDC\u7A0B\u8BBF\u95EE",
   "settings.enabledHint": "\u5173\u95ED\u540E\u79FB\u9664\u4FA7\u8FB9\u680F\u5165\u53E3\u5E76\u505C\u7528\u914D\u5BF9\u8DEF\u7531\u4E0E\u5C40\u57DF\u7F51\u6805\u680F\u3002",
   "settings.tokenTtlMs": "\u914D\u5BF9\u4EE4\u724C\u6709\u6548\u671F\uFF08\u6BEB\u79D2\uFF09",
@@ -3308,7 +3308,7 @@ var en = {
   "close.label": "Close remote access panel",
   // Plugin settings card (the family list seat, or the official bundle-config seat).
   "settings.title": "Remote connection settings",
-  "settings.description": "Phone pairing, public tunnel and device limits.",
+  "settings.description": "Phone pairing, the public tunnel and LAN access.",
   "settings.enabled": "Enable remote access",
   "settings.enabledHint": "When off, the sidebar entry is removed and pairing routes plus the LAN fence stop.",
   "settings.tokenTtlMs": "Pairing token lifetime (ms)",
