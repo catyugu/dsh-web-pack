@@ -1,6 +1,6 @@
 {
   "name": "@catyugu/dsh-web-pack",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "type": "module",
   "description": "A pack of switchable DSH Web plugins: session management and session cleanup.",
   "license": "MIT",
@@ -16,14 +16,16 @@
   "files": [
     "cordis.patch.yml",
     "packages",
+    "!packages/*/node_modules",
     "icon.svg",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/build-client.mjs",
+    "build": "node scripts/build-client.mjs && node scripts/build-remote-web.mjs",
+    "build:remote-web": "node scripts/build-remote-web.mjs",
     "test": "node --test --test-concurrency=1 \"packages/*/test/*.test.mjs\"",
-    "check": "npm run build && npm test"
+    "check": "pnpm build && pnpm test"
   },
   "dsh": {
     "bundle": {
@@ -36,9 +38,15 @@
   },
   "dependencies": {
     "@catyugu/dsh-better-session": "file:./packages/dsh-better-session",
+    "@catyugu/dsh-remote-web": "file:./packages/dsh-remote-web",
     "@catyugu/dsh-session-cleanup": "file:./packages/dsh-session-cleanup"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
+    "qrcode.react": "^4.2.0"
   }
 }

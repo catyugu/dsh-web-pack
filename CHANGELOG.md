@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.4.0
+
+The pack takes over the remote-access row the upstream author retired — as this
+repository's own source tree, with its own tunnel binary.
+
+### Added
+
+- `dsh-remote-web`: scan-to-pair remote access for the Web GUI — QR pairing,
+  the gated `/remote` channel, the device roster, the LAN bind toggle, and the
+  optional Cloudflare tunnel with its stable-origin relay. It continues
+  `@linxin666/dsh-remote-web-ui@0.4.6` (the last release that still serves the
+  browser surface) under this repository's own package id.
+- Every setting the row has is edited in the pairing popup, in the same sheet a
+  user opens to pair a device. No settings card is contributed to the plugin
+  manager any more.
+- The row installs and owns `cloudflared`: a pinned release is downloaded into
+  `$DSH_HOME/dsh-web-pack/remote-web/bin/` and validated by running
+  `--version`. `DSH_REMOTE_CLOUDFLARED_BIN` points it at an existing binary.
+
+### Changed
+
+- Row state lives under `$DSH_HOME/dsh-web-pack/remote-web/`
+  (`devices.json`, `registry/<profile>.json`). Moving a host off the upstream
+  package is an operational step: move the two upstream files there before the
+  new row starts.
+- The row mounts as `web-pack-remote-web` from this pack's patch.
+- Sources are built from `src` by `scripts/build-remote-web.mjs` (esbuild plus a
+  CSS-modules loader); the prebuilt upstream bundle is no longer vendored.
+
+### Removed
+
+- The `cloudflared` npm dependency and the anonymous install heartbeat.
+
 ## 0.3.5
 
 The compaction panel tunes the policy the engine actually reads, and the pack

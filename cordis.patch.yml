@@ -4,3 +4,5 @@
       name: "@catyugu/dsh-better-session"
     - id: web-pack-session-cleanup
       name: "@catyugu/dsh-session-cleanup"
+    - id: web-pack-remote-web
+      name: "@catyugu/dsh-remote-web"

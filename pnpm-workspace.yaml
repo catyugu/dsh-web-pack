@@ -1,0 +1,16 @@
+# One workspace root: the pack itself plus every row package, so each row's
+# own dependencies (yaml, zod, schemastery) resolve from its directory while it
+# runs from this checkout. pnpm owns the graph and `pnpm-lock.yaml`.
+packages:
+  - .
+  - packages/*
+
+# Rows declare the Harness packages they run against as peers; the Harness
+# provides them at runtime, so the checkout must not install a second copy.
+autoInstallPeers: false
+
+# The build tool needs its install script. Nothing else does: the tunnel binary
+# `dsh-remote-web` runs is downloaded by that row itself (pinned release, under
+# `$DSH_HOME/dsh-web-pack/remote-web/bin`), never by a package postinstall.
+allowBuilds:
+  esbuild: true

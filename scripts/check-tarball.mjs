@@ -52,9 +52,18 @@ try {
   for (const directory of (await readdir(join(root, 'packages'))).sort()) {
     const manifest = JSON.parse(await readFile(join(root, 'packages', directory, 'package.json'), 'utf8'))
     if (!patch.includes(`"${manifest.name}"`)) throw new Error(`${manifest.name} has no row in the patch`)
-    for (const file of ['package.json', 'client.js', 'src/host.js']) {
-      const path = `package/packages/${directory}/${file}`
-      if (!files.has(path)) throw new Error(`${manifest.name} ships without ${file}`)
+    // Every entry point the manifest promises must be in the tarball: the
+    // Host module, the invariant companion and the browser bundle. Reading
+    // them from `exports` keeps one source of truth — a row that builds to
+    // `lib/host.js` instead of `src/host.js` is checked for what it ships.
+    const entryPoints = Object.entries(manifest.exports ?? {})
+      .filter(([key]) => key === '.' || key === './invariant' || key === './client')
+      .map(([, target]) => (typeof target === 'string' ? target : undefined))
+      .filter((target) => target !== undefined)
+    if (entryPoints.length === 0) throw new Error(`${manifest.name} declares no entry points`)
+    for (const entry of entryPoints) {
+      const path = `package/packages/${directory}/${entry.replace(/^\.\//, '')}`
+      if (!files.has(path)) throw new Error(`${manifest.name} ships without ${entry}`)
     }
   }
   console.log(`the tarball carries ${(await readdir(join(root, 'packages'))).length} rows`)
