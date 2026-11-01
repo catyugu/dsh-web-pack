@@ -102,3 +102,36 @@ export function writeJson(
   res.writeHead(status, { ...JSON_HEADERS, ...headers })
   res.end(payload)
 }
+
+/** Longest device-cookie lifetime: one year; revoked sessions die at the gate regardless. */
+const COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60
+
+/**
+ * Whether the request reached this process over TLS. The harness itself serves
+ * plain HTTP; a tunnel edge terminates TLS and stamps `x-forwarded-proto`
+ * (the same signal the landing redirect trusts when it rebuilds an origin).
+ * @param req - the request to classify.
+ * @returns true when the request arrived over TLS.
+ */
+export function isHttpsRequest(req: IncomingMessage): boolean {
+  const forwarded = req.headers['x-forwarded-proto']
+  if (typeof forwarded === 'string') {
+    const first = forwarded.split(',')[0]?.trim().toLowerCase()
+    if (first === 'https') return true
+  }
+  return (req.socket as { encrypted?: boolean }).encrypted === true
+}
+
+/**
+ * The device cookie for one request. `Secure` is added only when the request
+ * arrived over TLS: LAN pairing runs on plain HTTP, where a Secure cookie is
+ * simply dropped by the browser and the phone would silently lose its session.
+ * @param req - the request the cookie answers.
+ * @param cookieName - the configured cookie name.
+ * @param deviceId - the device session id.
+ * @returns the Set-Cookie value.
+ */
+export function deviceCookieOf(req: IncomingMessage, cookieName: string, deviceId: string): string {
+  const secure = isHttpsRequest(req) ? '; Secure' : ''
+  return `${cookieName}=${deviceId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(COOKIE_MAX_AGE_SEC)}${secure}`
+}

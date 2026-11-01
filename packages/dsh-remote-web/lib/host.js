@@ -8833,6 +8833,258 @@ function providePairingAccess(ctx, check) {
   return ctx.provide(REMOTE_WEB_UI_PAIRING, access);
 }
 
+// packages/dsh-remote-web/src/pairing/pair-grant.ts
+import { randomBytes as randomBytes2 } from "node:crypto";
+var DEFAULT_PAIR_GRANT_TTL_MS = 6e4;
+var MAX_LIVE_GRANTS = 256;
+function createPairGrantStore(options = {}) {
+  const ttlMs = options.ttlMs ?? DEFAULT_PAIR_GRANT_TTL_MS;
+  const now = options.now ?? (() => Date.now());
+  const createGrant = options.createGrant ?? (() => randomBytes2(32).toString("base64url"));
+  const entries = /* @__PURE__ */ new Map();
+  const purgeExpired = (at) => {
+    for (const [grant, entry] of entries) {
+      if (entry.expiresAt <= at) entries.delete(grant);
+    }
+  };
+  return {
+    issue(deviceId) {
+      const issuedAt = now();
+      purgeExpired(issuedAt);
+      while (entries.size >= MAX_LIVE_GRANTS) {
+        const oldest = entries.keys().next().value;
+        if (oldest === void 0) break;
+        entries.delete(oldest);
+      }
+      const grant = createGrant();
+      const expiresAt = issuedAt + ttlMs;
+      entries.set(grant, { deviceId, expiresAt });
+      return { grant, expiresAt };
+    },
+    consume(grant) {
+      if (grant === void 0 || grant === "") return void 0;
+      const consumedAt = now();
+      const entry = entries.get(grant);
+      entries.delete(grant);
+      purgeExpired(consumedAt);
+      if (entry === void 0 || entry.expiresAt <= consumedAt) return void 0;
+      return entry.deviceId;
+    },
+    peek(grant) {
+      if (grant === void 0 || grant === "") return void 0;
+      const at = now();
+      const entry = entries.get(grant);
+      if (entry === void 0) return void 0;
+      if (entry.expiresAt <= at) {
+        entries.delete(grant);
+        return void 0;
+      }
+      return entry.deviceId;
+    },
+    get size() {
+      return entries.size;
+    }
+  };
+}
+
+// packages/dsh-remote-web/src/http/fence.ts
+function isTrustedApiRequest(request, trustedHosts) {
+  if (!isTrustedHost(request, trustedHosts)) return false;
+  if (request.headers["sec-fetch-site"] === "cross-site") return false;
+  const origin = request.headers.origin;
+  if (origin === void 0) return true;
+  try {
+    return new URL(origin).host === new URL(`http://${request.headers.host ?? ""}`).host;
+  } catch {
+    return false;
+  }
+}
+function isTrustedHost(request, trustedHosts) {
+  const host = request.headers.host;
+  if (typeof host !== "string") return false;
+  let hostUrl;
+  try {
+    hostUrl = new URL(`http://${host}`);
+  } catch {
+    return false;
+  }
+  const hostname = hostUrl.hostname;
+  return isLoopbackClient(request) || trustedHosts.some((entry) => {
+    let entryUrl;
+    try {
+      entryUrl = new URL(`http://${entry}`);
+    } catch {
+      return false;
+    }
+    return entryUrl.port === "" ? entryUrl.hostname === hostname : entryUrl.host === hostUrl.host;
+  });
+}
+function isTopLevelDocumentNavigation(request) {
+  return request.headers["sec-fetch-mode"] === "navigate" && request.headers["sec-fetch-dest"] === "document";
+}
+function isPrivateOrLocalHostname(hostname) {
+  const normalized = hostname.toLowerCase().trim();
+  if (normalized === "localhost" || normalized.endsWith(".local") || normalized.endsWith(".lan") || normalized.endsWith(".internal") || normalized.endsWith(".home.arpa")) {
+    return true;
+  }
+  let ip = normalized;
+  if (ip.startsWith("[") && ip.endsWith("]")) ip = ip.slice(1, -1);
+  if (ip === "::1" || ip === "127.0.0.1") return true;
+  if (ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80")) return true;
+  const parts = ip.split(".").map(Number);
+  if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    const [a, b] = parts;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+  }
+  return false;
+}
+function isNonCrossSite(request) {
+  if (request.headers["sec-fetch-site"] === "cross-site") return false;
+  const host = request.headers.host;
+  if (typeof host !== "string") return false;
+  const origin = request.headers.origin;
+  if (origin === void 0) return true;
+  try {
+    const originUrl = new URL(origin);
+    const hostUrl = new URL(`http://${host}`);
+    return originUrl.host === hostUrl.host;
+  } catch {
+    return false;
+  }
+}
+function privateLanHostOf(request, navigation = false) {
+  const host = request.headers.host;
+  if (typeof host !== "string") return void 0;
+  let hostName = "";
+  try {
+    hostName = new URL(`http://${host}`).hostname;
+  } catch {
+    return void 0;
+  }
+  if (hostName === "" || !isPrivateOrLocalHostname(hostName)) return void 0;
+  if (!(navigation && isTopLevelDocumentNavigation(request)) && !isNonCrossSite(request)) return void 0;
+  return host;
+}
+var MAX_DYNAMIC_TRUSTED_HOSTS = 64;
+function addBounded(set2, value, max) {
+  if (set2.has(value)) return;
+  if (set2.size >= max) {
+    const oldest = set2.values().next().value;
+    if (oldest !== void 0) set2.delete(oldest);
+  }
+  set2.add(value);
+}
+function publicHostOf(url) {
+  if (url === void 0) return void 0;
+  try {
+    return new URL(url).host;
+  } catch {
+    return void 0;
+  }
+}
+var loggedEntryRefusals = /* @__PURE__ */ new Set();
+function logEntryRefusal(request, path, reason) {
+  const key = `${reason}|${request.headers.host ?? ""}|${path}`;
+  if (loggedEntryRefusals.has(key) || loggedEntryRefusals.size >= 64) return;
+  loggedEntryRefusals.add(key);
+  const markers = [
+    `sec-fetch-site=${request.headers["sec-fetch-site"] ?? "-"}`,
+    `sec-fetch-mode=${request.headers["sec-fetch-mode"] ?? "-"}`,
+    `sec-fetch-dest=${request.headers["sec-fetch-dest"] ?? "-"}`,
+    `origin=${request.headers.origin ?? "-"}`
+  ].join(" ");
+  console.log(`dsh-remote-web: refused ${path} from host ${request.headers.host ?? "-"} (${reason}; ${markers})`);
+}
+var MAX_ACCEPT_BUCKETS = 1024;
+var ACCEPT_MAX_ATTEMPTS = 10;
+var ACCEPT_WINDOW_MS = 3e4;
+var MAX_FORWARDED_KEY_CHARS = 64;
+function acceptLimitKey(socketIp, forwarded, bucket) {
+  if (isLoopbackAddress(socketIp) && forwarded !== void 0 && forwarded !== "") {
+    return `${bucket}|${socketIp}|${forwarded.slice(0, MAX_FORWARDED_KEY_CHARS)}`;
+  }
+  return `${bucket}|${socketIp}`;
+}
+function createAcceptRateLimiter() {
+  const attempts = /* @__PURE__ */ new Map();
+  const prune = (nowMs) => {
+    while (attempts.size > 0) {
+      const oldest = attempts.keys().next().value;
+      if (oldest === void 0) break;
+      const attempt = attempts.get(oldest);
+      if (attempt !== void 0 && nowMs - attempt.windowStart <= ACCEPT_WINDOW_MS) break;
+      attempts.delete(oldest);
+    }
+    while (attempts.size > MAX_ACCEPT_BUCKETS) {
+      const oldest = attempts.keys().next().value;
+      if (oldest === void 0) break;
+      attempts.delete(oldest);
+    }
+  };
+  return {
+    limited(req, bucket) {
+      const socketIp = req.socket?.remoteAddress ?? "unknown";
+      const hops = typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",") : [];
+      const forwarded = (hops[hops.length - 1] ?? "").trim();
+      const key = acceptLimitKey(socketIp, forwarded, bucket);
+      const nowMs = Date.now();
+      prune(nowMs);
+      const entry = attempts.get(key);
+      if (entry === void 0 || nowMs - entry.windowStart > ACCEPT_WINDOW_MS) {
+        attempts.delete(key);
+        attempts.set(key, { count: 1, windowStart: nowMs });
+        return false;
+      }
+      entry.count += 1;
+      return entry.count > ACCEPT_MAX_ATTEMPTS;
+    }
+  };
+}
+function createPairingFences(deps) {
+  const dynamicTrustedHosts = /* @__PURE__ */ new Set();
+  return {
+    loopback: (req) => isTrustedApiRequest(req, []),
+    lan: (req, navigation = false) => {
+      const publicHost = publicHostOf(deps.service.publicBaseUrl);
+      const bases = deps.service.lanAddresses;
+      const extraHosts = typeof deps.trustedHosts === "function" ? deps.trustedHosts() : deps.trustedHosts ?? [];
+      const combined = [
+        ...bases,
+        ...publicHost !== void 0 ? [publicHost] : [],
+        ...extraHosts,
+        ...dynamicTrustedHosts
+      ];
+      if (navigation && isTopLevelDocumentNavigation(req) ? isTrustedHost(req, combined) : isTrustedApiRequest(req, combined)) return true;
+      const privateLanHost = privateLanHostOf(req, navigation);
+      if (privateLanHost !== void 0) {
+        const cookieDeviceId = readCookie(req.headers.cookie, deps.service.config.cookieName);
+        let queryDeviceId = null;
+        let queryGrant;
+        try {
+          const params = new URL(req.url ?? "/", "http://pair.invalid").searchParams;
+          queryDeviceId = params.get("device");
+          queryGrant = params.get("grant") ?? void 0;
+        } catch {
+        }
+        const granted = deps.grants.peek(queryGrant);
+        const deviceId = cookieDeviceId ?? queryDeviceId ?? granted ?? void 0;
+        if (deviceId !== void 0 && deps.service.hasDevice(deviceId)) {
+          addBounded(dynamicTrustedHosts, privateLanHost, MAX_DYNAMIC_TRUSTED_HOSTS);
+          return true;
+        }
+      }
+      return false;
+    },
+    remember(host) {
+      addBounded(dynamicTrustedHosts, host, MAX_DYNAMIC_TRUSTED_HOSTS);
+    }
+  };
+}
+
 // packages/dsh-remote-web/src/http/http.ts
 var DEFAULT_JSON_BODY_MAX_BYTES = 64 * 1024;
 var JSON_HEADERS = {
@@ -8874,6 +9126,275 @@ function writeJson(res, status, body, headers = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, { ...JSON_HEADERS, ...headers });
   res.end(payload);
+}
+var COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
+function isHttpsRequest(req) {
+  const forwarded = req.headers["x-forwarded-proto"];
+  if (typeof forwarded === "string") {
+    const first = forwarded.split(",")[0]?.trim().toLowerCase();
+    if (first === "https") return true;
+  }
+  return req.socket.encrypted === true;
+}
+function deviceCookieOf(req, cookieName, deviceId) {
+  const secure = isHttpsRequest(req) ? "; Secure" : "";
+  return `${cookieName}=${deviceId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(COOKIE_MAX_AGE_SEC)}${secure}`;
+}
+
+// packages/dsh-remote-web/src/http/paths.ts
+var PAIR_PATHS = {
+  issue: "/api/pair/issue",
+  accept: "/api/pair/accept",
+  stop: "/api/pair/stop",
+  revoke: "/api/pair/revoke",
+  heartbeat: "/api/pair/heartbeat",
+  status: "/api/pair/status",
+  events: "/api/pair/events",
+  lanBind: "/api/pair/lan-bind",
+  /** Top-level accept-and-redirect entry the QR link points at. */
+  acceptPage: "/pair-accept",
+  /** The cookieless app landing: serves the official shell for a paired device. */
+  appPage: "/pair-app",
+  /**
+   * The reopen service worker (registered by the capture script). Root-level
+   * path so its default script-directory scope already covers `/`.
+   */
+  appServiceWorker: "/pair-app.sw.js"
+};
+
+// packages/dsh-remote-web/src/http/pair-routes.ts
+var MAX_BODY_BYTES = 4096;
+var PairingEventsStream = class {
+  streams = /* @__PURE__ */ new Set();
+  /**
+   * @param service - the pairing service whose snapshots are fanned out.
+   */
+  constructor(service) {
+    service.onState((snapshot2) => {
+      this.push(snapshot2);
+    });
+  }
+  /** Open one stream; the response is owned to completion. */
+  open(req, res) {
+    res.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache",
+      connection: "keep-alive"
+    });
+    const stream = { res, closed: false };
+    this.streams.add(stream);
+    const close = () => {
+      if (stream.closed) return;
+      stream.closed = true;
+      this.streams.delete(stream);
+    };
+    res.on("close", close);
+    req.on("close", close);
+  }
+  /** Push one frame to every open stream (contained per stream). */
+  push(snapshot2) {
+    const frame = `data: ${JSON.stringify({ type: "state", ...snapshot2 })}
+
+`;
+    for (const stream of this.streams) {
+      try {
+        stream.res.write(frame);
+      } catch {
+        stream.closed = true;
+        this.streams.delete(stream);
+      }
+    }
+  }
+  /** Stream count (tests/diagnostics). */
+  get size() {
+    return this.streams.size;
+  }
+};
+function issuePayloadOf(body) {
+  const record = isJsonObject(body) ? body : {};
+  const address = record.address;
+  if (address === void 0) return {};
+  return typeof address === "string" && address.length > 0 ? { address } : void 0;
+}
+function acceptPayloadOf(body) {
+  const record = isJsonObject(body) ? body : {};
+  const token = record.token;
+  if (token === void 0) return { token: "" };
+  return typeof token === "string" ? { token } : void 0;
+}
+function revokePayloadOf(body) {
+  const record = isJsonObject(body) ? body : {};
+  const deviceId = record.deviceId;
+  return typeof deviceId === "string" && deviceId.length > 0 ? { deviceId } : void 0;
+}
+function makePairRoutes(deps) {
+  const { service, fences } = deps;
+  const pairingRequired = () => typeof deps.requirePairingForLan === "function" ? deps.requirePairingForLan() : deps.requirePairingForLan ?? true;
+  const isEnabled = () => typeof deps.enabled === "function" ? deps.enabled() : deps.enabled ?? true;
+  const tunnelTokenStored = () => deps.tunnelTokenStored?.() === true;
+  const events = new PairingEventsStream(service);
+  const requireMethod = (req, res, method) => {
+    if (req.method === method) return true;
+    res.writeHead(405);
+    res.end();
+    return false;
+  };
+  const handleIssue = async (req, res) => {
+    if (!requireMethod(req, res, "POST")) return;
+    if (!fences.loopback(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    if (!isEnabled()) {
+      writeJson(res, 503, { ok: false, code: "disabled" });
+      return;
+    }
+    const payload = issuePayloadOf(await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true }));
+    if (payload === void 0) {
+      writeJson(res, 400, { ok: false, code: "bad-payload" });
+      return;
+    }
+    const { address } = payload;
+    try {
+      const { token, expiresAt } = service.issue(void 0, address);
+      const base = address === void 0 ? service.publicBaseUrl ?? service.lanBaseUrl : service.lanBaseUrlFor(address);
+      if (base === void 0) throw new Error("dsh-remote-web: base unavailable");
+      writeJson(res, 200, {
+        ok: true,
+        url: `${base}/pair-accept?pair=${token}`,
+        token,
+        expiresAt,
+        // Every constructible base, so a multi-homed panel can switch the
+        // advertised network without a second round trip.
+        lanAddresses: service.lanAddresses,
+        // The configured public base, when present — the panel uses it to
+        // label the QR as a public (tunneled) link.
+        ...service.publicBaseUrl !== void 0 ? { publicBaseUrl: service.publicBaseUrl } : {}
+      });
+    } catch (error) {
+      const unknownAddress = error instanceof UnknownLanAddressError;
+      writeJson(res, unknownAddress ? 400 : 409, {
+        ok: false,
+        code: unknownAddress ? "unknown-address" : "lan-required"
+      });
+    }
+  };
+  const handleAccept = async (req, res) => {
+    if (!requireMethod(req, res, "POST")) return;
+    const privateHost = privateLanHostOf(req);
+    if (!fences.lan(req) && privateHost === void 0) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    if (deps.limiter.limited(req, "api")) {
+      writeJson(res, 429, { ok: false, code: "rate-limited" });
+      return;
+    }
+    const payload = acceptPayloadOf(await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true }));
+    if (payload === void 0) {
+      writeJson(res, 400, { ok: false, code: "bad-payload" });
+      return;
+    }
+    const ua = req.headers["user-agent"];
+    const result = service.accept(payload.token, typeof ua === "string" ? ua : void 0);
+    if (!result.ok) {
+      if (!fences.lan(req)) {
+        writeJson(res, 403, { ok: false, code: "forbidden" });
+        return;
+      }
+      writeJson(res, 404, { ok: false, code: result.code });
+      return;
+    }
+    if (privateHost !== void 0) fences.remember(privateHost);
+    writeJson(res, 200, { ok: true, deviceId: result.deviceId }, {
+      "set-cookie": [deviceCookieOf(req, service.config.cookieName, result.deviceId)]
+    });
+  };
+  const handleStop = async (req, res) => {
+    if (!requireMethod(req, res, "POST")) return;
+    if (!fences.loopback(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
+    service.stop();
+    writeJson(res, 200, { ok: true });
+  };
+  const handleRevoke = async (req, res) => {
+    if (!requireMethod(req, res, "POST")) return;
+    if (!fences.loopback(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    const payload = revokePayloadOf(await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true }));
+    if (payload === void 0) {
+      writeJson(res, 400, { ok: false, code: "bad-payload" });
+      return;
+    }
+    if (!service.revoke(payload.deviceId)) {
+      writeJson(res, 404, { ok: false, code: "unknown-device" });
+      return;
+    }
+    writeJson(res, 200, { ok: true });
+  };
+  const handleHeartbeat = async (req, res) => {
+    if (!requireMethod(req, res, "POST")) return;
+    if (!fences.lan(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
+    const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
+    if (deviceId === void 0 || !service.heartbeat(deviceId)) {
+      writeJson(res, 401, { ok: false, code: "unpaired" });
+      return;
+    }
+    writeJson(res, 200, { ok: true });
+  };
+  const handleStatus = async (req, res) => {
+    if (!requireMethod(req, res, "GET")) return;
+    if (!fences.lan(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
+    const paired = deviceId !== void 0 && service.hasDevice(deviceId);
+    const local = isLoopbackClient(req);
+    const snapshot2 = service.snapshot();
+    const { devices: _devices, ...rest } = snapshot2;
+    const visible = paired || local ? { ...rest, tunnelTokenStored: tunnelTokenStored() } : { phase: snapshot2.phase, lanAvailable: snapshot2.lanAvailable };
+    writeJson(res, 200, { ok: true, paired, requirePairingForLan: pairingRequired(), ...visible });
+  };
+  const handleEvents = (req, res) => {
+    if (!requireMethod(req, res, "GET")) return;
+    if (!fences.loopback(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    events.open(req, res);
+    events.push(service.snapshot());
+  };
+  const handleLanBind = (req, res) => {
+    if (!requireMethod(req, res, "GET")) return;
+    if (!fences.loopback(req)) {
+      writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    writeJson(res, 200, { ok: true, ...deps.lanBindStatus?.() ?? {} });
+  };
+  const routes = [
+    { kind: "exact", path: PAIR_PATHS.issue, handler: handleIssue },
+    { kind: "exact", path: PAIR_PATHS.accept, handler: handleAccept },
+    { kind: "exact", path: PAIR_PATHS.stop, handler: handleStop },
+    { kind: "exact", path: PAIR_PATHS.revoke, handler: handleRevoke },
+    { kind: "exact", path: PAIR_PATHS.heartbeat, handler: handleHeartbeat },
+    { kind: "exact", path: PAIR_PATHS.status, handler: handleStatus },
+    { kind: "exact", path: PAIR_PATHS.events, handler: handleEvents }
+  ];
+  if (deps.lanBindStatus !== void 0) {
+    routes.push({ kind: "exact", path: PAIR_PATHS.lanBind, handler: handleLanBind });
+  }
+  return routes;
 }
 
 // packages/dsh-remote-web/src/http/reopen-worker.ts
@@ -8940,60 +9461,6 @@ function refreshShell() {
     });
   }, function () { return undefined; });
 }`;
-}
-
-// packages/dsh-remote-web/src/pairing/pair-grant.ts
-import { randomBytes as randomBytes2 } from "node:crypto";
-var DEFAULT_PAIR_GRANT_TTL_MS = 6e4;
-var MAX_LIVE_GRANTS = 256;
-function createPairGrantStore(options = {}) {
-  const ttlMs = options.ttlMs ?? DEFAULT_PAIR_GRANT_TTL_MS;
-  const now = options.now ?? (() => Date.now());
-  const createGrant = options.createGrant ?? (() => randomBytes2(32).toString("base64url"));
-  const entries = /* @__PURE__ */ new Map();
-  const purgeExpired = (at) => {
-    for (const [grant, entry] of entries) {
-      if (entry.expiresAt <= at) entries.delete(grant);
-    }
-  };
-  return {
-    issue(deviceId) {
-      const issuedAt = now();
-      purgeExpired(issuedAt);
-      while (entries.size >= MAX_LIVE_GRANTS) {
-        const oldest = entries.keys().next().value;
-        if (oldest === void 0) break;
-        entries.delete(oldest);
-      }
-      const grant = createGrant();
-      const expiresAt = issuedAt + ttlMs;
-      entries.set(grant, { deviceId, expiresAt });
-      return { grant, expiresAt };
-    },
-    consume(grant) {
-      if (grant === void 0 || grant === "") return void 0;
-      const consumedAt = now();
-      const entry = entries.get(grant);
-      entries.delete(grant);
-      purgeExpired(consumedAt);
-      if (entry === void 0 || entry.expiresAt <= consumedAt) return void 0;
-      return entry.deviceId;
-    },
-    peek(grant) {
-      if (grant === void 0 || grant === "") return void 0;
-      const at = now();
-      const entry = entries.get(grant);
-      if (entry === void 0) return void 0;
-      if (entry.expiresAt <= at) {
-        entries.delete(grant);
-        return void 0;
-      }
-      return entry.deviceId;
-    },
-    get size() {
-      return entries.size;
-    }
-  };
 }
 
 // packages/dsh-remote-web/src/http/remote-methods.ts
@@ -9093,128 +9560,7 @@ var REMOTE_CHANNEL_RULES = {
 };
 var REMOTE_CHANNEL_BOOT_GLOBAL = "__DSH_REMOTE_CHANNEL_BOOT__";
 
-// packages/dsh-remote-web/src/http/routes.ts
-function isTrustedApiRequest(request, trustedHosts) {
-  if (!isTrustedHost(request, trustedHosts)) return false;
-  if (request.headers["sec-fetch-site"] === "cross-site") return false;
-  const origin = request.headers.origin;
-  if (origin === void 0) return true;
-  try {
-    return new URL(origin).host === new URL(`http://${request.headers.host ?? ""}`).host;
-  } catch {
-    return false;
-  }
-}
-function isTrustedHost(request, trustedHosts) {
-  const host = request.headers.host;
-  if (typeof host !== "string") return false;
-  let hostUrl;
-  try {
-    hostUrl = new URL(`http://${host}`);
-  } catch {
-    return false;
-  }
-  const hostname = hostUrl.hostname;
-  return isLoopbackClient(request) || trustedHosts.some((entry) => {
-    let entryUrl;
-    try {
-      entryUrl = new URL(`http://${entry}`);
-    } catch {
-      return false;
-    }
-    return entryUrl.port === "" ? entryUrl.hostname === hostname : entryUrl.host === hostUrl.host;
-  });
-}
-function isTopLevelDocumentNavigation(request) {
-  return request.headers["sec-fetch-mode"] === "navigate" && request.headers["sec-fetch-dest"] === "document";
-}
-function isPrivateOrLocalHostname(hostname) {
-  const normalized = hostname.toLowerCase().trim();
-  if (normalized === "localhost" || normalized.endsWith(".local") || normalized.endsWith(".lan") || normalized.endsWith(".internal") || normalized.endsWith(".home.arpa")) {
-    return true;
-  }
-  let ip = normalized;
-  if (ip.startsWith("[") && ip.endsWith("]")) ip = ip.slice(1, -1);
-  if (ip === "::1" || ip === "127.0.0.1") return true;
-  if (ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80")) return true;
-  const parts = ip.split(".").map(Number);
-  if (parts.length === 4 && parts.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
-    const [a, b] = parts;
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-  }
-  return false;
-}
-function isNonCrossSite(request) {
-  if (request.headers["sec-fetch-site"] === "cross-site") return false;
-  const host = request.headers.host;
-  if (typeof host !== "string") return false;
-  const origin = request.headers.origin;
-  if (origin === void 0) return true;
-  try {
-    const originUrl = new URL(origin);
-    const hostUrl = new URL(`http://${host}`);
-    return originUrl.host === hostUrl.host;
-  } catch {
-    return false;
-  }
-}
-function privateLanHostOf(request, navigation = false) {
-  const host = request.headers.host;
-  if (typeof host !== "string") return void 0;
-  let hostName = "";
-  try {
-    hostName = new URL(`http://${host}`).hostname;
-  } catch {
-    return void 0;
-  }
-  if (hostName === "" || !isPrivateOrLocalHostname(hostName)) return void 0;
-  if (!(navigation && isTopLevelDocumentNavigation(request)) && !isNonCrossSite(request)) return void 0;
-  return host;
-}
-var MAX_BODY_BYTES = 4096;
-function acceptLimitKey(socketIp, forwarded, bucket) {
-  if (isLoopbackAddress(socketIp) && forwarded !== void 0 && forwarded !== "") {
-    return `${bucket}|${socketIp}|${forwarded.slice(0, MAX_FORWARDED_KEY_CHARS)}`;
-  }
-  return `${bucket}|${socketIp}`;
-}
-var MAX_FORWARDED_KEY_CHARS = 64;
-var MAX_ACCEPT_BUCKETS = 1024;
-var MAX_DYNAMIC_TRUSTED_HOSTS = 64;
-var loggedEntryRefusals = /* @__PURE__ */ new Set();
-function logEntryRefusal(request, path, reason) {
-  const key = `${reason}|${request.headers.host ?? ""}|${path}`;
-  if (loggedEntryRefusals.has(key) || loggedEntryRefusals.size >= 64) return;
-  loggedEntryRefusals.add(key);
-  const markers = [
-    `sec-fetch-site=${request.headers["sec-fetch-site"] ?? "-"}`,
-    `sec-fetch-mode=${request.headers["sec-fetch-mode"] ?? "-"}`,
-    `sec-fetch-dest=${request.headers["sec-fetch-dest"] ?? "-"}`,
-    `origin=${request.headers.origin ?? "-"}`
-  ].join(" ");
-  console.log(`dsh-remote-web: refused ${path} from host ${request.headers.host ?? "-"} (${reason}; ${markers})`);
-}
-function addBounded(set2, value, max) {
-  if (set2.has(value)) return;
-  if (set2.size >= max) {
-    const oldest = set2.values().next().value;
-    if (oldest !== void 0) set2.delete(oldest);
-  }
-  set2.add(value);
-}
-function publicHostOf(url) {
-  if (url === void 0) return void 0;
-  try {
-    return new URL(url).host;
-  } catch {
-    return void 0;
-  }
-}
-var COOKIE_MAX_AGE_SEC = 365 * 24 * 60 * 60;
+// packages/dsh-remote-web/src/http/landing-routes.ts
 var APP_DEVICE_STORAGE_KEY = "dsh-remote-device";
 function appShellCaptureScript(deviceId) {
   const safeId = JSON.stringify(deviceId);
@@ -9244,328 +9590,32 @@ function pairingFailurePage() {
     "</body></html>"
   ].join("");
 }
-var PAIR_PATHS = {
-  issue: "/api/pair/issue",
-  accept: "/api/pair/accept",
-  stop: "/api/pair/stop",
-  revoke: "/api/pair/revoke",
-  heartbeat: "/api/pair/heartbeat",
-  status: "/api/pair/status",
-  events: "/api/pair/events",
-  lanBind: "/api/pair/lan-bind",
-  /** Top-level accept-and-redirect entry the QR link points at. */
-  acceptPage: "/pair-accept",
-  /** The cookieless app landing: serves the official shell for a paired device. */
-  appPage: "/pair-app",
-  /**
-   * The reopen service worker (registered by the capture script). Root-level
-   * path so its default script-directory scope already covers `/`.
-   */
-  appServiceWorker: "/pair-app.sw.js"
-};
-function issuePayloadOf(body) {
-  const record = isJsonObject(body) ? body : {};
-  const address = record.address;
-  if (address === void 0) return {};
-  return typeof address === "string" && address.length > 0 ? { address } : void 0;
+function appOrigin(req) {
+  const origin = `http://${req.headers.host ?? "127.0.0.1"}`;
+  return isHttpsRequest(req) ? origin.replace("http://", "https://") : origin;
 }
-function acceptPayloadOf(body) {
-  const record = isJsonObject(body) ? body : {};
-  const token = record.token;
-  if (token === void 0) return { token: "" };
-  return typeof token === "string" ? { token } : void 0;
-}
-function revokePayloadOf(body) {
-  const record = isJsonObject(body) ? body : {};
-  const deviceId = record.deviceId;
-  return typeof deviceId === "string" && deviceId.length > 0 ? { deviceId } : void 0;
-}
-var PairingEventsStream = class {
-  streams = /* @__PURE__ */ new Set();
-  /**
-   * @param service - the pairing service whose snapshots are fanned out.
-   */
-  constructor(service) {
-    service.onState((snapshot2) => {
-      this.push(snapshot2);
-    });
-  }
-  /** Open one stream; the response is owned to completion. */
-  open(req, res) {
-    res.writeHead(200, {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-cache",
-      connection: "keep-alive"
-    });
-    const stream = { res, closed: false };
-    this.streams.add(stream);
-    const close = () => {
-      if (stream.closed) return;
-      stream.closed = true;
-      this.streams.delete(stream);
-    };
-    res.on("close", close);
-    req.on("close", close);
-  }
-  /** Push one frame to every open stream (contained per stream). */
-  push(snapshot2) {
-    const frame = `data: ${JSON.stringify({ type: "state", ...snapshot2 })}
-
-`;
-    for (const stream of this.streams) {
-      try {
-        stream.res.write(frame);
-      } catch {
-        stream.closed = true;
-        this.streams.delete(stream);
-      }
-    }
-  }
-  /** Stream count (tests/diagnostics). */
-  get size() {
-    return this.streams.size;
-  }
-};
-function makeRoutes(deps) {
-  const { service, requirePairingForLan = true, enabled = true } = deps;
-  const pairingRequired = () => typeof requirePairingForLan === "function" ? requirePairingForLan() : requirePairingForLan;
-  const isEnabled = () => typeof enabled === "function" ? enabled() : enabled;
-  const tunnelTokenStored = () => deps.tunnelTokenStored?.() === true;
-  const grants = deps.grants ?? createPairGrantStore();
-  const events = new PairingEventsStream(service);
-  const dynamicTrustedHosts = /* @__PURE__ */ new Set();
-  const loopbackFence = (req) => isTrustedApiRequest(req, []);
-  const lanFence = (req, navigation = false) => {
-    const publicHost = publicHostOf(service.publicBaseUrl);
-    const bases = service.lanAddresses;
-    const extraHosts = typeof deps.trustedHosts === "function" ? deps.trustedHosts() : deps.trustedHosts ?? [];
-    const combined = [
-      ...bases,
-      ...publicHost !== void 0 ? [publicHost] : [],
-      ...extraHosts,
-      ...dynamicTrustedHosts
-    ];
-    if (navigation && isTopLevelDocumentNavigation(req) ? isTrustedHost(req, combined) : isTrustedApiRequest(req, combined)) return true;
-    const privateLanHost = privateLanHostOf(req, navigation);
-    if (privateLanHost !== void 0) {
-      const cookieDeviceId = readCookie(req.headers.cookie, service.config.cookieName);
-      let queryDeviceId = null;
-      let queryGrant;
-      try {
-        const params = new URL(req.url ?? "/", "http://pair.invalid").searchParams;
-        queryDeviceId = params.get("device");
-        queryGrant = params.get("grant") ?? void 0;
-      } catch {
-      }
-      const granted = grants.peek(queryGrant);
-      const deviceId = cookieDeviceId ?? queryDeviceId ?? granted ?? void 0;
-      if (deviceId !== void 0 && service.hasDevice(deviceId)) {
-        addBounded(dynamicTrustedHosts, privateLanHost, MAX_DYNAMIC_TRUSTED_HOSTS);
-        return true;
-      }
-    }
-    return false;
-  };
+function makeLandingRoutes(deps) {
+  const { service, fences, grants } = deps;
   const requireMethod = (req, res, method) => {
     if (req.method === method) return true;
     res.writeHead(405);
     res.end();
     return false;
   };
-  const acceptAttempts = /* @__PURE__ */ new Map();
-  const ACCEPT_MAX_ATTEMPTS = 10;
-  const ACCEPT_WINDOW_MS = 3e4;
-  const pruneAcceptAttempts = (nowMs) => {
-    while (acceptAttempts.size > 0) {
-      const oldest = acceptAttempts.keys().next().value;
-      if (oldest === void 0) break;
-      const attempt = acceptAttempts.get(oldest);
-      if (attempt !== void 0 && nowMs - attempt.windowStart <= ACCEPT_WINDOW_MS) break;
-      acceptAttempts.delete(oldest);
-    }
-    while (acceptAttempts.size > MAX_ACCEPT_BUCKETS) {
-      const oldest = acceptAttempts.keys().next().value;
-      if (oldest === void 0) break;
-      acceptAttempts.delete(oldest);
-    }
-  };
-  const rateLimitAccept = (req, bucket) => {
-    const socketIp = req.socket?.remoteAddress ?? "unknown";
-    const hops = typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",") : [];
-    const forwarded = (hops[hops.length - 1] ?? "").trim();
-    const ip = acceptLimitKey(socketIp, forwarded, bucket);
-    const nowMs = Date.now();
-    pruneAcceptAttempts(nowMs);
-    const entry = acceptAttempts.get(ip);
-    if (entry === void 0 || nowMs - entry.windowStart > ACCEPT_WINDOW_MS) {
-      acceptAttempts.delete(ip);
-      acceptAttempts.set(ip, { count: 1, windowStart: nowMs });
-      return false;
-    }
-    entry.count += 1;
-    return entry.count > ACCEPT_MAX_ATTEMPTS;
-  };
-  const handleIssue = async (req, res) => {
-    if (!requireMethod(req, res, "POST")) return;
-    if (!loopbackFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    if (!isEnabled()) {
-      writeJson(res, 503, { ok: false, code: "disabled" });
-      return;
-    }
-    const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    const payload = issuePayloadOf(body);
-    if (payload === void 0) {
-      writeJson(res, 400, { ok: false, code: "bad-payload" });
-      return;
-    }
-    const { address } = payload;
-    try {
-      const { token, expiresAt } = service.issue(void 0, address);
-      const base = address === void 0 ? service.publicBaseUrl ?? service.lanBaseUrl : service.lanBaseUrlFor(address);
-      if (base === void 0) throw new Error("dsh-remote-web: base unavailable");
-      writeJson(res, 200, {
-        ok: true,
-        url: `${base}/pair-accept?pair=${token}`,
-        token,
-        expiresAt,
-        // Every constructible base, so a multi-homed panel can switch the
-        // advertised network without a second round trip.
-        lanAddresses: service.lanAddresses,
-        // The configured public base, when present — the panel uses it to
-        // label the QR as a public (tunneled) link.
-        ...service.publicBaseUrl !== void 0 ? { publicBaseUrl: service.publicBaseUrl } : {}
-      });
-    } catch (error) {
-      const unknownAddress = error instanceof UnknownLanAddressError;
-      writeJson(res, unknownAddress ? 400 : 409, {
-        ok: false,
-        code: unknownAddress ? "unknown-address" : "lan-required"
-      });
-    }
-  };
-  const handleAccept = async (req, res) => {
-    if (!requireMethod(req, res, "POST")) return;
-    const privateLanHost = privateLanHostOf(req);
-    if (!lanFence(req) && privateLanHost === void 0) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    if (rateLimitAccept(req, "api")) {
-      writeJson(res, 429, { ok: false, code: "rate-limited" });
-      return;
-    }
-    const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    const payload = acceptPayloadOf(body);
-    if (payload === void 0) {
-      writeJson(res, 400, { ok: false, code: "bad-payload" });
-      return;
-    }
-    const ua = req.headers["user-agent"];
-    const result = service.accept(payload.token, typeof ua === "string" ? ua : void 0);
-    if (!result.ok) {
-      if (!lanFence(req)) {
-        writeJson(res, 403, { ok: false, code: "forbidden" });
-        return;
-      }
-      writeJson(res, 404, { ok: false, code: result.code });
-      return;
-    }
-    if (privateLanHost !== void 0) {
-      addBounded(dynamicTrustedHosts, privateLanHost, MAX_DYNAMIC_TRUSTED_HOSTS);
-    }
-    writeJson(res, 200, { ok: true, deviceId: result.deviceId }, {
-      "set-cookie": [deviceCookie(req, service.config.cookieName, result.deviceId)]
-    });
-  };
-  const handleStop = async (req, res) => {
-    if (!requireMethod(req, res, "POST")) return;
-    if (!loopbackFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    service.stop();
-    writeJson(res, 200, { ok: true });
-  };
-  const handleRevoke = async (req, res) => {
-    if (!requireMethod(req, res, "POST")) return;
-    if (!loopbackFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    const payload = revokePayloadOf(body);
-    if (payload === void 0) {
-      writeJson(res, 400, { ok: false, code: "bad-payload" });
-      return;
-    }
-    const revoked = service.revoke(payload.deviceId);
-    if (!revoked) {
-      writeJson(res, 404, { ok: false, code: "unknown-device" });
-      return;
-    }
-    writeJson(res, 200, { ok: true });
-  };
-  const handleHeartbeat = async (req, res) => {
-    if (!requireMethod(req, res, "POST")) return;
-    if (!lanFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
-    if (deviceId === void 0 || !service.heartbeat(deviceId)) {
-      writeJson(res, 401, { ok: false, code: "unpaired" });
-      return;
-    }
-    writeJson(res, 200, { ok: true });
-  };
-  const handleStatus = async (req, res) => {
-    if (!requireMethod(req, res, "GET")) return;
-    if (!lanFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
-    const paired = deviceId !== void 0 && service.hasDevice(deviceId);
-    const local = isLoopbackClient(req);
-    const snapshot2 = service.snapshot();
-    const { devices: _devices, ...rest } = snapshot2;
-    const visible = paired || local ? { ...rest, tunnelTokenStored: tunnelTokenStored() } : { phase: snapshot2.phase, lanAvailable: snapshot2.lanAvailable };
-    writeJson(res, 200, { ok: true, paired, requirePairingForLan: pairingRequired(), ...visible });
-  };
-  const handleEvents = (req, res) => {
-    if (!requireMethod(req, res, "GET")) return;
-    if (!loopbackFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    events.open(req, res);
-    events.push(service.snapshot());
-  };
-  const handleLanBind = (req, res) => {
-    if (!requireMethod(req, res, "GET")) return;
-    if (!loopbackFence(req)) {
-      writeJson(res, 403, { ok: false, code: "forbidden" });
-      return;
-    }
-    writeJson(res, 200, { ok: true, ...deps.lanBindStatus?.() ?? {} });
+  const refusePlain = (res, text, status = 403) => {
+    res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
+    res.end(text);
   };
   const handleAcceptPage = async (req, res) => {
     if (!requireMethod(req, res, "GET")) return;
-    const privateLanHost = privateLanHostOf(req, true);
-    if (!lanFence(req, true) && privateLanHost === void 0) {
+    const privateHost = privateLanHostOf(req, true);
+    if (!fences.lan(req, true) && privateHost === void 0) {
       logEntryRefusal(req, PAIR_PATHS.acceptPage, "untrusted-host");
-      res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
-      res.end("forbidden");
+      refusePlain(res, "forbidden");
       return;
     }
-    if (rateLimitAccept(req, "page")) {
-      res.writeHead(429, { "content-type": "text/plain; charset=utf-8" });
-      res.end("rate limited");
+    if (deps.limiter.limited(req, "page")) {
+      refusePlain(res, "rate limited", 429);
       return;
     }
     const url = new URL(req.url ?? "/", "http://pair.invalid");
@@ -9573,10 +9623,9 @@ function makeRoutes(deps) {
     const ua = req.headers["user-agent"];
     const result = token === "" ? { ok: false, code: "invalid" } : service.accept(token, typeof ua === "string" ? ua : void 0);
     if (!result.ok) {
-      if (!lanFence(req, true)) {
+      if (!fences.lan(req, true)) {
         logEntryRefusal(req, PAIR_PATHS.acceptPage, "untrusted-host-after-invalid-token");
-        res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
-        res.end("forbidden");
+        refusePlain(res, "forbidden");
         return;
       }
       const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
@@ -9590,29 +9639,25 @@ function makeRoutes(deps) {
       res.end(pairingFailurePage());
       return;
     }
-    if (privateLanHost !== void 0) {
-      addBounded(dynamicTrustedHosts, privateLanHost, MAX_DYNAMIC_TRUSTED_HOSTS);
-    }
+    if (privateHost !== void 0) fences.remember(privateHost);
     const { grant } = grants.issue(result.deviceId);
     res.writeHead(303, {
       location: `${appOrigin(req)}/pair-app?grant=${encodeURIComponent(grant)}`,
       "cache-control": "no-store",
       "referrer-policy": "no-referrer",
-      "set-cookie": [deviceCookie(req, service.config.cookieName, result.deviceId)]
+      "set-cookie": [deviceCookieOf(req, service.config.cookieName, result.deviceId)]
     });
     res.end();
   };
   const handleAppPage = async (req, res) => {
     if (!requireMethod(req, res, "GET")) return;
-    if (!lanFence(req, true)) {
+    if (!fences.lan(req, true)) {
       logEntryRefusal(req, PAIR_PATHS.appPage, "untrusted-host");
-      res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
-      res.end("forbidden");
+      refusePlain(res, "forbidden");
       return;
     }
-    if (rateLimitAccept(req, "page")) {
-      res.writeHead(429, { "content-type": "text/plain; charset=utf-8" });
-      res.end("rate limited");
+    if (deps.limiter.limited(req, "page")) {
+      refusePlain(res, "rate limited", 429);
       return;
     }
     const url = new URL(req.url ?? "/", "http://pair.invalid");
@@ -9626,68 +9671,69 @@ function makeRoutes(deps) {
     }
     const html = await deps.indexDocument?.(id).catch(() => void 0);
     if (html === void 0) {
-      res.writeHead(502, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
-      res.end("remote device app unavailable");
+      refusePlain(res, "remote device app unavailable", 502);
       return;
     }
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
       "referrer-policy": "no-referrer",
-      "set-cookie": [deviceCookie(req, service.config.cookieName, id)]
+      "set-cookie": [deviceCookieOf(req, service.config.cookieName, id)]
     });
     res.end(patchAppShell(html, id));
   };
   const handleAppServiceWorker = (req, res) => {
     if (!requireMethod(req, res, "GET")) return;
-    if (!lanFence(req, true)) {
-      res.writeHead(403, { "content-type": "text/plain; charset=utf-8" });
-      res.end("forbidden");
+    if (!fences.lan(req, true)) {
+      refusePlain(res, "forbidden");
       return;
     }
     res.writeHead(200, {
       "content-type": "text/javascript; charset=utf-8",
       "cache-control": "no-store",
-      // Defensive: the root-level script path already allows a `/` scope,
-      // the header keeps that explicit for engines that want it stated.
+      // Defensive: the root-level script path already allows a `/` scope, the
+      // header keeps that explicit for engines that want it stated.
       "service-worker-allowed": "/"
     });
     res.end(appServiceWorkerScript());
   };
   const routes = [
-    { kind: "exact", path: PAIR_PATHS.issue, handler: handleIssue },
-    { kind: "exact", path: PAIR_PATHS.accept, handler: handleAccept },
-    { kind: "exact", path: PAIR_PATHS.stop, handler: handleStop },
-    { kind: "exact", path: PAIR_PATHS.revoke, handler: handleRevoke },
-    { kind: "exact", path: PAIR_PATHS.heartbeat, handler: handleHeartbeat },
-    { kind: "exact", path: PAIR_PATHS.status, handler: handleStatus },
-    { kind: "exact", path: PAIR_PATHS.events, handler: handleEvents }
+    { kind: "exact", path: PAIR_PATHS.acceptPage, handler: handleAcceptPage }
   ];
-  if (deps.lanBindStatus !== void 0) {
-    routes.push({ kind: "exact", path: PAIR_PATHS.lanBind, handler: handleLanBind });
-  }
-  routes.push({ kind: "exact", path: PAIR_PATHS.acceptPage, handler: handleAcceptPage });
   if (deps.indexDocument !== void 0) {
     routes.push({ kind: "exact", path: PAIR_PATHS.appPage, handler: handleAppPage });
     routes.push({ kind: "exact", path: PAIR_PATHS.appServiceWorker, handler: handleAppServiceWorker });
   }
   return routes;
 }
-function isHttpsRequest(req) {
-  const forwarded = req.headers["x-forwarded-proto"];
-  if (typeof forwarded === "string") {
-    const first = forwarded.split(",")[0]?.trim().toLowerCase();
-    if (first === "https") return true;
-  }
-  return req.socket.encrypted === true;
-}
-function deviceCookie(req, cookieName, deviceId) {
-  const secure = isHttpsRequest(req) ? "; Secure" : "";
-  return `${cookieName}=${deviceId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${String(COOKIE_MAX_AGE_SEC)}${secure}`;
-}
-function appOrigin(req) {
-  const origin = `http://${req.headers.host ?? "127.0.0.1"}`;
-  return isHttpsRequest(req) ? origin.replace("http://", "https://") : origin;
+
+// packages/dsh-remote-web/src/http/routes.ts
+function makeRoutes(deps) {
+  const grants = deps.grants ?? createPairGrantStore();
+  const fences = createPairingFences({
+    service: deps.service,
+    trustedHosts: deps.trustedHosts,
+    grants
+  });
+  const limiter = createAcceptRateLimiter();
+  return [
+    ...makePairRoutes({
+      service: deps.service,
+      fences,
+      limiter,
+      requirePairingForLan: deps.requirePairingForLan,
+      enabled: deps.enabled,
+      tunnelTokenStored: deps.tunnelTokenStored,
+      lanBindStatus: deps.lanBindStatus
+    }),
+    ...makeLandingRoutes({
+      service: deps.service,
+      fences,
+      limiter,
+      grants,
+      indexDocument: deps.indexDocument
+    })
+  ];
 }
 
 // packages/dsh-remote-web/src/http/loopback-proxy.ts

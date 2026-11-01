@@ -73,10 +73,11 @@ Rules that keep it readable:
   and `exports["./invariant"]` (the invariant companion). Everything else is
   internal. A name that is exported owes a docstring; none of the internal
   modules are reachable from outside the package.
-- Every source module is maintained here. There is no generated copy of a
-  module and no cross-repository sync step: a module two rows need is either
-  bundled into both from a repository-internal source tree or does not exist.
-  The one published cross-repository contract is `mountOnce`'s
+- Every source module is maintained here, inside the package that ships it.
+  There is no generated copy, no cross-repository sync step, and no shared
+  runtime module between rows: a row that needs a helper implements it in its
+  own tree, and the build copies nothing between packages. The one published
+  cross-repository contract is `mountOnce`'s
   `Symbol.for('dsh-web.mounted-plugins')` registry, whose shape sibling
   packages in other repositories read — changing it breaks them.
 
