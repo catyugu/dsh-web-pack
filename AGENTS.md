@@ -38,3 +38,7 @@ source and rebuild.
   `cloudflared` npm package or on a machine-local tool directory.
 - Every public behavior change needs a line in `CHANGELOG.md` and, when it
   changes a row's shape, in `docs/design.md`.
+- Tests are budgeted, not grown: at most 10 test files and 50 entries per row
+  package, and each entry pins a behavior a user can observe end to end. New
+  coverage joins an existing file; a test that only raises a number is not
+  worth its maintenance.
