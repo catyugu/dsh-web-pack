@@ -28604,6 +28604,72 @@ function writeJson(res, status, body, headers = {}) {
   res.end(payload);
 }
 
+// packages/dsh-remote-web/src/http/reopen-worker.ts
+function appServiceWorkerScript() {
+  return `'use strict';
+var SHELL_CACHE = 'dsh-remote-shell-v1';
+var SHELL_PREFIX = 'dsh-remote-shell-';
+var SHELL_KEY = '/dsh-remote-shell';
+var APP_URL = '/pair-app';
+self.addEventListener('install', function (event) {
+  event.waitUntil(refreshShell().then(function () { return self.skipWaiting(); }));
+});
+/* CacheStorage is shared by every worker and page of this origin, so only the
+   plugin's own namespace may be pruned: an upstream or sibling-plugin cache is
+   none of this worker's business. */
+self.addEventListener('activate', function (event) {
+  event.waitUntil(self.caches.keys().then(function (names) {
+    return Promise.all(names.map(function (name) {
+      var mine = name.indexOf(SHELL_PREFIX) === 0;
+      return mine && name !== SHELL_CACHE ? self.caches.delete(name) : Promise.resolve();
+    }));
+  }).then(function () { return self.clients.claim(); }));
+});
+self.addEventListener('fetch', function (event) {
+  var request = event.request;
+  if (request.method !== 'GET' || request.mode !== 'navigate') return;
+  var path;
+  try { path = new URL(request.url).pathname; } catch (error) { return; }
+  if (path !== '/') return;
+  event.respondWith(reopen(event));
+});
+/* Network-first: a live pairing gets the current shell (the /pair-app check
+   refreshes lastSeenAt, so every reopen also keeps the session alive); a
+   refused shell passes the original navigation through for the harness's
+   own response; an unreachable server falls back to the cached shell. The
+   cached shell embeds the device id, so a refusal drops it: a revoked device
+   must not leave its credential in CacheStorage for a later offline open. */
+function reopen(event) {
+  var request = event.request;
+  return fetch(APP_URL, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
+    if (!response.ok) return dropShell().then(function () { return fetch(request); });
+    var copy = response.clone();
+    event.waitUntil(self.caches.open(SHELL_CACHE).then(function (cache) {
+      return cache.put(SHELL_KEY, copy);
+    }));
+    return response;
+  }, function () {
+    return self.caches.match(SHELL_KEY).then(function (cached) {
+      return cached !== undefined ? cached : fetch(request);
+    });
+  });
+}
+/* Forgetting the shell is always safe: the next install/reopen rebuilds it. */
+function dropShell() {
+  return self.caches.delete(SHELL_CACHE).then(function () { return undefined; }, function () { return undefined; });
+}
+/* Best-effort shell warm-up and refresh; never rejects. */
+function refreshShell() {
+  return fetch(APP_URL, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
+    if (!response.ok) return dropShell();
+    var copy = response.clone();
+    return self.caches.open(SHELL_CACHE).then(function (cache) {
+      return cache.put(SHELL_KEY, copy);
+    });
+  }, function () { return undefined; });
+}`;
+}
+
 // packages/dsh-remote-web/src/pairing/pair-grant.ts
 import { randomBytes as randomBytes2 } from "node:crypto";
 var DEFAULT_PAIR_GRANT_TTL_MS = 6e4;
@@ -28864,59 +28930,6 @@ function patchAppShell(html, deviceId) {
   if (head === null) return script + html;
   const end = head.index + head[0].length;
   return html.slice(0, end) + script + html.slice(end);
-}
-function appServiceWorkerScript() {
-  return `'use strict';
-var SHELL_CACHE = 'dsh-remote-shell-v1';
-var SHELL_KEY = '/dsh-remote-shell';
-var APP_URL = '/pair-app';
-self.addEventListener('install', function (event) {
-  event.waitUntil(refreshShell().then(function () { return self.skipWaiting(); }));
-});
-self.addEventListener('activate', function (event) {
-  event.waitUntil(self.caches.keys().then(function (names) {
-    return Promise.all(names.map(function (name) {
-      return name === SHELL_CACHE ? Promise.resolve() : self.caches.delete(name);
-    }));
-  }).then(function () { return self.clients.claim(); }));
-});
-self.addEventListener('fetch', function (event) {
-  var request = event.request;
-  if (request.method !== 'GET' || request.mode !== 'navigate') return;
-  var path;
-  try { path = new URL(request.url).pathname; } catch (error) { return; }
-  if (path !== '/') return;
-  event.respondWith(reopen(event));
-});
-/* Network-first: a live pairing gets the current shell (the /pair-app check
-   refreshes lastSeenAt, so every reopen also keeps the session alive); a
-   refused shell passes the original navigation through for the harness's
-   own response; an unreachable server falls back to the cached shell. */
-function reopen(event) {
-  var request = event.request;
-  return fetch(APP_URL, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
-    if (!response.ok) return fetch(request);
-    var copy = response.clone();
-    event.waitUntil(self.caches.open(SHELL_CACHE).then(function (cache) {
-      return cache.put(SHELL_KEY, copy);
-    }));
-    return response;
-  }, function () {
-    return self.caches.match(SHELL_KEY).then(function (cached) {
-      return cached !== undefined ? cached : fetch(request);
-    });
-  });
-}
-/* Best-effort shell warm-up and refresh; never rejects. */
-function refreshShell() {
-  return fetch(APP_URL, { credentials: 'same-origin', cache: 'no-store' }).then(function (response) {
-    if (!response.ok) return undefined;
-    var copy = response.clone();
-    return self.caches.open(SHELL_CACHE).then(function (cache) {
-      return cache.put(SHELL_KEY, copy);
-    });
-  }, function () { return undefined; });
-}`;
 }
 function pairingFailurePage() {
   return [
