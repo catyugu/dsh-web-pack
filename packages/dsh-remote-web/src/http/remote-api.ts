@@ -253,7 +253,17 @@ export function makeRemoteApiUpgradeRoutes(deps: RemoteApiDeps): WebUpgradeRoute
       .catch(() => undefined)
       .then((cookie) => {
         if (socket.destroyed) return
-        proxyLoopbackUpgrade(req, socket, head, port, inner, typeof cookie === 'string' ? cookie : undefined)
+        // The socket is only as good as the pairing that opened it: the
+        // service owns the connection as a lease, so a revoke, a stop, or an
+        // idle eviction closes it instead of leaving a stream open with data
+        // the device may no longer receive. `release` forgets the lease when
+        // the connection ends on its own (phone sleeps, network drops).
+        const close = () => { socket.destroy() }
+        const release = service.lease(paired, close)
+        proxyLoopbackUpgrade(req, socket, head, port, inner, {
+          ...(typeof cookie === 'string' ? { cookie } : {}),
+          onClosed: release,
+        })
       })
   }
 

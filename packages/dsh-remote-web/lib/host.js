@@ -8329,7 +8329,7 @@ var PairingService = class {
     } catch {
     }
   }
-  /** Drop sessions whose lastSeenAt is older than idleExpireMs. */
+  /** Drop sessions whose lastSeenAt is older than idleExpireMs (and their sockets). */
   evictIdle() {
     const now = this.clock.now();
     const limit = this.config.idleExpireMs ?? DEFAULT_IDLE_EXPIRE_MS;
@@ -8337,6 +8337,7 @@ var PairingService = class {
     for (const [id, session] of [...this.devices]) {
       if (now - session.lastSeenAt > limit) {
         this.devices.delete(id);
+        this.closeLeases(id);
         removed = true;
       }
     }
@@ -8549,25 +8550,28 @@ var PairingService = class {
   }
   /**
    * Stop remote control: revoke every device session and clear the token.
-   * The phone's next gated /api request 403s; the panel falls back to
-   * stopped until a fresh QR is issued.
+   * The phone's next gated /api request 403s and its open sockets close; the
+   * panel falls back to stopped until a fresh QR is issued.
    */
   stop() {
     this.tokens.clear();
     this.devices.clear();
+    this.closeAllLeases();
     this.persistRevocation();
     this.stopped = true;
     this.notify();
   }
   /**
    * Revoke one paired device. The next gated request from that cookie is
-   * refused; other sessions stay live. Unknown ids are a no-op.
+   * refused and every connection the device already holds is closed; other
+   * sessions stay live. Unknown ids are a no-op.
    * @param deviceId - the cookie value of the device to drop.
    * @returns true when a live session was removed.
    */
   revoke(deviceId) {
     if (this.stopped) return false;
     if (!this.devices.delete(deviceId)) return false;
+    this.closeLeases(deviceId);
     this.persistRevocation();
     this.notify();
     return true;
@@ -29496,14 +29500,14 @@ function pipeLoopbackHttp(req, res, port, upstreamPath, auth, cookie) {
   });
   req.pipe(upstream);
 }
-function proxyLoopbackUpgrade(req, socket, head, port, upstreamPath, cookie) {
+function proxyLoopbackUpgrade(req, socket, head, port, upstreamPath, options = {}) {
   const lines = [
     `GET ${upstreamPath} HTTP/1.1`,
     `Host: 127.0.0.1:${String(port)}`,
     "Upgrade: websocket",
     "Connection: Upgrade"
   ];
-  if (cookie !== void 0) lines.push(`Cookie: ${cookie}`);
+  if (options.cookie !== void 0) lines.push(`Cookie: ${options.cookie}`);
   for (const name2 of WS_FORWARD_HEADERS) {
     const value = req.headers[name2];
     if (value === void 0) continue;
@@ -29515,24 +29519,29 @@ function proxyLoopbackUpgrade(req, socket, head, port, upstreamPath, cookie) {
   const upstream = connect(port, "127.0.0.1");
   socket.setKeepAlive(true, 2e4);
   upstream.setKeepAlive(true, 2e4);
+  let closed = false;
   const tearDown = () => {
     upstream.destroy();
     socket.destroy();
+    if (closed) return;
+    closed = true;
+    try {
+      options.onClosed?.();
+    } catch (error62) {
+      console.error("dsh-remote-web: the channel close hook failed", error62);
+    }
   };
   upstream.on("error", tearDown);
   socket.on("error", tearDown);
-  upstream.on("close", () => {
-    socket.destroy();
-  });
-  socket.on("close", () => {
-    upstream.destroy();
-  });
+  upstream.on("close", tearDown);
+  socket.on("close", tearDown);
   upstream.on("connect", () => {
     upstream.write(handshake);
     if (head.length > 0) upstream.write(head);
     socket.pipe(upstream);
     upstream.pipe(socket);
   });
+  return tearDown;
 }
 
 // packages/dsh-remote-web/src/http/remote-api.ts
@@ -29646,7 +29655,14 @@ function makeRemoteApiUpgradeRoutes(deps) {
     }
     void Promise.resolve(deps.auth?.ready()).catch(() => void 0).then((cookie) => {
       if (socket.destroyed) return;
-      proxyLoopbackUpgrade(req, socket, head, port, inner, typeof cookie === "string" ? cookie : void 0);
+      const close = () => {
+        socket.destroy();
+      };
+      const release = service.lease(paired, close);
+      proxyLoopbackUpgrade(req, socket, head, port, inner, {
+        ...typeof cookie === "string" ? { cookie } : {},
+        onClosed: release
+      });
     });
   };
   return REMOTE_UPGRADE_PATHS.map((path) => ({

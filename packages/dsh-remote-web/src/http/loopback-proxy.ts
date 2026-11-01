@@ -126,8 +126,12 @@ function pipeLoopbackHttp(
  * @param head - bytes already read past the handshake.
  * @param port - local webServer port.
  * @param upstreamPath - path + query on 127.0.0.1.
- * @param cookie - the inner browser-auth credential for the handshake, when
- *   the upstream route enforces it (the gateway event-stream mux does).
+ * @param options - `cookie` is the inner browser-auth credential for the
+ *   handshake (the gateway event-stream mux enforces it); `onClosed` runs once
+ *   when either leg ends — the caller's lease release, so the pairing service
+ *   does not keep a dead socket on its books.
+ * @returns the teardown, so an owner that loses its authorization can close
+ *   the pipe instead of leaving a revoked device's stream open.
  */
 export function proxyLoopbackUpgrade(
   req: IncomingMessage,
@@ -135,15 +139,15 @@ export function proxyLoopbackUpgrade(
   head: Buffer,
   port: number,
   upstreamPath: string,
-  cookie?: string,
-): void {
+  options: { cookie?: string; onClosed?: () => void } = {},
+): () => void {
   const lines = [
     `GET ${upstreamPath} HTTP/1.1`,
     `Host: 127.0.0.1:${String(port)}`,
     'Upgrade: websocket',
     'Connection: Upgrade',
   ]
-  if (cookie !== undefined) lines.push(`Cookie: ${cookie}`)
+  if (options.cookie !== undefined) lines.push(`Cookie: ${options.cookie}`)
   for (const name of WS_FORWARD_HEADERS) {
     const value = req.headers[name]
     if (value === undefined) continue
@@ -158,18 +162,29 @@ export function proxyLoopbackUpgrade(
   // client's reconnect + stream re-baseline re-syncs the feed in seconds.
   ;(socket as unknown as import('node:net').Socket).setKeepAlive(true, 20_000)
   upstream.setKeepAlive(true, 20_000)
+  let closed = false
+  /** Tear both legs down once, and tell the owner the pipe is gone. */
   const tearDown = (): void => {
     upstream.destroy()
     socket.destroy()
+    if (closed) return
+    closed = true
+    try {
+      options.onClosed?.()
+    } catch (error) {
+      // A lease release must never take the proxy down with it.
+      console.error('dsh-remote-web: the channel close hook failed', error)
+    }
   }
   upstream.on('error', tearDown)
   socket.on('error', tearDown)
-  upstream.on('close', () => { socket.destroy() })
-  socket.on('close', () => { upstream.destroy() })
+  upstream.on('close', tearDown)
+  socket.on('close', tearDown)
   upstream.on('connect', () => {
     upstream.write(handshake)
     if (head.length > 0) upstream.write(head)
     socket.pipe(upstream)
     upstream.pipe(socket)
   })
+  return tearDown
 }

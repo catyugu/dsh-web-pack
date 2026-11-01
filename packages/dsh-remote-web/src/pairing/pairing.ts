@@ -289,7 +289,7 @@ export class PairingService {
     }
   }
 
-  /** Drop sessions whose lastSeenAt is older than idleExpireMs. */
+  /** Drop sessions whose lastSeenAt is older than idleExpireMs (and their sockets). */
   private evictIdle(): boolean {
     const now = this.clock.now()
     const limit = this.config.idleExpireMs ?? DEFAULT_IDLE_EXPIRE_MS
@@ -297,6 +297,7 @@ export class PairingService {
     for (const [id, session] of [...this.devices]) {
       if (now - session.lastSeenAt > limit) {
         this.devices.delete(id)
+        this.closeLeases(id)
         removed = true
       }
     }
@@ -526,12 +527,13 @@ export class PairingService {
 
   /**
    * Stop remote control: revoke every device session and clear the token.
-   * The phone's next gated /api request 403s; the panel falls back to
-   * stopped until a fresh QR is issued.
+   * The phone's next gated /api request 403s and its open sockets close; the
+   * panel falls back to stopped until a fresh QR is issued.
    */
   stop(): void {
     this.tokens.clear()
     this.devices.clear()
+    this.closeAllLeases()
     this.persistRevocation()
     this.stopped = true
     this.notify()
@@ -539,13 +541,15 @@ export class PairingService {
 
   /**
    * Revoke one paired device. The next gated request from that cookie is
-   * refused; other sessions stay live. Unknown ids are a no-op.
+   * refused and every connection the device already holds is closed; other
+   * sessions stay live. Unknown ids are a no-op.
    * @param deviceId - the cookie value of the device to drop.
    * @returns true when a live session was removed.
    */
   revoke(deviceId: string): boolean {
     if (this.stopped) return false
     if (!this.devices.delete(deviceId)) return false
+    this.closeLeases(deviceId)
     this.persistRevocation()
     this.notify()
     return true
