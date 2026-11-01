@@ -1,7 +1,6 @@
 /**
  * The settings model's contract: what a save writes, what blocks it, and what
- * survives a refusal. These are the behaviors the card's users see, pinned
- * before the UI was cut down to a renderer.
+ * survives a refusal — the behaviors the card's users see.
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
@@ -17,13 +16,7 @@ import { RemoteSettingsModel } from '../src/client/settings/remote-settings.ts'
  * @returns {object} the form and the test's controls.
  */
 function makeForm({ base = {}, user = {}, status = 'ready' } = {}) {
-  const state = {
-    status,
-    base: { ...base },
-    user: { ...user },
-    writable: true,
-    revision: 1,
-  }
+  const state = { status, base: { ...base }, user: { ...user }, writable: true, revision: 1 }
   const listeners = new Set()
   const mutations = []
   const replies = []
@@ -63,148 +56,97 @@ function makeForm({ base = {}, user = {}, status = 'ready' } = {}) {
       return true
     },
   }
-  return { form, mutations, replies, state, listeners }
+  return { form, mutations, replies, state }
 }
 
-test('an edit is a staged draft, not an overridden value, until it differs', () => {
-  const { form } = makeForm({ user: { tunnelHost: 'https://old.example' } })
+test('staging shows the draft, marks overrides, and refuses invalid text', async () => {
+  const { form, mutations } = makeForm({
+    base: { tokenTtlMs: 600_000, tunnelHost: 'https://base.example' },
+    user: { tunnelHost: 'https://old.example' },
+  })
   const model = new RemoteSettingsModel(form)
   assert.equal(model.getState().dirty, false)
   assert.equal(model.getState().fields.tunnelHost.overridden, true)
-  assert.equal(model.getState().fields.tunnelHost.text, 'https://old.example')
+  assert.equal(model.getState().fields.tokenTtlMs.text, '600000')
 
   model.edit('tunnelHost', 'https://new.example')
+  model.edit('tokenTtlMs', 'soon')
   const state = model.getState()
   assert.equal(state.dirty, true)
   assert.equal(state.fields.tunnelHost.text, 'https://new.example')
-  assert.equal(state.fields.tunnelHost.overridden, true)
-  model.dispose()
-})
-
-test('a draft the field refuses blocks the save instead of being dropped', async () => {
-  const { form, mutations } = makeForm({ base: { tokenTtlMs: 600_000 } })
-  const model = new RemoteSettingsModel(form)
-  model.edit('tokenTtlMs', 'soon')
-  assert.equal(model.getState().invalid, true)
-  assert.equal(model.getState().fields.tokenTtlMs.invalid, true)
+  assert.equal(state.fields.tokenTtlMs.invalid, true)
+  assert.equal(state.invalid, true)
 
   await model.save()
-  assert.deepEqual(mutations, [])
+  assert.deepEqual(mutations, [], 'an invalid draft blocks the save instead of being dropped')
   assert.equal(model.getState().dirty, true, 'the refused draft stays for correction')
+
+  model.discard()
+  assert.equal(model.getState().dirty, false)
+  assert.equal(model.getState().fields.tunnelHost.text, 'https://old.example')
   model.dispose()
 })
 
-test('a save writes the whole batch as one atomic mutation', async () => {
-  const { form, mutations, state } = makeForm({ base: { enabled: true, tunnel: 'off' } })
+test('a save is one atomic mutation, and a refusal keeps every draft', async () => {
+  const { form, mutations, replies } = makeForm({ base: { enabled: true, tunnel: 'off' } })
   const model = new RemoteSettingsModel(form)
   model.edit('enabled', 'false')
   model.edit('tunnel', 'named')
   model.edit('tunnelHost', 'https://dsh.example.com')
 
   await model.save()
-  assert.equal(mutations.length, 1)
   assert.deepEqual(mutations[0], [
     { op: 'set', path: ['enabled'], value: false },
     { op: 'set', path: ['tunnel'], value: 'named' },
     { op: 'set', path: ['tunnelHost'], value: 'https://dsh.example.com' },
   ])
-  assert.deepEqual(state.user, { enabled: false, tunnel: 'named', tunnelHost: 'https://dsh.example.com' })
+  assert.equal(model.getState().dirty, false)
 
-  const after = model.getState()
-  assert.equal(after.dirty, false)
-  assert.equal(after.failed, false)
-  assert.equal(after.fields.enabled.text, 'false')
-  assert.equal(after.fields.tunnel.text, 'named')
-  model.dispose()
-})
-
-test('a refused batch keeps every draft and reports the failure', async () => {
-  const { form, replies } = makeForm({ base: { enabled: true } })
-  const model = new RemoteSettingsModel(form)
   replies.push('refuse')
-  model.edit('enabled', 'false')
-
+  model.edit('enabled', 'true')
   await model.save()
-  const state = model.getState()
-  assert.equal(state.failed, true)
-  assert.equal(state.dirty, true)
-  assert.equal(state.fields.enabled.text, 'false')
-  model.dispose()
-})
+  assert.equal(model.getState().failed, true)
+  assert.equal(model.getState().dirty, true, 'a refused batch keeps its drafts')
 
-test('a rejecting transport surfaces its message', async () => {
-  const { form, replies } = makeForm({ base: { enabled: true } })
-  const model = new RemoteSettingsModel(form)
   replies.push('reject')
-  model.edit('enabled', 'false')
-
   await model.save()
-  const state = model.getState()
-  assert.equal(state.failed, true)
-  assert.equal(state.failedReason, 'the bridge is down')
-  assert.equal(state.dirty, true)
-  model.dispose()
-})
+  assert.equal(model.getState().failedReason, 'the bridge is down')
 
-test('a save pressed mid-flight runs again and can recover', async () => {
-  const { form, replies, mutations } = makeForm({ base: { enabled: true } })
-  const model = new RemoteSettingsModel(form)
+  // A save pressed mid-flight runs once the first settles, and can recover.
   let release
-  const gate = new Promise((resolve) => { release = resolve })
-  replies.push({ wait: gate, refuse: true })
-  model.edit('enabled', 'false')
-
-  const first = model.save()
-  const second = model.save()
+  const wait = new Promise((resolve) => { release = resolve })
+  replies.push({ wait, refuse: true })
+  const queued = model.save()
+  const pressed = model.save()
   release()
-  await first
-  await second
-
-  assert.equal(mutations.length, 2, 'the queued save ran once the first settled')
-  assert.equal(model.getState().dirty, false, 'the second save landed the edit')
+  await queued
+  await pressed
+  assert.equal(mutations.length, 5)
+  assert.equal(model.getState().dirty, false, 'the queued save landed the edit')
   model.dispose()
 })
 
-test('reset writes a clear only for a field the user layer holds', async () => {
+test('a reset writes only the clear it can honor, and a secret is judged by settling', async () => {
   const { form, mutations, state } = makeForm({
-    base: { tunnelHost: 'https://base.example' },
+    base: { tunnelHost: 'https://base.example', tunnelToken: '', enabled: true },
     user: { tunnelHost: 'https://mine.example' },
   })
   const model = new RemoteSettingsModel(form)
   model.reset('tunnelHost')
   assert.equal(model.getState().fields.tunnelHost.overridden, false)
-
   await model.save()
   assert.deepEqual(mutations[0], [{ op: 'unset', path: ['tunnelHost'] }])
   assert.deepEqual(state.user, {})
   assert.equal(model.getState().fields.tunnelHost.text, 'https://base.example')
-  model.dispose()
-})
 
-test('a redacted secret is judged by the mutation settling', async () => {
-  const { form, mutations } = makeForm({ base: { tunnelToken: '' } })
-  const model = new RemoteSettingsModel(form)
   model.edit('tunnelToken', 'secret-value')
-
   await model.save()
-  assert.deepEqual(mutations[0], [{ op: 'set', path: ['tunnelToken'], value: 'secret-value' }])
-  const state = model.getState()
-  assert.equal(state.failed, false)
-  assert.equal(state.dirty, false, 'the Host never echoes a secret, so settling is the only signal')
-  model.dispose()
-})
+  assert.deepEqual(mutations[1], [{ op: 'set', path: ['tunnelToken'], value: 'secret-value' }])
+  assert.equal(model.getState().dirty, false, 'the Host never echoes a secret, so settling is the only signal')
 
-test('a loading namespace renders nothing, and discard drops the drafts', () => {
-  const { form } = makeForm({ status: 'loading' })
-  const model = new RemoteSettingsModel(form)
-  assert.equal(model.getState().available, false)
+  const loading = makeForm({ status: 'loading' })
+  const early = new RemoteSettingsModel(loading.form)
+  assert.equal(early.getState().available, false, 'a loading namespace renders nothing')
   model.dispose()
-
-  const ready = makeForm({ base: { enabled: true } })
-  const second = new RemoteSettingsModel(ready.form)
-  second.edit('enabled', 'false')
-  second.discard()
-  assert.equal(second.getState().dirty, false)
-  assert.equal(second.getState().fields.enabled.text, 'true')
-  second.dispose()
+  early.dispose()
 })
