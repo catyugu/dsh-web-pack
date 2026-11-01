@@ -54,10 +54,10 @@ export interface PairGatePolicy {
 /** Read the host-authoritative desktop pairing policy. */
 export async function readPairGatePolicy(): Promise<PairGatePolicy> {
   const response = await fetch('api/pair/status')
-  if (!response.ok) throw new Error(`remote-web-ui: status failed with ${String(response.status)}`)
+  if (!response.ok) throw new Error(`dsh-remote-web: status failed with ${String(response.status)}`)
   const value = await response.json() as { requirePairingForLan?: unknown }
   if (typeof value.requirePairingForLan !== 'boolean') {
-    throw new Error('remote-web-ui: status omitted requirePairingForLan')
+    throw new Error('dsh-remote-web: status omitted requirePairingForLan')
   }
   return { requirePairingForLan: value.requirePairingForLan }
 }
@@ -141,7 +141,7 @@ export async function issuePair(address?: string): Promise<IssueResponse> {
     if (response.status === 409) return { ok: false, code: 'lan-required' }
     if (response.status === 403) return { ok: false, code: 'forbidden' }
     if (response.status === 400) return { ok: false, code: 'unknown-address' }
-    throw new Error(`remote-web-ui: issue failed with ${String(response.status)}`)
+    throw new Error(`dsh-remote-web: issue failed with ${String(response.status)}`)
   }
   return await response.json() as IssueResult
 }
@@ -168,7 +168,7 @@ export async function acceptPair(token: string): Promise<{ ok: true } | AcceptFa
 /** Revoke mobile access (paired devices + the current token). */
 export async function stopPair(): Promise<void> {
   const response = await fetch('api/pair/stop', { method: 'POST' })
-  if (!response.ok) throw new Error(`remote-web-ui: stop failed with ${String(response.status)}`)
+  if (!response.ok) throw new Error(`dsh-remote-web: stop failed with ${String(response.status)}`)
 }
 
 /**
@@ -182,7 +182,7 @@ export async function revokePair(deviceId: string): Promise<void> {
     body: JSON.stringify({ deviceId }),
   })
   if (response.status === 404) return
-  if (!response.ok) throw new Error(`remote-web-ui: revoke failed with ${String(response.status)}`)
+  if (!response.ok) throw new Error(`dsh-remote-web: revoke failed with ${String(response.status)}`)
 }
 
 /**
@@ -257,7 +257,7 @@ export class LanBindStatusError extends Error {
 /** Read the LAN-bind facts (loopback-only endpoint). */
 export async function readLanBindStatus(): Promise<LanBindFrame> {
   const response = await fetch('api/pair/lan-bind')
-  if (!response.ok) throw new LanBindStatusError(response.status, `remote-web-ui: lan-bind status failed with ${String(response.status)}`)
+  if (!response.ok) throw new LanBindStatusError(response.status, `dsh-remote-web: lan-bind status failed with ${String(response.status)}`)
   return await response.json() as LanBindFrame
 }
 

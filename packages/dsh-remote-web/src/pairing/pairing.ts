@@ -103,7 +103,7 @@ export interface TunnelStatus {
 
 /**
  * One relay-registry status frame (undefined while the stable-origin relay
- * is not in play: autoTunnel off, or the relay toggle disabled).
+ * is not in play, which today means the tunnel is not in `quick` mode).
  */
 export interface RelayStatus {
   /** registering: a sync is in flight; running: the mapping is accepted. */
@@ -178,7 +178,7 @@ export class UnknownLanAddressError extends Error {
    * @param address - the offending literal.
    */
   constructor(address: string) {
-    super(`remote-web-ui: unknown LAN address ${JSON.stringify(address)}`)
+    super(`dsh-remote-web: unknown LAN address ${JSON.stringify(address)}`)
     this.name = 'UnknownLanAddressError'
   }
 }
@@ -316,7 +316,7 @@ export class PairingService {
       this.dirty = false
       return true
     } catch (error) {
-      console.error('remote-web-ui: failed to persist paired devices', error)
+      console.error('dsh-remote-web: failed to persist paired devices', error)
       return false
     }
   }
@@ -337,9 +337,9 @@ export class PairingService {
     try {
       if (this.fs.removeFile !== undefined) this.fs.removeFile(file)
       else rmSync(file, { force: true })
-      console.error('remote-web-ui: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it')
+      console.error('dsh-remote-web: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it')
     } catch (error) {
-      console.error('remote-web-ui: the device revocation could not be persisted and the stale device store could not be removed', error)
+      console.error('dsh-remote-web: the device revocation could not be persisted and the stale device store could not be removed', error)
     }
   }
 
@@ -412,7 +412,7 @@ export class PairingService {
    */
   issue(workspaceId?: string, address?: string): { token: string; expiresAt: number } {
     if (this.lanBases.size === 0 && this.publicBase === undefined) {
-      throw new Error('remote-web-ui: pairing requires a reachable bind (--host 0.0.0.0 or publicBaseUrl)')
+      throw new Error('dsh-remote-web: pairing requires a reachable bind (--host 0.0.0.0 or publicBaseUrl)')
     }
     if (address !== undefined && !this.lanBases.has(address)) {
       throw new UnknownLanAddressError(address)
@@ -630,7 +630,7 @@ export class PairingService {
         listener(snapshot)
       } catch (error) {
         // A throwing subscriber must not break the emit loop or the caller.
-        console.error('remote-web-ui: pairing state listener failed', error)
+        console.error('dsh-remote-web: pairing state listener failed', error)
       }
     }
   }

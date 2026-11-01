@@ -1,0 +1,187 @@
+/* Card-local controls: a switch, a radio group, and the section frame they sit in. */
+
+.section + .section {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  margin-top: 4px;
+}
+
+.sectionTitle {
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.badges {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.reset {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.reset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.state {
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 11px;
+  background: var(--dsw-alias-bg-layer-3);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.switchOn {
+  border-color: transparent;
+  background: var(--dsw-alias-brand-primary);
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1);
+  transition: transform 150ms ease;
+}
+
+.knobOn {
+  transform: translateX(16px);
+}
+
+.radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.radio input {
+  margin: 2px 0 0;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.radioText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radioLabel {
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.radioDetail {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.subfield {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 22px;
+}
+
+.other {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.otherSummary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+/* Live facts under the LAN decision (bind host, firewall, reachable URLs). */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.statusLine {
+  word-break: break-all;
+}

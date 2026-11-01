@@ -10,13 +10,17 @@ by a stable-origin relay). Phones get a portrait touch adaptation layer; a
 remote desktop gets the full workbench. Everything behind `/remote` answers
 only a request that carries a live paired-device cookie.
 
-## One place for settings
+## One place for settings, three decisions
 
-Everything a user can switch — whether remote access is on at all, the pairing
-window, the cookie name, the LAN fence policy, the public base URL, the tunnel
-token, the LAN bind — lives in the popup the user already opens to pair a
-device. There is no second settings card in the plugin manager: the pairing
-sheet and the staged form are one modal (`src/client/entry/RemoteEntry.tsx`).
+The popup the user already opens to pair a device is also the only settings
+surface, and it asks three questions rather than listing config keys:
+**remote access** (one switch), **public access** (off / temporary tunnel /
+fixed-domain tunnel, with the two `named` inputs appearing only when they
+apply), and **LAN access** (follow the launch flags / open to the LAN / this
+machine only). Two leftovers — the LAN fence policy and the pairing-link
+lifetime — sit under a collapsed "Other". There is no second settings card in
+the plugin manager: the pairing sheet and the staged form are one modal
+(`src/client/entry/RemoteEntry.tsx`).
 
 Turning remote access off revokes every paired device, drops the token and
 stops the public tunnel, but the sidebar entry stays mounted: the switch is
@@ -53,25 +57,29 @@ the relay identity keeps the public origin stable.
 ## Configuration
 
 The row mounts from `cordis.patch.yml` as `web-pack-remote-web`. Its schema is
-`Config` in `src/index.ts`; the popup edits the same fields through the
-`remote-web-ui` settings namespace, so a value saved in the form and a value in
-the patch compose in the ordinary Harness order.
+`Config` in `src/index.ts`. The split below is enforced by the schema, not by
+the UI: the Host serves a form only for `volatile()` fields, so everything in
+the popup column is a user decision and everything in the patch column is a
+deployment fact (the popup cannot even show it).
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `enabled` | `true` | the popup's master switch: off revokes every device and stops the tunnel |
-| `tokenTtlMs` | 10 min | lifetime of one QR pairing link |
-| `offlineAfterMs` | 25 s | a device is offline once it is quieter than this |
-| `idleExpireMs` | 30 days | a silent device session is dropped after this |
-| `cookieName` | `dsh_pair` | cookie carrying the paired device id |
-| `requirePairingForLan` | `true` | non-loopback desktops ride the gated `/remote` channel |
-| `publicBaseUrl` | — | tunnel hostname the QR link is built from |
-| `trustedHosts` | — | extra host authorities trusted by the pairing fence |
-| `devicesFile` | fork path | override for the device store |
-| `autoTunnel` | `false` | run a Cloudflare quick tunnel (ephemeral hostname) |
-| `tunnelToken` | — | Cloudflare named-tunnel token (fixed hostname) |
-| `lanBind` | off | forward the LAN address to the loopback server |
-| `profile` | `$DSH_PROFILE` or `desktop` | profile whose patch the LAN bind manages |
+| Key | Default | Where | Meaning |
+| --- | --- | --- | --- |
+| `enabled` | `true` | popup | master switch: off revokes every device and stops the tunnel |
+| `tunnel` | `off` | popup | `off`, `quick` (ephemeral hostname) or `named` (fixed hostname) |
+| `tunnelHost` | — | popup | the fixed public hostname `named` serves |
+| `tunnelToken` | — | popup | Cloudflare tunnel token for `named`; stored redacted |
+| `lanBind` | unset | popup | unset follows the launch flags; `true` writes `0.0.0.0`; `false` pins `127.0.0.1` |
+| `requirePairingForLan` | `true` | popup | non-loopback desktops ride the gated `/remote` channel |
+| `tokenTtlMs` | 10 min | popup | lifetime of one QR pairing link |
+| `offlineAfterMs` | 25 s | patch | a device is offline once it is quieter than this |
+| `idleExpireMs` | 30 days | patch | a silent device session is dropped after this |
+| `cookieName` | `dsh_pair` | patch | cookie carrying the paired device id |
+| `trustedHosts` | — | patch | extra host authorities trusted by the pairing fence |
+| `devicesFile` | fork path | patch | override for the device store |
+| `profile` | launched profile | patch | profile whose patch the LAN bind manages |
+
+`DSH_REMOTE_TUNNEL_HOST` overrides `tunnelHost` from the environment, for
+deployments that inject the public hostname at boot.
 
 ## Building
 

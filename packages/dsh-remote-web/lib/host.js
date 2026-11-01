@@ -8251,7 +8251,7 @@ var UnknownLanAddressError = class extends Error {
    * @param address - the offending literal.
    */
   constructor(address) {
-    super(`remote-web-ui: unknown LAN address ${JSON.stringify(address)}`);
+    super(`dsh-remote-web: unknown LAN address ${JSON.stringify(address)}`);
     this.name = "UnknownLanAddressError";
   }
 };
@@ -8358,7 +8358,7 @@ var PairingService = class {
       this.dirty = false;
       return true;
     } catch (error62) {
-      console.error("remote-web-ui: failed to persist paired devices", error62);
+      console.error("dsh-remote-web: failed to persist paired devices", error62);
       return false;
     }
   }
@@ -8378,9 +8378,9 @@ var PairingService = class {
     try {
       if (this.fs.removeFile !== void 0) this.fs.removeFile(file2);
       else rmSync(file2, { force: true });
-      console.error("remote-web-ui: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it");
+      console.error("dsh-remote-web: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it");
     } catch (error62) {
-      console.error("remote-web-ui: the device revocation could not be persisted and the stale device store could not be removed", error62);
+      console.error("dsh-remote-web: the device revocation could not be persisted and the stale device store could not be removed", error62);
     }
   }
   /** The default LAN base URL (the first interface; undefined when not LAN-reachable). */
@@ -8443,7 +8443,7 @@ var PairingService = class {
    */
   issue(workspaceId, address) {
     if (this.lanBases.size === 0 && this.publicBase === void 0) {
-      throw new Error("remote-web-ui: pairing requires a reachable bind (--host 0.0.0.0 or publicBaseUrl)");
+      throw new Error("dsh-remote-web: pairing requires a reachable bind (--host 0.0.0.0 or publicBaseUrl)");
     }
     if (address !== void 0 && !this.lanBases.has(address)) {
       throw new UnknownLanAddressError(address);
@@ -8644,7 +8644,7 @@ var PairingService = class {
       try {
         listener(snapshot2);
       } catch (error62) {
-        console.error("remote-web-ui: pairing state listener failed", error62);
+        console.error("dsh-remote-web: pairing state listener failed", error62);
       }
     }
   }
@@ -28780,7 +28780,7 @@ function logEntryRefusal(request, path, reason) {
     `sec-fetch-dest=${request.headers["sec-fetch-dest"] ?? "-"}`,
     `origin=${request.headers.origin ?? "-"}`
   ].join(" ");
-  console.log(`remote-web-ui: refused ${path} from host ${request.headers.host ?? "-"} (${reason}; ${markers})`);
+  console.log(`dsh-remote-web: refused ${path} from host ${request.headers.host ?? "-"} (${reason}; ${markers})`);
 }
 function addBounded(set3, value, max) {
   if (set3.has(value)) return;
@@ -29058,7 +29058,7 @@ function makeRoutes(deps) {
     try {
       const { token, expiresAt } = service.issue(void 0, address);
       const base = address === void 0 ? service.publicBaseUrl ?? service.lanBaseUrl : service.lanBaseUrlFor(address);
-      if (base === void 0) throw new Error("remote-web-ui: base unavailable");
+      if (base === void 0) throw new Error("dsh-remote-web: base unavailable");
       writeJson(res, 200, {
         ok: true,
         url: `${base}/pair-accept?pair=${token}`,
@@ -29854,12 +29854,12 @@ var LAN_BIND_BLOCK_BEGIN = "# --- remote-web-ui lan-bind block (managed - do not
 var LAN_BIND_BLOCK_END = "# --- end remote-web-ui lan-bind block ---";
 function profilePatchFile(profile, home = dshHome()) {
   if (!PROFILE_PATTERN.test(profile)) {
-    throw new Error(`remote-web-ui: unsafe lan-bind profile ${JSON.stringify(profile)}`);
+    throw new Error(`dsh-remote-web: unsafe lan-bind profile ${JSON.stringify(profile)}`);
   }
   const file2 = resolve2(join2(home, "profiles", profile, "cordis.patch.yml"));
   const root = resolve2(join2(home, "profiles")) + sep;
   if (!file2.startsWith(root)) {
-    throw new Error(`remote-web-ui: lan-bind profile ${JSON.stringify(profile)} escapes the profiles directory`);
+    throw new Error(`dsh-remote-web: lan-bind profile ${JSON.stringify(profile)} escapes the profiles directory`);
   }
   return file2;
 }
@@ -29928,10 +29928,10 @@ function mergePatchContent(base, block, file2) {
 ${block}`;
   const doc = (0, import_yaml.parseDocument)(base, { uniqueKeys: false });
   if (doc.errors.length > 0 || doc.contents === null) {
-    throw new Error(`remote-web-ui: cannot update the lan-bind block in ${file2}: ${doc.errors[0]?.message ?? "the patch file is not a YAML document"}`);
+    throw new Error(`dsh-remote-web: cannot update the lan-bind block in ${file2}: ${doc.errors[0]?.message ?? "the patch file is not a YAML document"}`);
   }
   if (!("items" in doc.contents)) {
-    throw new Error(`remote-web-ui: cannot update the lan-bind block in ${file2}: the patch file is not a top-level patch list`);
+    throw new Error(`dsh-remote-web: cannot update the lan-bind block in ${file2}: the patch file is not a top-level patch list`);
   }
   toBlockStyle(doc.contents);
   const rendered = doc.toString({ lineWidth: 0 }).trimEnd();
@@ -29996,19 +29996,14 @@ function isHttpUrl(value) {
   }
 }
 function tunnelPlanOf(value, port) {
-  if (value.autoTunnel === true) {
-    const ignored = [];
-    if (value.tunnelToken !== void 0 && value.tunnelToken !== "") ignored.push("tunnelToken");
-    if (value.publicBaseUrl !== void 0 && value.publicBaseUrl !== "") ignored.push("publicBaseUrl");
-    return { mode: "quick", targetUrl: `http://127.0.0.1:${String(port)}`, ignored };
-  }
-  if (value.tunnelToken !== void 0 && value.tunnelToken !== "") {
-    if (value.publicBaseUrl !== void 0 && isHttpUrl(value.publicBaseUrl)) {
-      return { mode: "named", token: value.tunnelToken, publicUrl: value.publicBaseUrl };
-    }
-    return { mode: "off" };
-  }
-  return { mode: "off" };
+  if (value.tunnel === "quick") return { mode: "quick", targetUrl: `http://127.0.0.1:${String(port)}` };
+  if (value.tunnel !== "named") return { mode: "off" };
+  const host = value.tunnelHost?.trim() ?? "";
+  const token = value.tunnelToken?.trim() ?? "";
+  if (host === "") return { mode: "off", problem: "host-missing" };
+  if (!isHttpUrl(host)) return { mode: "off", problem: "host-invalid" };
+  if (token === "") return { mode: "off", problem: "token-missing" };
+  return { mode: "named", token, publicUrl: host };
 }
 
 // packages/dsh-remote-web/src/ingress/relay-registry.ts
@@ -30803,10 +30798,6 @@ var PublicBaseKeeper = class {
     if (this.mode === "named") return;
     this.startGrace();
   }
-  /** Re-publish the current base after a branch change that did not move it. */
-  refresh() {
-    this.emit();
-  }
   /** Forget everything (teardown, or a mode change that stops the tunnel). */
   reset() {
     this.cancelGrace();
@@ -30946,20 +30937,25 @@ var inject = ["webServer", "typertGateway", "connection"];
 var REMOTE_WEB_UI_SETTINGS_NAMESPACE = "remote-web-ui";
 var Config = Schema.object({
   tokenTtlMs: Schema.number().step(1).min(6e4).default(10 * 6e4).volatile(),
-  offlineAfterMs: Schema.number().step(1).min(5e3).default(25e3).volatile(),
-  idleExpireMs: Schema.number().step(1).min(6e4).default(DEFAULT_IDLE_EXPIRE_MS).volatile(),
-  cookieName: Schema.string().min(1).default("dsh_pair").volatile(),
+  offlineAfterMs: Schema.number().step(1).min(5e3).default(25e3),
+  idleExpireMs: Schema.number().step(1).min(6e4).default(DEFAULT_IDLE_EXPIRE_MS),
+  cookieName: Schema.string().min(1).default("dsh_pair"),
   requirePairingForLan: Schema.boolean().default(true).volatile(),
-  publicBaseUrl: Schema.string().volatile(),
+  tunnel: Schema.string().default("off").volatile(),
+  tunnelHost: Schema.string().volatile(),
   trustedHosts: Schema.array(Schema.string()),
   devicesFile: Schema.string(),
-  autoTunnel: Schema.boolean().default(false).volatile(),
   tunnelToken: Schema.string().role("secret").volatile(),
   lanBind: Schema.boolean().volatile(),
   profile: Schema.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
   enabled: Schema.boolean().default(true).volatile()
 });
 var SWEEP_INTERVAL_MS = 1e4;
+var TUNNEL_PROBLEMS = {
+  "host-missing": "the fixed-domain tunnel needs its public hostname",
+  "host-invalid": "the fixed-domain tunnel hostname is not an http(s) URL",
+  "token-missing": "the fixed-domain tunnel needs its Cloudflare tunnel token"
+};
 function readConfigField(field, fallback) {
   if (field === void 0) return fallback;
   if (typeof field === "object" && field !== null && typeof field.get === "function") {
@@ -30993,10 +30989,10 @@ var DEFAULTS = {
   idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
   cookieName: "dsh_pair",
   requirePairingForLan: true,
-  publicBaseUrl: void 0,
+  tunnel: "off",
+  tunnelHost: void 0,
   trustedHosts: void 0,
   devicesFile: defaultDevicesFile(),
-  autoTunnel: false,
   tunnelToken: void 0,
   lanBind: void 0,
   profile: resolveManagedProfile(void 0, void 0, process.env.DSH_PROFILE),
@@ -31008,17 +31004,17 @@ function launchedProfileName(ctx) {
 }
 var apply = mountOnce("@catyugu/dsh-remote-web", applyImpl);
 function applyImpl(ctx, config2) {
-  const envPublicBase = process.env.DSH_REMOTE_PUBLIC_BASE_URL?.trim() || void 0;
+  const envTunnelHost = process.env.DSH_REMOTE_TUNNEL_HOST?.trim() || void 0;
   const resolve3 = () => ({
     tokenTtlMs: readConfigField(config2?.tokenTtlMs, DEFAULTS.tokenTtlMs),
     offlineAfterMs: readConfigField(config2?.offlineAfterMs, DEFAULTS.offlineAfterMs),
     idleExpireMs: readConfigField(config2?.idleExpireMs, DEFAULTS.idleExpireMs),
     cookieName: readConfigField(config2?.cookieName, DEFAULTS.cookieName),
     requirePairingForLan: readConfigField(config2?.requirePairingForLan, DEFAULTS.requirePairingForLan),
-    publicBaseUrl: readOptionalConfigField(config2?.publicBaseUrl) ?? envPublicBase,
+    tunnel: readConfigField(config2?.tunnel, DEFAULTS.tunnel),
+    tunnelHost: readOptionalConfigField(config2?.tunnelHost) ?? envTunnelHost,
     trustedHosts: readOptionalConfigField(config2?.trustedHosts),
     devicesFile: readConfigField(config2?.devicesFile, DEFAULTS.devicesFile),
-    autoTunnel: readConfigField(config2?.autoTunnel, DEFAULTS.autoTunnel),
     tunnelToken: readOptionalConfigField(config2?.tunnelToken),
     lanBind: readOptionalConfigField(config2?.lanBind),
     profile: resolveManagedProfile(readOptionalConfigField(config2?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
@@ -31051,11 +31047,11 @@ function applyImpl(ctx, config2) {
           } else if (state.state === "off") {
             publicBase.setRelay(void 0);
           } else if (state.state === "failed") {
-            console.warn(`remote-web-ui: relay registration failed (${state.error}) \u2014 the stable origin may serve its offline page until the retry lands`);
+            console.warn(`dsh-remote-web: relay registration failed (${state.error}) \u2014 the stable origin may serve its offline page until the retry lands`);
           }
         });
       } catch (error62) {
-        console.warn(`remote-web-ui: relay registry unavailable (${error62 instanceof Error ? error62.message : String(error62)}) \u2014 the quick URL is the QR base`);
+        console.warn(`dsh-remote-web: relay registry unavailable (${error62 instanceof Error ? error62.message : String(error62)}) \u2014 the quick URL is the QR base`);
       }
     }
     return relayRegistrar;
@@ -31065,7 +31061,7 @@ function applyImpl(ctx, config2) {
     relayAnnouncedFor = target;
     void registrar.announce(target);
   };
-  let tunnelMode = resolve3().autoTunnel ? "quick" : "off";
+  let tunnelMode = "off";
   tunnel.onPhase((info) => {
     if (tunnelMode === "off") return;
     if (info.phase === "running" && info.url !== void 0) {
@@ -31086,7 +31082,7 @@ function applyImpl(ctx, config2) {
     disposeRelayRegistrar();
     publicBase.dispose();
     tunnel.dispose();
-  }, "remote-web-ui: auto tunnel");
+  }, "dsh-remote-web: auto tunnel");
   const bindKnown = (ctx.webServer.host === "0.0.0.0" || ctx.webServer.host === "127.0.0.1") && Number.isFinite(ctx.webServer.port);
   if (bindKnown) {
     const lanBases = ctx.webServer.host === "0.0.0.0" ? lanIPv4Addresses().map((address) => ({ address, base: `http://${address}:${String(ctx.webServer.port)}` })) : [];
@@ -31201,7 +31197,7 @@ function applyImpl(ctx, config2) {
     auth: innerAuth
   });
   const gate = makeGateListener(service, () => resolve3().requirePairingForLan, () => resolve3().enabled);
-  ctx.effect(() => ctx.on("api/gate", gate), "remote-web-ui: api gate");
+  ctx.effect(() => ctx.on("api/gate", gate), "dsh-remote-web: api gate");
   let postureKey;
   let postureWasExposed = false;
   const runPostureProbe = () => {
@@ -31221,9 +31217,9 @@ function applyImpl(ctx, config2) {
       const exposedHosts = snapshot2.hosts.filter((host) => host.exposed).map((host) => host.host);
       const exposed = exposedHosts.length > 0;
       if (exposed && !postureWasExposed) {
-        console.error(`remote-web-ui: CRITICAL \u2014 the /api fence is OPEN for [${exposedHosts.join(", ")}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`);
+        console.error(`dsh-remote-web: CRITICAL \u2014 the /api fence is OPEN for [${exposedHosts.join(", ")}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`);
       } else if (!exposed && postureWasExposed) {
-        console.log("remote-web-ui: the /api posture probe is clean again (every advertised origin refused with 403).");
+        console.log("dsh-remote-web: the /api posture probe is clean again (every advertised origin refused with 403).");
       }
       postureWasExposed = exposed;
     }).catch(() => {
@@ -31236,7 +31232,7 @@ function applyImpl(ctx, config2) {
   initialPostureTimer.unref();
   ctx.effect(() => () => {
     clearTimeout(initialPostureTimer);
-  }, "remote-web-ui: posture probe boot");
+  }, "dsh-remote-web: posture probe boot");
   providePairingAccess(ctx, (request) => {
     if (!resolve3().enabled) return false;
     return isPairedDeviceRequest(service, request);
@@ -31251,13 +31247,13 @@ function applyImpl(ctx, config2) {
       }
     }
   });
-  ctx.effect(() => presencePet, "remote-web-ui: remote-presence pet visibility");
+  ctx.effect(() => presencePet, "dsh-remote-web: remote-presence pet visibility");
   if (service.lanAddresses.length > 0) {
     const urls = service.lanAddresses.map((ip) => `http://${ip}:${String(ctx.webServer.port)}`).join(" , ");
-    console.log(`remote-web-ui: the paired Web GUI is reachable on LAN at ${urls}`);
+    console.log(`dsh-remote-web: the paired Web GUI is reachable on LAN at ${urls}`);
   }
   if (ctx.webServer.host === "0.0.0.0") {
-    console.warn("remote-web-ui: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)");
+    console.warn("dsh-remote-web: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)");
   }
   const applyLanBindWork = (value) => {
     if (value.lanBind !== void 0) {
@@ -31265,21 +31261,21 @@ function applyImpl(ctx, config2) {
       const desiredHost = desiredBindHost(value.lanBind === true, startup?.host);
       const desiredPort = desiredBindPort(startup?.port, Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : void 0);
       if (desiredPort === void 0) {
-        console.error("remote-web-ui: cannot assert the lan-bind block \u2014 the web server port is not known yet");
+        console.error("dsh-remote-web: cannot assert the lan-bind block \u2014 the web server port is not known yet");
       } else {
         try {
           const current = lanBindState(value.profile);
           if (current.host !== desiredHost || current.port !== desiredPort) {
             writeLanBind(desiredHost, desiredPort, value.profile);
-            console.log(`remote-web-ui: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`);
+            console.log(`dsh-remote-web: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`);
           }
         } catch (error62) {
-          console.error(`remote-web-ui: failed to write the lan-bind block: ${error62 instanceof Error ? error62.message : String(error62)}`);
+          console.error(`dsh-remote-web: failed to write the lan-bind block: ${error62 instanceof Error ? error62.message : String(error62)}`);
         }
       }
       const livePort = Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : void 0;
       if (livePort === void 0) {
-        console.error("remote-web-ui: cannot align the host firewall rule \u2014 the web server port is not known yet");
+        console.error("dsh-remote-web: cannot align the host firewall rule \u2014 the web server port is not known yet");
       } else {
         const nextFirewall = { enabled: value.lanBind === true, port: livePort };
         if (firewallActionNeeded(lastFirewallApplied, nextFirewall)) {
@@ -31287,7 +31283,7 @@ function applyImpl(ctx, config2) {
           if (ruleOk) {
             lastFirewallApplied = nextFirewall;
           } else {
-            console.error("remote-web-ui: the host firewall rule could not be updated (admin rights required on managed platforms)");
+            console.error("dsh-remote-web: the host firewall rule could not be updated (admin rights required on managed platforms)");
           }
         }
       }
@@ -31302,55 +31298,45 @@ function applyImpl(ctx, config2) {
       try {
         applyLanBindWork(resolve3());
       } catch (error62) {
-        console.error(`remote-web-ui: the deferred lan-bind assertion failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
+        console.error(`dsh-remote-web: the deferred lan-bind assertion failed: ${error62 instanceof Error ? error62.message : String(error62)}`);
       }
     }));
   };
   ctx.effect(() => () => {
     lanBindWorkPending = false;
-  }, "remote-web-ui: lan-bind work");
+  }, "dsh-remote-web: lan-bind work");
   const sync = () => {
     const value = resolve3();
     service.config = pairingConfigOf(value);
     scheduleLanBindWork();
-    const plan = tunnelPlanOf(value, ctx.webServer.port);
+    const plan = value.enabled ? tunnelPlanOf(value, ctx.webServer.port) : { mode: "off" };
     tunnelMode = plan.mode;
     publicBase.setMode(plan.mode);
-    const liveTunnelUrl = publicBase.quickUrl();
-    if (plan.mode !== "quick") {
-      disposeRelayRegistrar();
-      if (plan.mode !== "named") publicBase.refresh();
-    } else if (liveTunnelUrl !== void 0) {
-      const registrar = ensureRelayRegistrar();
-      if (registrar !== void 0) announceRelay(registrar, liveTunnelUrl);
-    }
     if (plan.mode === "quick") {
-      for (const ignored of plan.ignored) {
-        console.warn(`remote-web-ui: autoTunnel is on \u2014 ignoring the configured ${ignored}`);
+      const liveTunnelUrl = publicBase.quickUrl();
+      if (liveTunnelUrl !== void 0) {
+        const registrar2 = ensureRelayRegistrar();
+        if (registrar2 !== void 0) announceRelay(registrar2, liveTunnelUrl);
       }
       const registrar = ensureRelayRegistrar();
       const originHostHeader = registrar === void 0 ? void 0 : new URL(registrar.baseUrl).host;
       tunnel.start(originHostHeader === void 0 ? plan.targetUrl : { kind: "quick", targetUrl: plan.targetUrl, originHostHeader });
     } else if (plan.mode === "named") {
+      disposeRelayRegistrar();
       publicBase.markRunning(plan.publicUrl);
       tunnel.start({ kind: "named", token: plan.token, publicUrl: plan.publicUrl });
     } else {
+      disposeRelayRegistrar();
       tunnel.stop();
-      if (value.tunnelToken !== void 0 && value.tunnelToken !== "") {
-        console.warn("remote-web-ui: tunnelToken is set but publicBaseUrl is missing or not a valid URL \u2014 fill the fixed public hostname of the named tunnel (e.g. https://dsh.example.com) to run it");
-      }
-      if (value.publicBaseUrl !== void 0 && !isHttpUrl(value.publicBaseUrl)) {
-        console.warn(`remote-web-ui: ignoring malformed publicBaseUrl ${JSON.stringify(value.publicBaseUrl)} (expected https://host[:port])`);
-        service.setPublicBaseUrl(void 0);
-      } else {
-        service.setPublicBaseUrl(value.publicBaseUrl);
+      publicBase.reset();
+      if (plan.problem !== void 0) {
+        const message = TUNNEL_PROBLEMS[plan.problem];
+        console.warn(`dsh-remote-web: ${message}`);
+        service.setTunnelStatus({ state: "failed", error: message });
       }
     }
     if (!value.enabled) {
       service.stop();
-      tunnel.stop();
-      disposeRelayRegistrar();
-      publicBase.reset();
     }
     if (disposeRoutes === void 0) {
       disposeRoutes = ctx.effect(
@@ -31363,7 +31349,7 @@ function applyImpl(ctx, config2) {
             for (const dispose of disposers) dispose();
           };
         },
-        "remote-web-ui: pairing routes"
+        "dsh-remote-web: pairing routes"
       );
     }
     if (disposeSweep === void 0) {
@@ -31377,19 +31363,19 @@ function applyImpl(ctx, config2) {
             clearInterval(timer);
           };
         },
-        "remote-web-ui: presence sweep"
+        "dsh-remote-web: presence sweep"
       );
     }
     runPostureProbe();
   };
   ctx.effect(() => ctx.on("webserver/index-inject", (table) => {
     table.push({ kind: "script", placement: "head", text: UUID_POLYFILL_SCRIPT });
-  }), "remote-web-ui: uuid polyfill");
+  }), "dsh-remote-web: uuid polyfill");
   ctx.effect(() => ctx.on("webserver/index-inject", (table) => {
     const value = resolve3();
     if (!value.enabled || !value.requirePairingForLan) return;
     table.push({ kind: "script", placement: "head", text: REMOTE_CHANNEL_BOOT_SCRIPT });
-  }), "remote-web-ui: remote channel boot patch");
+  }), "dsh-remote-web: remote channel boot patch");
   ctx.on("loader/volatile-update", () => {
     sync();
   });

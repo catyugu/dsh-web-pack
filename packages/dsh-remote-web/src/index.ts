@@ -31,7 +31,7 @@ import { claimPostureKey, postureTargets, probePosture, releasePostureKey } from
 import { lanIPv4Addresses } from './ingress/lan.ts'
 import { ensureFirewallRule, firewallSummary, removeFirewallRule } from './ingress/firewall.ts'
 import { lanBindState, writeLanBind } from './ingress/lan-bind.ts'
-import { isHttpUrl, tunnelPlanOf } from './ingress/tunnel-plan.ts'
+import { tunnelPlanOf, type TunnelPlan, type TunnelProblem } from './ingress/tunnel-plan.ts'
 import { loadRelayIdentity, RelayRegistrar, type RelayState } from './ingress/relay-registry.ts'
 import { desiredBindHost, desiredBindPort, firewallActionNeeded, pendingRestartOf, resolveManagedProfile, type AppliedFirewallState, type StartupFacts } from './ingress/lan-bind-plan.ts'
 import { createInnerAuth } from './http/inner-auth.ts'
@@ -124,14 +124,36 @@ export interface Config {
    */
   requirePairingForLan?: boolean
   /**
-   * Public base URL of a tunnel in front of this server (e.g. a Cloudflare
-   * Tunnel quick URL `https://xxx.trycloudflare.com` or a named-tunnel
-   * subdomain). When set, the QR link is built from it — a phone anywhere
-   * can pair — and its host is trusted by the phone-facing pairing fence.
-   * Leave unset for LAN-only usage. Malformed values are ignored with a
-   * warning (LAN-only behavior preserved). Ignored while `autoTunnel` is on.
+   * How the public side is reached — the one decision behind what used to be
+   * three overlapping keys.
+   *
+   * - `off` (default): no public ingress; the GUI answers on its LAN addresses.
+   * - `quick`: the plugin runs a Cloudflare quick tunnel with the binary it
+   *   ships, so a phone anywhere can pair without setup. The minted hostname
+   *   changes on every start, so a paired phone has to pair again after a
+   *   restart.
+   * - `named`: the plugin runs the tunnel named by `tunnelToken` toward the
+   *   fixed `tunnelHost` mapped in the Cloudflare dashboard. That hostname
+   *   never changes, so a phone pairs once and keeps its bookmark and cookie
+   *   across restarts.
+   *
+   * Unknown values are treated as `off`.
    */
-  publicBaseUrl?: string
+  tunnel?: string
+  /**
+   * The fixed public hostname a `named` tunnel serves (e.g.
+   * `https://dsh.example.com`). Required by `named`: the tunnel token carries
+   * the tunnel, not its hostname, so without this the QR base and the fence
+   * trust would have no source. Ignored by the other modes. Can also be set
+   * via the DSH_REMOTE_TUNNEL_HOST env var.
+   */
+  tunnelHost?: string
+  /**
+   * Cloudflare tunnel token (`cloudflared tunnel run --token <t>`), required
+   * by `named`. Treated as a secret: the settings surface stores it redacted,
+   * and an empty value means "keep the stored token".
+   */
+  tunnelToken?: string
   /**
    * Extra trusted host authorities (exact host:port or port-less host) allowed
    * to access pairing endpoints and remote web services. Useful in Docker, reverse proxy,
@@ -146,29 +168,6 @@ export interface Config {
    * 365 days). Override to another absolute path when needed.
    */
   devicesFile?: string
-  /**
-   * When true, the plugin runs its own Cloudflare quick tunnel (the
-   * cloudflared binary ships with the package — no user-side install) and
-   * feeds the minted public URL into the QR base and the phone-facing
-   * pairing fence dynamically, so phones anywhere can pair without any manual
-   * tunnel setup. The minted hostname changes on every start, so a paired
-   * phone must re-pair after each restart. The manual `publicBaseUrl` and
-   * `tunnelToken` are ignored while this is on.
-   */
-  autoTunnel?: boolean
-  /**
-   * Cloudflare named-tunnel token (`cloudflared tunnel run --token <t>`).
-   * When set (and `autoTunnel` is off), the plugin runs the named tunnel
-   * itself — same binary, same lifecycle management — toward the fixed
-   * public hostname configured in the Cloudflare dashboard. Because that
-   * hostname never changes, a paired phone keeps its bookmark and its
-   * pairing cookie across `dsh web` restarts: pair once, never again.
-   * Requires `publicBaseUrl` to name that same hostname (the token does not
-   * carry it); without a valid `publicBaseUrl` the tunnel stays off and a
-   * warning explains what is missing. Treated as a secret: the settings
-   * surface stores it redacted.
-   */
-  tunnelToken?: string
   /**
    * LAN bind toggle. When the user flips it (true or false) the plugin
    * writes the managed webserver block into the profile patch — true pins
@@ -215,18 +214,21 @@ export interface Config {
  * The deployment-level fields (`trustedHosts`, `devicesFile`, `profile`) are
  * deliberately NOT volatile: they belong in the profile patch, so the form
  * leaves them to the operator instead of offering a card control that a
- * document write could not honor.
+ * document write could not honor. The same holds for the heartbeat tunables
+ * (`offlineAfterMs`, `idleExpireMs`, `cookieName`): their correct values are
+ * host facts, and editing them from the pairing popup can only mis-tune device
+ * liveness.
  */
 export const Config = z.object({
   tokenTtlMs: z.number().step(1).min(60_000).default(10 * 60_000).volatile(),
-  offlineAfterMs: z.number().step(1).min(5_000).default(25_000).volatile(),
-  idleExpireMs: z.number().step(1).min(60_000).default(DEFAULT_IDLE_EXPIRE_MS).volatile(),
-  cookieName: z.string().min(1).default('dsh_pair').volatile(),
+  offlineAfterMs: z.number().step(1).min(5_000).default(25_000),
+  idleExpireMs: z.number().step(1).min(60_000).default(DEFAULT_IDLE_EXPIRE_MS),
+  cookieName: z.string().min(1).default('dsh_pair'),
   requirePairingForLan: z.boolean().default(true).volatile(),
-  publicBaseUrl: z.string().volatile(),
+  tunnel: z.string().default('off').volatile(),
+  tunnelHost: z.string().volatile(),
   trustedHosts: z.array(z.string()),
   devicesFile: z.string(),
-  autoTunnel: z.boolean().default(false).volatile(),
   tunnelToken: z.string().role('secret').volatile(),
   lanBind: z.boolean().volatile(),
   profile: z.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
@@ -236,13 +238,20 @@ export const Config = z.object({
 /** Presence sweep cadence (a stale device flips to disconnected within two sweeps). */
 const SWEEP_INTERVAL_MS = 10_000
 
+/** Why a `named` tunnel cannot run, in the words the panel and the log show. */
+const TUNNEL_PROBLEMS: Record<TunnelProblem, string> = {
+  'host-missing': 'the fixed-domain tunnel needs its public hostname',
+  'host-invalid': 'the fixed-domain tunnel hostname is not an http(s) URL',
+  'token-missing': 'the fixed-domain tunnel needs its Cloudflare tunnel token',
+}
+
 /**
- * Fully resolved config: every field non-optional except `publicBaseUrl`,
- * which legitimately resolves to `undefined` when unset (the schema keeps it
- * optional, so `Required` alone would over-narrow it to `string`).
+ * Fully resolved config: every field non-optional except the ones that
+ * legitimately resolve to `undefined` when unset (the schema keeps them
+ * optional, so `Required` alone would over-narrow them).
  */
-type ResolvedConfig = Required<Omit<Config, 'publicBaseUrl' | 'trustedHosts' | 'devicesFile' | 'lanBind' | 'profile' | 'tunnelToken'>> & {
-  publicBaseUrl: string | undefined
+type ResolvedConfig = Required<Omit<Config, 'tunnelHost' | 'trustedHosts' | 'devicesFile' | 'lanBind' | 'profile' | 'tunnelToken'>> & {
+  tunnelHost: string | undefined
   trustedHosts: string[] | undefined
   devicesFile: string
   /** undefined until the user flips the toggle once; undefined never writes the patch. */
@@ -270,10 +279,10 @@ export interface ResolvedConfigFields {
   idleExpireMs?: ConfigField<number>
   cookieName?: ConfigField<string>
   requirePairingForLan?: ConfigField<boolean>
-  publicBaseUrl?: ConfigField<string>
+  tunnel?: ConfigField<string>
+  tunnelHost?: ConfigField<string>
   trustedHosts?: ConfigField<string[]>
   devicesFile?: ConfigField<string>
-  autoTunnel?: ConfigField<boolean>
   tunnelToken?: ConfigField<string>
   lanBind?: ConfigField<boolean>
   profile?: ConfigField<string>
@@ -333,10 +342,10 @@ const DEFAULTS: ResolvedConfig = {
   idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
   cookieName: 'dsh_pair',
   requirePairingForLan: true,
-  publicBaseUrl: undefined,
+  tunnel: 'off',
+  tunnelHost: undefined,
   trustedHosts: undefined,
   devicesFile: defaultDevicesFile(),
-  autoTunnel: false,
   tunnelToken: undefined,
   lanBind: undefined,
   profile: resolveManagedProfile(undefined, undefined, process.env.DSH_PROFILE),
@@ -365,7 +374,7 @@ function launchedProfileName(ctx: Context): string | undefined {
 export const apply = mountOnce('@catyugu/dsh-remote-web', applyImpl)
 
 function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
-  const envPublicBase = process.env.DSH_REMOTE_PUBLIC_BASE_URL?.trim() || undefined
+  const envTunnelHost = process.env.DSH_REMOTE_TUNNEL_HOST?.trim() || undefined
   // The settings are read through the volatile references at every call rather
   // than captured once: a settings save commits into those references and
   // announces `loader/volatile-update` (see the listener below), so resolving
@@ -377,10 +386,10 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     idleExpireMs: readConfigField(config?.idleExpireMs, DEFAULTS.idleExpireMs),
     cookieName: readConfigField(config?.cookieName, DEFAULTS.cookieName),
     requirePairingForLan: readConfigField(config?.requirePairingForLan, DEFAULTS.requirePairingForLan),
-    publicBaseUrl: readOptionalConfigField(config?.publicBaseUrl) ?? envPublicBase,
+    tunnel: readConfigField(config?.tunnel, DEFAULTS.tunnel),
+    tunnelHost: readOptionalConfigField(config?.tunnelHost) ?? envTunnelHost,
     trustedHosts: readOptionalConfigField(config?.trustedHosts),
     devicesFile: readConfigField(config?.devicesFile, DEFAULTS.devicesFile),
-    autoTunnel: readConfigField(config?.autoTunnel, DEFAULTS.autoTunnel),
     tunnelToken: readOptionalConfigField(config?.tunnelToken),
     lanBind: readOptionalConfigField(config?.lanBind),
     profile: resolveManagedProfile(readOptionalConfigField(config?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
@@ -436,11 +445,11 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
             // Keep the last relay URL on failures: the phone origin only
             // breaks when the mapping itself goes stale, not when one
             // refresh call fails. The registrar retries with backoff.
-            console.warn(`remote-web-ui: relay registration failed (${state.error}) — the stable origin may serve its offline page until the retry lands`)
+            console.warn(`dsh-remote-web: relay registration failed (${state.error}) — the stable origin may serve its offline page until the retry lands`)
           }
         })
       } catch (error) {
-        console.warn(`remote-web-ui: relay registry unavailable (${error instanceof Error ? error.message : String(error)}) — the quick URL is the QR base`)
+        console.warn(`dsh-remote-web: relay registry unavailable (${error instanceof Error ? error.message : String(error)}) — the quick URL is the QR base`)
       }
     }
     return relayRegistrar
@@ -452,7 +461,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   }
   // 'off' until a sync pass turns a mode on; the phase listener only feeds
   // the public base while a plugin-managed tunnel (quick or named) runs.
-  let tunnelMode: 'off' | 'quick' | 'named' = resolve().autoTunnel ? 'quick' : 'off'
+  let tunnelMode: TunnelPlan['mode'] = 'off'
   tunnel.onPhase((info: TunnelInfo) => {
     if (tunnelMode === 'off') return
     if (info.phase === 'running' && info.url !== undefined) {
@@ -479,7 +488,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     disposeRelayRegistrar()
     publicBase.dispose()
     tunnel.dispose()
-  }, 'remote-web-ui: auto tunnel')
+  }, 'dsh-remote-web: auto tunnel')
   // The bind facts are known by now (webServer is an inject edge): the LAN
   // bases are frozen per process, matching the CLI's once-per-invocation
   // sampling stance. The QR can only advertise addresses the fence accepts;
@@ -637,7 +646,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     auth: innerAuth,
   })
   const gate = makeGateListener(service, () => resolve().requirePairingForLan, () => resolve().enabled)
-  ctx.effect(() => ctx.on('api/gate', gate), 'remote-web-ui: api gate')
+  ctx.effect(() => ctx.on('api/gate', gate), 'dsh-remote-web: api gate')
 
   // ── posture probe ─────────────────────────────────────────────────────────
   // Guardrail for the one seam this plugin cannot mount a gate into: the
@@ -664,9 +673,9 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       const exposedHosts = snapshot.hosts.filter(host => host.exposed).map(host => host.host)
       const exposed = exposedHosts.length > 0
       if (exposed && !postureWasExposed) {
-        console.error(`remote-web-ui: CRITICAL — the /api fence is OPEN for [${exposedHosts.join(', ')}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`)
+        console.error(`dsh-remote-web: CRITICAL — the /api fence is OPEN for [${exposedHosts.join(', ')}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`)
       } else if (!exposed && postureWasExposed) {
-        console.log('remote-web-ui: the /api posture probe is clean again (every advertised origin refused with 403).')
+        console.log('dsh-remote-web: the /api posture probe is clean again (every advertised origin refused with 403).')
       }
       postureWasExposed = exposed
     }).catch(() => {
@@ -679,7 +688,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   // before it mounts would read the SPA fallback and false-positive.
   const initialPostureTimer = nodeSetTimeout(() => { runPostureProbe() }, 5_000)
   initialPostureTimer.unref()
-  ctx.effect(() => () => { clearTimeout(initialPostureTimer) }, 'remote-web-ui: posture probe boot')
+  ctx.effect(() => () => { clearTimeout(initialPostureTimer) }, 'dsh-remote-web: posture probe boot')
   // Sibling plugins (dsh-better-sidebar, …) look this up by name. Absent when this
   // plugin is not installed; stop() / enabled=false still refuse cookies.
   providePairingAccess(ctx, (request) => {
@@ -702,11 +711,11 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       }
     },
   })
-  ctx.effect(() => presencePet, 'remote-web-ui: remote-presence pet visibility')
+  ctx.effect(() => presencePet, 'dsh-remote-web: remote-presence pet visibility')
 
   if (service.lanAddresses.length > 0) {
     const urls = service.lanAddresses.map(ip => `http://${ip}:${String(ctx.webServer.port)}`).join(' , ')
-    console.log(`remote-web-ui: the paired Web GUI is reachable on LAN at ${urls}`)
+    console.log(`dsh-remote-web: the paired Web GUI is reachable on LAN at ${urls}`)
   }
   // Cohort honesty (see the README security model): the pairing gate covers
   // the plugin's own /remote channel; direct /api from LAN origins is
@@ -714,7 +723,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   // api/gate seam has no emitter — so stop()/revoke() cannot invalidate a
   // browser credential a device has already redeemed.
   if (ctx.webServer.host === '0.0.0.0') {
-    console.warn('remote-web-ui: LAN-exposed bind — pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)')
+    console.warn('dsh-remote-web: LAN-exposed bind — pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)')
   }
 
   // LAN bind toggle: only write the managed patch block once the user has
@@ -750,16 +759,16 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       const desiredHost = desiredBindHost(value.lanBind === true, startup?.host)
       const desiredPort = desiredBindPort(startup?.port, Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : undefined)
       if (desiredPort === undefined) {
-        console.error('remote-web-ui: cannot assert the lan-bind block — the web server port is not known yet')
+        console.error('dsh-remote-web: cannot assert the lan-bind block — the web server port is not known yet')
       } else {
         try {
           const current = lanBindState(value.profile)
           if (current.host !== desiredHost || current.port !== desiredPort) {
             writeLanBind(desiredHost, desiredPort, value.profile)
-            console.log(`remote-web-ui: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`)
+            console.log(`dsh-remote-web: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`)
           }
         } catch (error) {
-          console.error(`remote-web-ui: failed to write the lan-bind block: ${error instanceof Error ? error.message : String(error)}`)
+          console.error(`dsh-remote-web: failed to write the lan-bind block: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
       // Keep the firewall rule aligned with the toggle (managed platforms
@@ -769,7 +778,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       // port; without it there is nothing to align yet.
       const livePort = Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : undefined
       if (livePort === undefined) {
-        console.error('remote-web-ui: cannot align the host firewall rule — the web server port is not known yet')
+        console.error('dsh-remote-web: cannot align the host firewall rule — the web server port is not known yet')
       } else {
         const nextFirewall: AppliedFirewallState = { enabled: value.lanBind === true, port: livePort }
         if (firewallActionNeeded(lastFirewallApplied, nextFirewall)) {
@@ -777,7 +786,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
           if (ruleOk) {
             lastFirewallApplied = nextFirewall
           } else {
-            console.error('remote-web-ui: the host firewall rule could not be updated (admin rights required on managed platforms)')
+            console.error('dsh-remote-web: the host firewall rule could not be updated (admin rights required on managed platforms)')
           }
         }
       }
@@ -807,11 +816,11 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
         // A deferred assertion must never surface as an unhandled rejection:
         // the settings save that triggered it already answered, and the card
         // reads the live block state back on its own poll.
-        console.error(`remote-web-ui: the deferred lan-bind assertion failed: ${error instanceof Error ? error.message : String(error)}`)
+        console.error(`dsh-remote-web: the deferred lan-bind assertion failed: ${error instanceof Error ? error.message : String(error)}`)
       }
     }))
   }
-  ctx.effect(() => () => { lanBindWorkPending = false }, 'remote-web-ui: lan-bind work')
+  ctx.effect(() => () => { lanBindWorkPending = false }, 'dsh-remote-web: lan-bind work')
 
   // Apply the effective configuration to the running surfaces once per
   // activation: the service tunables, the LAN-bind block/firewall, the tunnel
@@ -820,74 +829,60 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     const value = resolve()
     service.config = pairingConfigOf(value)
     scheduleLanBindWork()
-    // The plugin-managed tunnels own the public base while one runs: the URL
+    // A plugin-managed tunnel owns the public base while it runs: the URL
     // lands in the service through the tunnel's phase listener (the minted
-    // quick URL, or the named tunnel's fixed public hostname). The manual
-    // publicBaseUrl applies only when no tunnel runs.
-    const plan = tunnelPlanOf(value, ctx.webServer.port)
+    // quick URL, or the named tunnel's fixed public hostname). `off` has no
+    // public base at all, so the QR falls back to the LAN addresses. The
+    // master switch wins over the tunnel setting: a disabled row runs nothing,
+    // which is why the "off" arm below is the only ingress teardown there is.
+    const plan: TunnelPlan = value.enabled ? tunnelPlanOf(value, ctx.webServer.port) : { mode: 'off' }
     tunnelMode = plan.mode
     publicBase.setMode(plan.mode)
-    const liveTunnelUrl = publicBase.quickUrl()
-    if (plan.mode !== 'quick') {
-      // The relay only fronts the quick tunnel; named mode owns its fixed
-      // dashboard hostname and the off mode has no public base at all.
-      disposeRelayRegistrar()
-      if (plan.mode !== 'named') publicBase.refresh()
-    } else if (liveTunnelUrl !== undefined) {
-      // The relay just turned on (or the registrar is new) while the tunnel
-      // already runs: announce now — no phase event will fire for an
-      // unchanged target.
-      const registrar = ensureRelayRegistrar()
-      if (registrar !== undefined) announceRelay(registrar, liveTunnelUrl)
-    }
     if (plan.mode === 'quick') {
-      for (const ignored of plan.ignored) {
-        console.warn(`remote-web-ui: autoTunnel is on — ignoring the configured ${ignored}`)
+      const liveTunnelUrl = publicBase.quickUrl()
+      if (liveTunnelUrl !== undefined) {
+        // The registrar is new (or the relay just came back) while the tunnel
+        // already runs: announce now — no phase event fires for an unchanged
+        // target.
+        const registrar = ensureRelayRegistrar()
+        if (registrar !== undefined) announceRelay(registrar, liveTunnelUrl)
       }
-      // With the relay on, the connector stamps the stable origin as the
+      // With the relay in front, the connector stamps the stable origin as the
       // origin-side Host (`--http-host-header`): the plugin fence and the
       // harness browser-auth are Host-bound to the relay origin, and the
-      // Workers relay cannot control the origin-side Host (fetch forces it
-      // to the URL authority). The target identity change is also what
-      // restarts a running tunnel on a relay toggle.
+      // Workers relay cannot control the origin-side Host (fetch forces it to
+      // the URL authority). The target identity change is also what restarts a
+      // running tunnel when the relay appears.
       const registrar = ensureRelayRegistrar()
       const originHostHeader = registrar === undefined ? undefined : new URL(registrar.baseUrl).host
       tunnel.start(originHostHeader === undefined
         ? plan.targetUrl
         : { kind: 'quick', targetUrl: plan.targetUrl, originHostHeader })
     } else if (plan.mode === 'named') {
+      // The relay only fronts the quick tunnel.
+      disposeRelayRegistrar()
       // The hostname is fixed and known before the process runs, so publish it
       // now: a named tunnel that fails to start must not leave the previous
       // mode's ephemeral host as the QR and fence base.
       publicBase.markRunning(plan.publicUrl)
       tunnel.start({ kind: 'named', token: plan.token, publicUrl: plan.publicUrl })
     } else {
+      disposeRelayRegistrar()
       tunnel.stop()
-      // A named-tunnel token without a usable public hostname cannot serve
-      // the QR: stay off and say exactly what is missing instead of running
-      // a tunnel nothing points at.
-      if (value.tunnelToken !== undefined && value.tunnelToken !== '') {
-        console.warn('remote-web-ui: tunnelToken is set but publicBaseUrl is missing or not a valid URL — fill the fixed public hostname of the named tunnel (e.g. https://dsh.example.com) to run it')
-      }
-      // A malformed public base is ignored with a warning — LAN-only behavior
-      // stays intact rather than silently minting unusable QR links.
-      if (value.publicBaseUrl !== undefined && !isHttpUrl(value.publicBaseUrl)) {
-        console.warn(`remote-web-ui: ignoring malformed publicBaseUrl ${JSON.stringify(value.publicBaseUrl)} (expected https://host[:port])`)
-        service.setPublicBaseUrl(undefined)
-      } else {
-        service.setPublicBaseUrl(value.publicBaseUrl)
+      publicBase.reset()
+      // An incomplete `named` setting is a configuration mistake the user can
+      // fix in the popup: name the missing input instead of leaving a silent
+      // public-less row (a running earlier tunnel is stopped either way).
+      if (plan.problem !== undefined) {
+        const message = TUNNEL_PROBLEMS[plan.problem]
+        console.warn(`dsh-remote-web: ${message}`)
+        service.setTunnelStatus({ state: 'failed', error: message })
       }
     }
     if (!value.enabled) {
+      // Everything remote goes quiet; the route family below stays mounted so
+      // the popup can still report the stopped state and flip the switch back.
       service.stop()
-      // The tunnel branch above follows the plan, not the master switch, so an
-      // explicit "off" must also drop the public ingress it started: otherwise
-      // the cloudflared child keeps a live public URL (and the relay keeps its
-      // stable row) while the panel says remote control is stopped. The relay
-      // row is deliberately kept so re-enabling reuses the same origin.
-      tunnel.stop()
-      disposeRelayRegistrar()
-      publicBase.reset()
     }
     // The route family and the sweep are mounted once for the plugin lifetime,
     // not per switch state: a disabled row still answers the panel so the
@@ -903,7 +898,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
           ]
           return () => { for (const dispose of disposers) dispose() }
         },
-        'remote-web-ui: pairing routes',
+        'dsh-remote-web: pairing routes',
       )
     }
     if (disposeSweep === undefined) {
@@ -913,7 +908,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
           timer.unref()
           return () => { clearInterval(timer) }
         },
-        'remote-web-ui: presence sweep',
+        'dsh-remote-web: presence sweep',
       )
     }
     // Settings changed the reachable posture (manual publicBaseUrl, bind):
@@ -924,7 +919,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   // the main bundle doesn't crash on non-secure contexts (LAN HTTP)
   ctx.effect(() => ctx.on('webserver/index-inject', (table) => {
     table.push({ kind: 'script', placement: 'head', text: UUID_POLYFILL_SCRIPT })
-  }), 'remote-web-ui: uuid polyfill')
+  }), 'dsh-remote-web: uuid polyfill')
 
   // Issue #987: the browser-half channel patch installs at this plugin's
   // boot entry, but dsh-client-connection boots earlier and opens its event
@@ -938,7 +933,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     const value = resolve()
     if (!value.enabled || !value.requirePairingForLan) return
     table.push({ kind: 'script', placement: 'head', text: REMOTE_CHANNEL_BOOT_SCRIPT })
-  }), 'remote-web-ui: remote channel boot patch')
+  }), 'dsh-remote-web: remote channel boot patch')
 
   // The settings write path. The Host commits the new values into this row's
   // volatile references and announces it here instead of remounting the row, so

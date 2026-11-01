@@ -82,11 +82,6 @@ export class PublicBaseKeeper {
     this.startGrace()
   }
 
-  /** Re-publish the current base after a branch change that did not move it. */
-  refresh(): void {
-    this.emit()
-  }
-
   /** Forget everything (teardown, or a mode change that stops the tunnel). */
   reset(): void {
     this.cancelGrace()

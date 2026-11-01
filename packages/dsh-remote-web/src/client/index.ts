@@ -192,7 +192,7 @@ export function apply(ctx: ClientContext): void {
   startMobileAdapt()
   ctx.effect(() => () => {
     ;(window as unknown as { __dshRemoteAdapt?: RemoteAdaptGlobal }).__dshRemoteAdapt?.setEnabled?.(false)
-  }, 'remote-web-ui: mobile-adapt')
+  }, 'dsh-remote-web: mobile-adapt')
 
   ctx.effect(() => {
     try {
@@ -200,7 +200,7 @@ export function apply(ctx: ClientContext): void {
     } catch {
       return () => {}
     }
-  }, 'remote-web-ui: dictionaries')
+  }, 'dsh-remote-web: dictionaries')
 
   // The mobile adapt's whale button expands the collapsed sidebar and the
   // activation closes the details panel — both through the official layout
@@ -303,7 +303,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => () => {
     publishSettingsFace(undefined)
     remoteSettings.dispose()
-  }, 'remote-web-ui: settings card')
+  }, 'dsh-remote-web: settings card')
 
   // Phone-side boot flow + heartbeats. Loopback pages (the desktop) never
   // heartbeat; the server ignores unpaired heartbeats anyway. Both run only
@@ -325,7 +325,7 @@ export function apply(ctx: ClientContext): void {
           }).catch(() => {})
         }, HEARTBEAT_INTERVAL_MS)
         return () => { window.clearInterval(timer) }
-      }, 'remote-web-ui: pair flow + heartbeats')
+      }, 'dsh-remote-web: pair flow + heartbeats')
     } else if (!enabled() && disposeRuntime !== undefined) {
       disposeRuntime()
       disposeRuntime = undefined
@@ -388,12 +388,12 @@ export function apply(ctx: ClientContext): void {
         disposeChannel = ctx.effect(() => () => {
           seat.onUnpaired = null
           seat.onPaired = null
-        }, 'remote-web-ui: remote desktop channel (boot patch)')
+        }, 'dsh-remote-web: remote desktop channel (boot patch)')
       } else {
         disposeChannel = ctx.effect(() => {
           const restore = installRemoteChannel(window, { onUnpaired: handleUnpaired, onPaired: hideFenceNotice })
           return restore
-        }, 'remote-web-ui: remote desktop channel')
+        }, 'dsh-remote-web: remote desktop channel')
       }
     } else if (transition === 'retire' && disposeChannel !== undefined) {
       disposeChannel()
@@ -447,5 +447,5 @@ export function apply(ctx: ClientContext): void {
       void root
     }, 1500)
     return () => { window.clearTimeout(timer) }
-  }, 'remote-web-ui: failed-pair notice')
+  }, 'dsh-remote-web: failed-pair notice')
 }

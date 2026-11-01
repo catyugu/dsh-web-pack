@@ -42,12 +42,12 @@ export type LanBindHost = '0.0.0.0' | '127.0.0.1'
  */
 export function profilePatchFile(profile: string, home: string = dshHome()): string {
   if (!PROFILE_PATTERN.test(profile)) {
-    throw new Error(`remote-web-ui: unsafe lan-bind profile ${JSON.stringify(profile)}`)
+    throw new Error(`dsh-remote-web: unsafe lan-bind profile ${JSON.stringify(profile)}`)
   }
   const file = resolve(join(home, 'profiles', profile, 'cordis.patch.yml'))
   const root = resolve(join(home, 'profiles')) + sep
   if (!file.startsWith(root)) {
-    throw new Error(`remote-web-ui: lan-bind profile ${JSON.stringify(profile)} escapes the profiles directory`)
+    throw new Error(`dsh-remote-web: lan-bind profile ${JSON.stringify(profile)} escapes the profiles directory`)
   }
   return file
 }
@@ -204,10 +204,10 @@ function mergePatchContent(base: string, block: string, file: string): string {
   if (!isFlowRoot(base)) return `${base}\n\n${block}`
   const doc = parseDocument(base, { uniqueKeys: false })
   if (doc.errors.length > 0 || doc.contents === null) {
-    throw new Error(`remote-web-ui: cannot update the lan-bind block in ${file}: ${doc.errors[0]?.message ?? 'the patch file is not a YAML document'}`)
+    throw new Error(`dsh-remote-web: cannot update the lan-bind block in ${file}: ${doc.errors[0]?.message ?? 'the patch file is not a YAML document'}`)
   }
   if (!('items' in (doc.contents as { items?: unknown[] }))) {
-    throw new Error(`remote-web-ui: cannot update the lan-bind block in ${file}: the patch file is not a top-level patch list`)
+    throw new Error(`dsh-remote-web: cannot update the lan-bind block in ${file}: the patch file is not a top-level patch list`)
   }
   toBlockStyle(doc.contents)
   const rendered = doc.toString({ lineWidth: 0 }).trimEnd()

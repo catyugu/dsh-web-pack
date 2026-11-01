@@ -251,7 +251,7 @@ function logEntryRefusal(request: IncomingMessage, path: string, reason: string)
     `sec-fetch-dest=${request.headers['sec-fetch-dest'] ?? '-'}`,
     `origin=${request.headers.origin ?? '-'}`,
   ].join(' ')
-  console.log(`remote-web-ui: refused ${path} from host ${request.headers.host ?? '-'} (${reason}; ${markers})`)
+  console.log(`dsh-remote-web: refused ${path} from host ${request.headers.host ?? '-'} (${reason}; ${markers})`)
 }
 
 /**
@@ -720,7 +720,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       // phone anywhere can reach it — and the first LAN interface otherwise.
       // An explicit address always names a LAN literal.
       const base = address === undefined ? (service.publicBaseUrl ?? service.lanBaseUrl) : service.lanBaseUrlFor(address)
-      if (base === undefined) throw new Error('remote-web-ui: base unavailable')
+      if (base === undefined) throw new Error('dsh-remote-web: base unavailable')
       writeJson(res, 200, {
         ok: true,
         url: `${base}/pair-accept?pair=${token}`,

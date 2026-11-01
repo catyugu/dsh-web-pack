@@ -1177,10 +1177,10 @@ var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primit
 // packages/dsh-remote-web/src/client/pair-api.ts
 async function readPairGatePolicy() {
   const response = await fetch("api/pair/status");
-  if (!response.ok) throw new Error(`remote-web-ui: status failed with ${String(response.status)}`);
+  if (!response.ok) throw new Error(`dsh-remote-web: status failed with ${String(response.status)}`);
   const value = await response.json();
   if (typeof value.requirePairingForLan !== "boolean") {
-    throw new Error("remote-web-ui: status omitted requirePairingForLan");
+    throw new Error("dsh-remote-web: status omitted requirePairingForLan");
   }
   return { requirePairingForLan: value.requirePairingForLan };
 }
@@ -1198,7 +1198,7 @@ async function issuePair(address) {
     if (response.status === 409) return { ok: false, code: "lan-required" };
     if (response.status === 403) return { ok: false, code: "forbidden" };
     if (response.status === 400) return { ok: false, code: "unknown-address" };
-    throw new Error(`remote-web-ui: issue failed with ${String(response.status)}`);
+    throw new Error(`dsh-remote-web: issue failed with ${String(response.status)}`);
   }
   return await response.json();
 }
@@ -1214,7 +1214,7 @@ async function acceptPair(token) {
 }
 async function stopPair() {
   const response = await fetch("api/pair/stop", { method: "POST" });
-  if (!response.ok) throw new Error(`remote-web-ui: stop failed with ${String(response.status)}`);
+  if (!response.ok) throw new Error(`dsh-remote-web: stop failed with ${String(response.status)}`);
 }
 async function revokePair(deviceId) {
   const response = await fetch("api/pair/revoke", {
@@ -1223,7 +1223,7 @@ async function revokePair(deviceId) {
     body: JSON.stringify({ deviceId })
   });
   if (response.status === 404) return;
-  if (!response.ok) throw new Error(`remote-web-ui: revoke failed with ${String(response.status)}`);
+  if (!response.ok) throw new Error(`dsh-remote-web: revoke failed with ${String(response.status)}`);
 }
 async function sendHeartbeat() {
   const response = await fetch("api/pair/heartbeat", { method: "POST" });
@@ -1252,7 +1252,7 @@ var LanBindStatusError = class extends Error {
 };
 async function readLanBindStatus() {
   const response = await fetch("api/pair/lan-bind");
-  if (!response.ok) throw new LanBindStatusError(response.status, `remote-web-ui: lan-bind status failed with ${String(response.status)}`);
+  if (!response.ok) throw new LanBindStatusError(response.status, `dsh-remote-web: lan-bind status failed with ${String(response.status)}`);
   return await response.json();
 }
 function shouldStopLanBindPoll(status) {
@@ -2092,208 +2092,6 @@ function ValueField(props) {
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: props.invalid ? settings_card_default.invalid : settings_card_default.hint, children: props.invalid ? props.invalidLabel : props.hint })
   ] });
 }
-var NON_SKIN_BODY_MARKERS = /* @__PURE__ */ new Set(["dshSkinCenter", "dshSidebarCollapsed"]);
-function isSkinActive() {
-  const datasetList = Object.keys(document.body.dataset);
-  const isActive = datasetList.some((key) => key.startsWith("dsh") && !NON_SKIN_BODY_MARKERS.has(key));
-  return isActive;
-}
-var SELECT_CLOSE_MS = 100;
-function SelectField(props) {
-  const { id: id3, options, value } = props;
-  const [open, setOpen] = (0, import_react3.useState)(false);
-  const [closing, setClosing] = (0, import_react3.useState)(false);
-  const [phase, setPhase] = (0, import_react3.useState)("initial");
-  const [activeIndex, setActiveIndex] = (0, import_react3.useState)(0);
-  const closeTimer = (0, import_react3.useRef)(void 0);
-  const wrapRef = (0, import_react3.useRef)(null);
-  const popupRef = (0, import_react3.useRef)(null);
-  const currentIndex = () => {
-    const index = options.findIndex((option) => option.value === value);
-    return index >= 0 ? index : 0;
-  };
-  const close = (0, import_react3.useCallback)(() => {
-    if (closeTimer.current !== void 0) clearTimeout(closeTimer.current);
-    setClosing(true);
-    closeTimer.current = setTimeout(() => {
-      setClosing(false);
-      setOpen(false);
-    }, SELECT_CLOSE_MS);
-  }, []);
-  const openPopup = () => {
-    if (closeTimer.current !== void 0) clearTimeout(closeTimer.current);
-    setActiveIndex(currentIndex());
-    setPhase("initial");
-    setClosing(false);
-    setOpen(true);
-  };
-  const commit = (index) => {
-    const option = options[index];
-    if (option) props.onEdit(option.value);
-    close();
-  };
-  const onTriggerClick = () => {
-    if (props.disabled) return;
-    if (open && !closing) close();
-    else openPopup();
-  };
-  const onKeyDown = (event) => {
-    if (props.disabled) return;
-    const count = options.length;
-    switch (event.key) {
-      case "ArrowDown":
-      case "ArrowUp":
-      case "Enter":
-      case " ":
-        event.preventDefault();
-        if (!open) {
-          openPopup();
-        } else if (!closing) {
-          if (event.key === "ArrowDown") setActiveIndex((index) => (index + 1) % count);
-          else if (event.key === "ArrowUp") setActiveIndex((index) => (index - 1 + count) % count);
-          else commit(activeIndex);
-        }
-        break;
-      case "Escape":
-        if (open) {
-          event.preventDefault();
-          event.stopPropagation();
-          close();
-        }
-        break;
-      case "Tab":
-        if (open) close();
-        break;
-    }
-  };
-  (0, import_react3.useEffect)(() => () => {
-    if (closeTimer.current !== void 0) clearTimeout(closeTimer.current);
-  }, []);
-  (0, import_react3.useLayoutEffect)(() => {
-    if (open && !closing && phase === "initial") {
-      void popupRef.current?.offsetHeight;
-      setPhase("open");
-    }
-  }, [open, closing, phase]);
-  (0, import_react3.useEffect)(() => {
-    if (!open) return;
-    const onPointerDown = (event) => {
-      const target = event.target;
-      if (target instanceof Node && !wrapRef.current?.contains(target)) close();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, close]);
-  (0, import_react3.useEffect)(() => {
-    if (props.disabled && open) close();
-  }, [props.disabled, open, close]);
-  if (isSkinActive()) {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      "select",
-      {
-        id: id3,
-        className: settings_card_default.select,
-        value,
-        disabled: props.disabled,
-        onChange: (event) => {
-          props.onEdit(event.target.value);
-        },
-        children: options.map((option) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: option.value, children: option.label }, option.value))
-      }
-    );
-  }
-  const label = options.find((option) => option.value === value)?.label ?? "";
-  const popupClass = closing ? `${settings_card_default.selectPopup} ${settings_card_default.selectPopupClose}` : phase === "open" ? `${settings_card_default.selectPopup} ${settings_card_default.selectPopupOpen}` : settings_card_default.selectPopup;
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.selectWrap, ref: wrapRef, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-      "button",
-      {
-        type: "button",
-        id: id3,
-        className: `${settings_card_default.select} ${settings_card_default.selectButton}`,
-        disabled: props.disabled,
-        "aria-haspopup": "listbox",
-        "aria-expanded": open,
-        "aria-activedescendant": open ? `${id3}-o${activeIndex}` : void 0,
-        "aria-invalid": props.invalid || void 0,
-        onClick: onTriggerClick,
-        onKeyDown,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.selectLabel, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-            "svg",
-            {
-              width: "14",
-              height: "14",
-              viewBox: "0 0 14 14",
-              fill: "none",
-              xmlns: "http://www.w3.org/2000/svg",
-              className: open ? `${settings_card_default.selectChevron} ${settings_card_default.selectChevronOpen}` : settings_card_default.selectChevron,
-              "aria-hidden": "true",
-              children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                "path",
-                {
-                  d: "M11.8486 5.5L11.4238 5.92383L8.69727 8.65137C8.44157 8.90706 8.21562 9.13382 8.01172 9.29785C7.79912 9.46883 7.55595 9.61756 7.25 9.66602C7.08435 9.69222 6.91565 9.69222 6.75 9.66602C6.44405 9.61756 6.20088 9.46883 5.98828 9.29785C5.78438 9.13382 5.55843 8.90706 5.30273 8.65137L2.57617 5.92383L2.15137 5.5L3 4.65137L3.42383 5.07617L6.15137 7.80273C6.42595 8.07732 6.59876 8.24849 6.74023 8.3623C6.87291 8.46904 6.92272 8.47813 6.9375 8.48047C6.97895 8.48703 7.02105 8.48703 7.0625 8.48047C7.07728 8.47813 7.12709 8.46904 7.25977 8.3623C7.40124 8.24849 7.57405 8.07732 7.84863 7.80273L10.5762 5.07617L11 4.65137L11.8486 5.5Z",
-                  fill: "currentColor"
-                }
-              )
-            }
-          )
-        ]
-      }
-    ),
-    open ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: popupClass, role: "listbox", ref: popupRef, children: options.map((option, index) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      "div",
-      {
-        id: `${id3}-o${index}`,
-        role: "option",
-        "aria-selected": option.value === value,
-        className: `${settings_card_default.selectOption}${option.value === value ? ` ${settings_card_default.selectOptionSelected}` : ""}${index === activeIndex && !closing ? ` ${settings_card_default.selectOptionActive}` : ""}`,
-        onClick: () => {
-          commit(index);
-        },
-        children: option.label
-      },
-      option.value
-    )) }) : null
-  ] });
-}
-function BooleanField(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.field, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.head, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { className: settings_card_default.label, htmlFor: props.id, children: props.label }),
-      props.overridden ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_card_default.badges, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.badge, children: props.overriddenLabel }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "button",
-          {
-            type: "button",
-            className: settings_card_default.reset,
-            disabled: props.disabled,
-            onClick: props.onReset,
-            children: props.resetLabel
-          }
-        )
-      ] }) : null
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      SelectField,
-      {
-        id: props.id,
-        options: [
-          { value: "", label: props.inheritLabel },
-          { value: "true", label: props.onLabel },
-          { value: "false", label: props.offLabel }
-        ],
-        value: props.text,
-        disabled: props.disabled,
-        invalid: props.invalid,
-        onEdit: props.onEdit
-      }
-    ),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: settings_card_default.hint, children: props.hint })
-  ] });
-}
 
 // packages/dsh-remote-web/src/client/settings/settings-form.ts
 var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
@@ -2336,6 +2134,16 @@ function booleanField(field) {
       if (trimmed === "true") return { kind: "set", value: true };
       if (trimmed === "false") return { kind: "set", value: false };
       return void 0;
+    }
+  };
+}
+function choiceField(field, choices) {
+  return {
+    field,
+    format: (value) => typeof value === "string" && choices.includes(value) ? value : "",
+    parse: (text) => {
+      if (text === "") return { kind: "clear" };
+      return choices.includes(text) ? { kind: "set", value: text } : void 0;
     }
   };
 }
@@ -2564,8 +2372,84 @@ var CardForm = class {
   }
 };
 
-// packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
+// packages/dsh-remote-web/src/client/settings/controls.module.css
+var css3 = "/* Card-local controls: a switch, a radio group, and the section frame they sit in. */\n\n.section_38a6f6 + .section_38a6f6 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  margin-top: 4px;\n}\n\n.sectionTitle_38a6f6 {\n  margin: 16px 0 0;\n  font-size: 12px;\n  font-weight: 600;\n  letter-spacing: 0.02em;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.field_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 12px 0;\n}\n\n.head_38a6f6 {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.label_38a6f6 {\n  font-size: 13px;\n  font-weight: 500;\n  color: var(--dsw-alias-label-primary);\n}\n\n.badges_38a6f6 {\n  margin-left: auto;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.badge_38a6f6 {\n  padding: 1px 6px;\n  border-radius: 6px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n}\n\n.reset_38a6f6 {\n  padding: 0;\n  border: none;\n  background: none;\n  color: var(--dsw-alias-brand-primary);\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.reset_38a6f6:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n\n.hint_38a6f6 {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.switchRow_38a6f6 {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.state_38a6f6 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.switch_38a6f6 {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  padding: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 11px;\n  background: var(--dsw-alias-bg-layer-3);\n  cursor: pointer;\n  transition: background 150ms ease;\n}\n\n.switch_38a6f6:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n\n.switchOn_38a6f6 {\n  border-color: transparent;\n  background: var(--dsw-alias-brand-primary);\n}\n\n.knob_38a6f6 {\n  position: absolute;\n  top: 2px;\n  left: 2px;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  transition: transform 150ms ease;\n}\n\n.knobOn_38a6f6 {\n  transform: translateX(16px);\n}\n\n.radios_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.radio_38a6f6 {\n  display: flex;\n  align-items: flex-start;\n  gap: 8px;\n  cursor: pointer;\n}\n\n.radio_38a6f6 input {\n  margin: 2px 0 0;\n  accent-color: var(--dsw-alias-brand-primary);\n}\n\n.radioText_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.radioLabel_38a6f6 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.radioDetail_38a6f6 {\n  font-size: 12px;\n  line-height: 17px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.subfield_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding-left: 22px;\n}\n\n.other_38a6f6 {\n  margin-top: 4px;\n  padding-top: 12px;\n  border-top: 1px solid var(--dsw-alias-border-l2);\n}\n\n.otherSummary_38a6f6 {\n  font-size: 12px;\n  font-weight: 600;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n/* Live facts under the LAN decision (bind host, firewall, reachable URLs). */\n.status_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 0 0 4px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.statusLine_38a6f6 {\n  word-break: break-all;\n}\n";
+var id3 = "@catyugu/dsh-remote-web/controls.module.css";
+if (typeof document !== "undefined" && document.getElementById(id3) === null) {
+  const tag = document.createElement("style");
+  tag.id = id3;
+  tag.dataset.plugin = "@catyugu/dsh-remote-web";
+  tag.textContent = css3;
+  document.head.appendChild(tag);
+}
+var controls_default = { "section": "section_38a6f6", "sectionTitle": "sectionTitle_38a6f6", "field": "field_38a6f6", "head": "head_38a6f6", "label": "label_38a6f6", "badges": "badges_38a6f6", "badge": "badge_38a6f6", "reset": "reset_38a6f6", "hint": "hint_38a6f6", "switchRow": "switchRow_38a6f6", "state": "state_38a6f6", "switch": "switch_38a6f6", "switchOn": "switchOn_38a6f6", "knob": "knob_38a6f6", "knobOn": "knobOn_38a6f6", "radios": "radios_38a6f6", "radio": "radio_38a6f6", "radioText": "radioText_38a6f6", "radioLabel": "radioLabel_38a6f6", "radioDetail": "radioDetail_38a6f6", "subfield": "subfield_38a6f6", "other": "other_38a6f6", "otherSummary": "otherSummary_38a6f6", "status": "status_38a6f6", "statusLine": "statusLine_38a6f6" };
+
+// packages/dsh-remote-web/src/client/settings/controls.tsx
 var import_jsx_runtime3 = require("react/jsx-runtime");
+function FieldShell(props) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.field, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.head, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { className: controls_default.label, htmlFor: props.htmlFor ?? props.id, children: props.label }),
+      props.overridden ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: controls_default.badges, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.badge, children: props.overriddenLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: controls_default.reset, disabled: props.disabled, onClick: props.onReset, children: props.resetLabel })
+      ] }) : null
+    ] }),
+    props.children,
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: controls_default.hint, children: props.hint })
+  ] });
+}
+function SwitchField(props) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.switchRow, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.state, children: props.on ? props.onLabel : props.offLabel }),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      "button",
+      {
+        type: "button",
+        id: props.id,
+        role: "switch",
+        "aria-checked": props.on,
+        "aria-label": props.label,
+        className: props.on ? `${controls_default.switch} ${controls_default.switchOn}` : controls_default.switch,
+        disabled: props.disabled,
+        onClick: () => {
+          props.onChange(!props.on);
+        },
+        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: props.on ? `${controls_default.knob} ${controls_default.knobOn}` : controls_default.knob })
+      }
+    )
+  ] }) });
+}
+function RadioField(props) {
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: controls_default.radios, role: "radiogroup", "aria-labelledby": `${props.id}-label`, children: props.options.map((option) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: controls_default.radio, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      "input",
+      {
+        type: "radio",
+        name: props.id,
+        value: option.value,
+        checked: option.value === props.value,
+        disabled: props.disabled,
+        onChange: () => {
+          props.onChange(option.value);
+        }
+      }
+    ),
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: controls_default.radioText, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.radioLabel, children: option.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.radioDetail, children: option.detail })
+    ] })
+  ] }, option.value)) }) });
+}
+
+// packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
+var import_jsx_runtime4 = require("react/jsx-runtime");
+var TUNNEL_MODES = ["off", "quick", "named"];
+function boolOf(text, fallback) {
+  if (text === "true") return true;
+  if (text === "false") return false;
+  return fallback;
+}
 var RemoteSettingsCardController = class {
   form;
   store;
@@ -2573,15 +2457,12 @@ var RemoteSettingsCardController = class {
   constructor(scope) {
     this.form = new CardForm(scope, [
       booleanField("enabled"),
-      numberField("tokenTtlMs"),
-      numberField("offlineAfterMs"),
-      numberField("idleExpireMs"),
-      textField("cookieName"),
-      booleanField("requirePairingForLan"),
-      textField("publicBaseUrl"),
-      booleanField("autoTunnel"),
+      choiceField("tunnel", TUNNEL_MODES),
+      textField("tunnelHost"),
       secretField("tunnelToken"),
-      booleanField("lanBind")
+      booleanField("lanBind"),
+      booleanField("requirePairingForLan"),
+      numberField("tokenTtlMs", { integer: true, min: 6e4 })
     ]);
     this.store = this.form.bind(() => this.projection());
   }
@@ -2589,15 +2470,12 @@ var RemoteSettingsCardController = class {
     return {
       ...this.form.shell(),
       enabled: this.form.field("enabled"),
-      tokenTtlMs: this.form.field("tokenTtlMs"),
-      offlineAfterMs: this.form.field("offlineAfterMs"),
-      idleExpireMs: this.form.field("idleExpireMs"),
-      cookieName: this.form.field("cookieName"),
-      requirePairingForLan: this.form.field("requirePairingForLan"),
-      publicBaseUrl: this.form.field("publicBaseUrl"),
-      autoTunnel: this.form.field("autoTunnel"),
+      tunnel: this.form.field("tunnel"),
+      tunnelHost: this.form.field("tunnelHost"),
       tunnelToken: this.form.field("tunnelToken"),
-      lanBind: this.form.field("lanBind")
+      lanBind: this.form.field("lanBind"),
+      requirePairingForLan: this.form.field("requirePairingForLan"),
+      tokenTtlMs: this.form.field("tokenTtlMs")
     };
   }
   /**
@@ -2625,195 +2503,202 @@ function RemoteSettingsCard(props) {
     invalidLabel: t("settings.invalidNumber"),
     disabled
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+  const enabledOn = boolOf(state.enabled.text, true);
+  const tunnelValue = state.tunnel.text === "" ? "off" : state.tunnel.text;
+  const lanValue = state.lanBind.text === "" ? "follow" : state.lanBind.text === "true" ? "on" : "off";
+  const hostDraft = state.tunnelHost.text.trim();
+  const tokenReady = state.tunnelToken.text.trim() !== "" || state.tunnelToken.overridden;
+  const namedProblemKey = tunnelValue !== "named" ? void 0 : hostDraft === "" ? "settings.tunnelHostMissing" : !/^https?:\/\/\S+$/i.test(hostDraft) ? "settings.tunnelHostInvalid" : !tokenReady ? "settings.tunnelTokenMissing" : void 0;
+  const tunnelOptions = [
+    { value: "off", label: t("settings.tunnelOff"), detail: t("settings.tunnelOffDetail") },
+    { value: "quick", label: t("settings.tunnelQuick"), detail: t("settings.tunnelQuickDetail") },
+    { value: "named", label: t("settings.tunnelNamed"), detail: t("settings.tunnelNamedDetail") }
+  ];
+  const lanOptions = [
+    { value: "follow", label: t("settings.lanFollow"), detail: t("settings.lanFollowDetail") },
+    { value: "on", label: t("settings.lanOn"), detail: t("settings.lanOnDetail") },
+    { value: "off", label: t("settings.lanOff"), detail: t("settings.lanOffDetail") }
+  ];
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
     PluginSettingsCard,
     {
       t,
       titleKey: "settings.title",
       descriptionKey: "settings.description",
       defaultOpen: false,
+      hideFooter: true,
       state,
       onSave: props.save,
       onDiscard: props.discard,
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          BooleanField,
-          {
-            id: "settings-remote-enabled",
-            label: t("settings.enabled"),
-            hint: t("settings.enabledHint"),
-            inheritLabel: t("settings.inherit"),
-            onLabel: t("settings.on"),
-            offLabel: t("settings.off"),
-            ...fieldProps,
-            ...state.enabled,
-            onEdit: (text) => {
-              props.edit("enabled", text);
-            },
-            onReset: () => {
-              props.resetField("enabled");
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionAccess") }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            SwitchField,
+            {
+              id: "settings-remote-enabled",
+              label: t("settings.enabled"),
+              hint: t("settings.enabledHint"),
+              on: enabledOn,
+              onLabel: t("settings.on"),
+              offLabel: t("settings.off"),
+              ...fieldProps,
+              ...state.enabled,
+              onChange: (on) => {
+                props.edit("enabled", on ? "true" : "false");
+              },
+              onReset: () => {
+                props.resetField("enabled");
+              }
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-token-ttl",
-            label: t("settings.tokenTtlMs"),
-            hint: t("settings.tokenTtlMsHint"),
-            numeric: true,
-            ...fieldProps,
-            ...state.tokenTtlMs,
-            onEdit: (text) => {
-              props.edit("tokenTtlMs", text);
-            },
-            onReset: () => {
-              props.resetField("tokenTtlMs");
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionPublic") }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            RadioField,
+            {
+              id: "settings-remote-tunnel",
+              label: t("settings.tunnel"),
+              hint: t("settings.tunnelHint"),
+              value: tunnelValue,
+              options: tunnelOptions,
+              ...fieldProps,
+              ...state.tunnel,
+              onChange: (value) => {
+                props.edit("tunnel", value);
+              },
+              onReset: () => {
+                props.resetField("tunnel");
+              }
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-offline",
-            label: t("settings.offlineAfterMs"),
-            hint: t("settings.offlineAfterMsHint"),
-            numeric: true,
-            ...fieldProps,
-            ...state.offlineAfterMs,
-            onEdit: (text) => {
-              props.edit("offlineAfterMs", text);
-            },
-            onReset: () => {
-              props.resetField("offlineAfterMs");
+          ),
+          tunnelValue === "named" && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: controls_default.subfield, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+              ValueField,
+              {
+                id: "settings-remote-tunnel-host",
+                label: t("settings.tunnelHost"),
+                hint: t("settings.tunnelHostHint"),
+                placeholder: "https://dsh.example.com",
+                ...fieldProps,
+                ...state.tunnelHost,
+                onEdit: (text) => {
+                  props.edit("tunnelHost", text);
+                },
+                onReset: () => {
+                  props.resetField("tunnelHost");
+                }
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+              ValueField,
+              {
+                id: "settings-remote-tunnel-token",
+                label: t("settings.tunnelToken"),
+                hint: t("settings.tunnelTokenHint"),
+                placeholder: "eyJ...",
+                ...fieldProps,
+                ...state.tunnelToken,
+                onEdit: (text) => {
+                  props.edit("tunnelToken", text);
+                },
+                onReset: () => {
+                  props.resetField("tunnelToken");
+                }
+              }
+            )
+          ] }),
+          namedProblemKey !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: settings_card_default.failed, role: "status", children: t(namedProblemKey) })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionLan") }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            RadioField,
+            {
+              id: "settings-remote-lan-bind",
+              label: t("settings.lanBind"),
+              hint: t("settings.lanBindHint"),
+              value: lanValue,
+              options: lanOptions,
+              ...fieldProps,
+              ...state.lanBind,
+              onChange: (value) => {
+                if (value === "follow") props.resetField("lanBind");
+                else props.edit("lanBind", value === "on" ? "true" : "false");
+              },
+              onReset: () => {
+                props.resetField("lanBind");
+              }
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-idle-expire",
-            label: t("settings.idleExpireMs"),
-            hint: t("settings.idleExpireMsHint"),
-            numeric: true,
-            ...fieldProps,
-            ...state.idleExpireMs,
-            onEdit: (text) => {
-              props.edit("idleExpireMs", text);
-            },
-            onReset: () => {
-              props.resetField("idleExpireMs");
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(LanBindStatus, { t })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("details", { className: controls_default.other, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("summary", { className: controls_default.otherSummary, children: t("settings.sectionOther") }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            SwitchField,
+            {
+              id: "settings-remote-fence",
+              label: t("settings.requirePairingForLan"),
+              hint: t("settings.requirePairingForLanHint"),
+              on: boolOf(state.requirePairingForLan.text, true),
+              onLabel: t("settings.on"),
+              offLabel: t("settings.off"),
+              ...fieldProps,
+              ...state.requirePairingForLan,
+              onChange: (on) => {
+                props.edit("requirePairingForLan", on ? "true" : "false");
+              },
+              onReset: () => {
+                props.resetField("requirePairingForLan");
+              }
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-cookie",
-            label: t("settings.cookieName"),
-            hint: t("settings.cookieNameHint"),
-            ...fieldProps,
-            ...state.cookieName,
-            onEdit: (text) => {
-              props.edit("cookieName", text);
-            },
-            onReset: () => {
-              props.resetField("cookieName");
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            ValueField,
+            {
+              id: "settings-remote-token-ttl",
+              label: t("settings.tokenTtlMs"),
+              hint: t("settings.tokenTtlMsHint"),
+              numeric: true,
+              ...fieldProps,
+              ...state.tokenTtlMs,
+              onEdit: (text) => {
+                props.edit("tokenTtlMs", text);
+              },
+              onReset: () => {
+                props.resetField("tokenTtlMs");
+              }
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          BooleanField,
-          {
-            id: "settings-remote-fence",
-            label: t("settings.requirePairingForLan"),
-            hint: t("settings.requirePairingForLanHint"),
-            inheritLabel: t("settings.inherit"),
-            onLabel: t("settings.on"),
-            offLabel: t("settings.off"),
-            ...fieldProps,
-            ...state.requirePairingForLan,
-            onEdit: (text) => {
-              props.edit("requirePairingForLan", text);
-            },
-            onReset: () => {
-              props.resetField("requirePairingForLan");
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: settings_card_default.footer, children: [
+          state.failed ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("p", { className: settings_card_default.failed, role: "status", children: [
+            t("settings.saveFailed"),
+            state.failedReason ? " - " + state.failedReason : ""
+          ] }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            "button",
+            {
+              type: "button",
+              className: settings_card_default.discard,
+              disabled: !state.dirty || state.saving,
+              onClick: props.discard,
+              children: t("settings.discard")
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-public-base",
-            label: t("settings.publicBaseUrl"),
-            hint: t("settings.publicBaseUrlHint"),
-            placeholder: "https://example.trycloudflare.com",
-            ...fieldProps,
-            ...state.publicBaseUrl,
-            onEdit: (text) => {
-              props.edit("publicBaseUrl", text);
-            },
-            onReset: () => {
-              props.resetField("publicBaseUrl");
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+            "button",
+            {
+              type: "button",
+              className: settings_card_default.save,
+              disabled: !state.dirty || state.invalid || state.saving || namedProblemKey !== void 0,
+              onClick: props.save,
+              children: t(state.saving ? "settings.saving" : "settings.save")
             }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          BooleanField,
-          {
-            id: "settings-remote-auto-tunnel",
-            label: t("settings.autoTunnel"),
-            hint: t("settings.autoTunnelHint"),
-            inheritLabel: t("settings.inherit"),
-            onLabel: t("settings.on"),
-            offLabel: t("settings.off"),
-            ...fieldProps,
-            ...state.autoTunnel,
-            onEdit: (text) => {
-              props.edit("autoTunnel", text);
-            },
-            onReset: () => {
-              props.resetField("autoTunnel");
-            }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          ValueField,
-          {
-            id: "settings-remote-tunnel-token",
-            label: t("settings.tunnelToken"),
-            hint: t("settings.tunnelTokenHint"),
-            placeholder: "eyJ...",
-            ...fieldProps,
-            ...state.tunnelToken,
-            onEdit: (text) => {
-              props.edit("tunnelToken", text);
-            },
-            onReset: () => {
-              props.resetField("tunnelToken");
-            }
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(LanBindStatus, { t }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          BooleanField,
-          {
-            id: "settings-remote-lan-bind",
-            label: t("settings.lanBind"),
-            hint: t("settings.lanBindHint"),
-            inheritLabel: t("settings.inherit"),
-            onLabel: t("settings.on"),
-            offLabel: t("settings.off"),
-            ...fieldProps,
-            ...state.lanBind,
-            onEdit: (text) => {
-              props.edit("lanBind", text);
-            },
-            onReset: () => {
-              props.resetField("lanBind");
-            }
-          }
-        )
+          )
+        ] })
       ]
     }
   );
@@ -2854,7 +2739,7 @@ function LanBindStatus({ t }) {
   if (frame.pendingRestart === true) {
     lines.push(t("lan.pendingRestart"));
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { display: "flex", flexDirection: "column", gap: 2, fontSize: 12, lineHeight: "18px", opacity: 0.85 }, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { style: { wordBreak: "break-all" }, children: line }, index)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: controls_default.status, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: controls_default.statusLine, children: line }, index)) });
 }
 
 // packages/dsh-remote-web/src/client/settings/settings-face.ts
@@ -2867,9 +2752,9 @@ function currentSettingsFace() {
 }
 
 // packages/dsh-remote-web/src/client/entry/PhoneIcon.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function PhoneIcon({ size = 16, className }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
     "path",
     {
       d: "M4.2 1.8h2.4l.9 2.4-1.5 1.1a7.4 7.4 0 0 0 4.7 4.7l1.1-1.5 2.4.9v2.4a.9.9 0 0 1-1 .9A11.4 11.4 0 0 1 3.3 2.8a.9.9 0 0 1 .9-1Z",
@@ -2881,7 +2766,7 @@ function PhoneIcon({ size = 16, className }) {
 }
 
 // packages/dsh-remote-web/src/client/entry/RemoteEntry.tsx
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 function mergeFrame(state, frame) {
   if (state.kind === "lan-required") {
     return {
@@ -3032,12 +2917,12 @@ function RemoteEntry({ wide, t }) {
       }, 1500);
     });
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.entryRow, "data-rail": wide ? void 0 : "rail", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(TooltipAnchor, { wide, label: t("entry.label"), onClick: openPanel, expanded: open }) }),
-    open && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: remote_default.overlay, role: "presentation", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.mask, "aria-hidden": "true", onClick: closePanel }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: remote_default.stack, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.entryRow, "data-rail": wide ? void 0 : "rail", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TooltipAnchor, { wide, label: t("entry.label"), onClick: openPanel, expanded: open }) }),
+    open && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: remote_default.overlay, role: "presentation", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.mask, "aria-hidden": "true", onClick: closePanel }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: remote_default.stack, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           RemotePanel,
           {
             t,
@@ -3054,7 +2939,7 @@ function RemoteEntry({ wide, t }) {
             onRevoke: handleRevoke
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SettingsSection, { t })
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(SettingsSection, { t })
       ] })
     ] }), document.body)
   ] });
@@ -3080,10 +2965,10 @@ function SettingsSection({ t }) {
     ])
   );
   const cardProps = { ...actions, ...hookProps, t };
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.settingsSection, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(RemoteSettingsCard, { ...cardProps }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.settingsSection, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(RemoteSettingsCard, { ...cardProps }) });
 }
 function TooltipAnchor({ wide, label, onClick, expanded }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
     "button",
     {
       type: "button",
@@ -3093,15 +2978,15 @@ function TooltipAnchor({ wide, label, onClick, expanded }) {
       "aria-expanded": expanded,
       title: label,
       onClick,
-      children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PhoneIcon, { size: wide ? 16 : 18 })
+      children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(PhoneIcon, { size: wide ? 16 : 18 })
     }
   );
 }
 
 // packages/dsh-remote-web/src/client/entry/FooterRemoteEntry.tsx
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function FooterRemoteEntry(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
     RemoteEntry,
     {
       wide: props.wide,
@@ -3112,7 +2997,7 @@ function FooterRemoteEntry(props) {
 
 // packages/dsh-remote-web/src/client/panel/PairFailedNotice.tsx
 var import_react6 = require("react");
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function PairFailedNotice({ t }) {
   const [visible, setVisible] = (0, import_react6.useState)(true);
   (0, import_react6.useEffect)(() => {
@@ -3124,9 +3009,9 @@ function PairFailedNotice({ t }) {
     };
   }, []);
   if (!visible) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: remote_default.notice, role: "alert", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: remote_default.noticeTitle, children: t("pair.failed.title") }),
-    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: remote_default.noticeDetail, children: t("pair.failed.detail") })
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: remote_default.notice, role: "alert", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.noticeTitle, children: t("pair.failed.title") }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.noticeDetail, children: t("pair.failed.detail") })
   ] });
 }
 
@@ -3204,26 +3089,39 @@ var zh = {
   // 插件设置卡片（家族 list 席位，或官方 plugins.bundle.config 席位）。
   "settings.title": "\u8FDC\u7A0B\u8FDE\u63A5\u8BBE\u7F6E",
   "settings.description": "\u624B\u673A\u914D\u5BF9\u3001\u516C\u7F51\u96A7\u9053\u4E0E\u5C40\u57DF\u7F51\u8BBF\u95EE\u3002",
+  "settings.sectionAccess": "\u8FDC\u7A0B\u8BBF\u95EE",
   "settings.enabled": "\u542F\u7528\u8FDC\u7A0B\u8BBF\u95EE",
   "settings.enabledHint": "\u5173\u95ED\u540E\u64A4\u9500\u5168\u90E8\u5DF2\u914D\u5BF9\u8BBE\u5907\u5E76\u65AD\u5F00\u516C\u7F51\u96A7\u9053\uFF1B\u4FA7\u8FB9\u680F\u5165\u53E3\u4FDD\u7559\uFF0C\u53EF\u968F\u65F6\u91CD\u65B0\u6253\u5F00\u3002",
-  "settings.tokenTtlMs": "\u914D\u5BF9\u4EE4\u724C\u6709\u6548\u671F\uFF08\u6BEB\u79D2\uFF09",
-  "settings.tokenTtlMsHint": "\u65B0\u751F\u6210\u7684\u4E8C\u7EF4\u7801\u94FE\u63A5\u5728\u6B64\u65F6\u95F4\u540E\u5931\u6548\u3002",
-  "settings.offlineAfterMs": "\u8BBE\u5907\u79BB\u7EBF\u5224\u5B9A\uFF08\u6BEB\u79D2\uFF09",
-  "settings.offlineAfterMsHint": "\u914D\u5BF9\u8BBE\u5907\u8D85\u8FC7\u8BE5\u65F6\u957F\u672A\u4E0A\u62A5\u5FC3\u8DF3\u5373\u89C6\u4E3A\u79BB\u7EBF\u3002",
-  "settings.idleExpireMs": "\u7A7A\u95F2\u8FC7\u671F\uFF08\u6BEB\u79D2\uFF09",
-  "settings.idleExpireMsHint": "\u8D85\u8FC7\u8BE5\u65F6\u957F\u6CA1\u6709\u4EFB\u4F55\u5FC3\u8DF3\u6216\u8BF7\u6C42\u7684\u5DF2\u914D\u5BF9\u8BBE\u5907\u4F1A\u88AB\u5220\u9664\uFF0C\u5FC5\u987B\u91CD\u65B0\u626B\u7801\u3002\u9ED8\u8BA4 7 \u5929\u3002",
-  "settings.cookieName": "\u8BBE\u5907 Cookie \u540D",
-  "settings.cookieNameHint": "\u643A\u5E26\u5DF2\u914D\u5BF9\u8BBE\u5907\u6807\u8BC6\u7684 Cookie \u540D\u79F0\u3002",
+  "settings.sectionPublic": "\u516C\u7F51\u8BBF\u95EE",
+  "settings.tunnel": "\u516C\u7F51\u8BBF\u95EE\u65B9\u5F0F",
+  "settings.tunnelHint": "\u8BA9\u4E0D\u5728\u540C\u4E00\u7F51\u7EDC\u7684\u624B\u673A\u8FDE\u4E0A\u8FD9\u53F0\u673A\u5668\uFF0C\u4E09\u79CD\u65B9\u5F0F\u4E92\u65A5\u3002",
+  "settings.tunnelOff": "\u5173\u95ED",
+  "settings.tunnelOffDetail": "\u53EA\u5728\u672C\u673A\u4E0E\u5C40\u57DF\u7F51\u53EF\u7528\u3002",
+  "settings.tunnelQuick": "\u4E34\u65F6\u96A7\u9053",
+  "settings.tunnelQuickDetail": "\u63D2\u4EF6\u81EA\u52A8\u8FD0\u884C Cloudflare \u4E34\u65F6\u96A7\u9053\uFF0C\u65E0\u9700\u4EFB\u4F55\u914D\u7F6E\uFF1B\u5730\u5740\u6BCF\u6B21\u542F\u52A8\u90FD\u4F1A\u53D8\u5316\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u626B\u7801\u914D\u5BF9\u3002",
+  "settings.tunnelNamed": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053",
+  "settings.tunnelNamedDetail": "\u63D2\u4EF6\u8FD0\u884C\u4F60\u81EA\u5DF1\u7684 Cloudflare \u547D\u540D\u96A7\u9053\uFF1A\u57DF\u540D\u56FA\u5B9A\uFF0C\u914D\u5BF9\u4E00\u6B21\u540E\u91CD\u542F\u4E5F\u4E0D\u7528\u91CD\u626B\u3002\u9700\u5148\u5728 Cloudflare \u63A7\u5236\u53F0\u628A\u8BE5\u57DF\u540D\u6307\u5411 http://127.0.0.1:\u7AEF\u53E3\u3002",
+  "settings.tunnelHost": "\u516C\u7F51\u57DF\u540D",
+  "settings.tunnelHostHint": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\u5BF9\u5916\u63D0\u4F9B\u7684\u5730\u5740\uFF0C\u4F8B\u5982 https://dsh.example.com\u3002",
+  "settings.tunnelToken": "Cloudflare \u96A7\u9053\u4EE4\u724C",
+  "settings.tunnelTokenHint": "cloudflared tunnel run --token \u7684\u503C\u3002\u7559\u7A7A\u8868\u793A\u6CBF\u7528\u5DF2\u4FDD\u5B58\u7684\u4EE4\u724C\u3002",
+  "settings.tunnelHostMissing": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\u9700\u8981\u586B\u5199\u516C\u7F51\u57DF\u540D\u3002",
+  "settings.tunnelHostInvalid": "\u516C\u7F51\u57DF\u540D\u5FC5\u987B\u662F http(s) \u5730\u5740\u3002",
+  "settings.tunnelTokenMissing": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\u9700\u8981\u586B\u5199 Cloudflare \u96A7\u9053\u4EE4\u724C\u3002",
+  "settings.sectionLan": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
+  "settings.lanBind": "\u7ED1\u5B9A\u5730\u5740",
+  "settings.lanBindHint": "\u51B3\u5B9A Web \u670D\u52A1\u662F\u5426\u5BF9\u5C40\u57DF\u7F51\u5F00\u653E\u3002\u6539\u52A8\u4F1A\u5199\u5165 profile \u8865\u4E01\uFF0C\u901A\u5E38\u5728\u91CD\u542F dsh web \u540E\u751F\u6548\u3002",
+  "settings.lanFollow": "\u8DDF\u968F\u542F\u52A8\u53C2\u6570",
+  "settings.lanFollowDetail": "\u63D2\u4EF6\u4E0D\u6539\u5199 profile \u8865\u4E01\uFF0C\u7ED1\u5B9A\u7531 dsh web --host \u51B3\u5B9A\u3002",
+  "settings.lanOn": "\u5BF9\u5C40\u57DF\u7F51\u5F00\u653E\uFF080.0.0.0\uFF09",
+  "settings.lanOnDetail": "\u5199\u5165 profile \u8865\u4E01\u628A\u7ED1\u5B9A\u9ED8\u8BA4\u6539\u4E3A 0.0.0.0\uFF0C\u5E76\u653E\u884C\u4E3B\u673A\u9632\u706B\u5899\u3002",
+  "settings.lanOff": "\u4EC5\u672C\u673A\uFF08127.0.0.1\uFF09",
+  "settings.lanOffDetail": "\u5199\u5165 profile \u8865\u4E01\u628A\u7ED1\u5B9A\u56FA\u5B9A\u4E3A 127.0.0.1\u3002",
+  "settings.sectionOther": "\u5176\u4ED6",
   "settings.requirePairingForLan": "\u5C40\u57DF\u7F51\u8BBF\u95EE\u8981\u6C42\u914D\u5BF9",
-  "settings.requirePairingForLanHint": "\u5F00\u542F\uFF1A\u975E\u672C\u673A\u56DE\u73AF\u7684\u684C\u9762 Web GUI \u6539\u8D70\u95E8\u63A7\u7684 /remote\uFF0C\u5FC5\u987B\u643A\u5E26\u6709\u6548\u914D\u5BF9 Cookie\uFF1B\u5173\u95ED\uFF1A\u684C\u9762\u7EE7\u7EED\u8D70\u666E\u901A\u8DEF\u5F84\uFF08\u4EC5\u5728\u8BE5\u6765\u6E90\u5DF2\u88AB SDK \u4FE1\u4EFB\u65F6\u6709\u610F\u4E49\uFF09\uFF0C\u914D\u5BF9\u53EA\u7BA1\u7406\u4EE4\u724C\u4E0E\u72B6\u6001\u3002",
-  "settings.publicBaseUrl": "\u516C\u7F51\u5730\u5740\uFF08\u53EF\u9009\uFF09",
-  "settings.publicBaseUrlHint": "\u5185\u7F51\u7A7F\u900F\u7684\u516C\u7F51\u5730\u5740\uFF0C\u5982 Cloudflare Tunnel\uFF1Ahttps://xxx.trycloudflare.com\uFF1B\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\uFF08\u4E0B\u65B9\u4EE4\u724C\uFF09\u4E5F\u586B\u8FD9\u91CC\u3002\u586B\u5199\u540E\u4E8C\u7EF4\u7801\u5C06\u751F\u6210\u516C\u7F51\u94FE\u63A5\uFF0C\u624B\u673A\u4E0D\u5728\u540C\u4E00\u7F51\u7EDC\u4E5F\u80FD\u914D\u5BF9\uFF1B\u7559\u7A7A\u5219\u4EC5\u5C40\u57DF\u7F51\u53EF\u7528\u3002",
-  "settings.autoTunnel": "\u81EA\u52A8\u516C\u7F51\u96A7\u9053",
-  "settings.autoTunnelHint": "\u5F00\u542F\u540E\u63D2\u4EF6\u81EA\u52A8\u542F\u52A8 Cloudflare quick tunnel\uFF08\u65E0\u9700\u5B89\u88C5\u4EFB\u4F55\u5DE5\u5177\uFF09\uFF0C\u5E76\u81EA\u52A8\u66F4\u65B0\u516C\u7F51\u5730\u5740\u4E0E\u4FE1\u4EFB\u914D\u7F6E\uFF0C\u624B\u673A\u968F\u65F6\u53EF\u7528\u516C\u7F51\u914D\u5BF9\uFF1B\u6CE8\u610F\u4E34\u65F6\u57DF\u540D\u6BCF\u6B21\u91CD\u542F\u90FD\u4F1A\u53D8\u5316\uFF0C\u624B\u673A\u9700\u91CD\u65B0\u626B\u7801\u3002\u5F00\u542F\u65F6\u5FFD\u7565\u4E0B\u65B9\u56FA\u5B9A\u96A7\u9053\u4EE4\u724C\u4E0E\u4E0A\u65B9\u624B\u52A8\u516C\u7F51\u5730\u5740\u3002",
-  "settings.tunnelToken": "\u56FA\u5B9A\u57DF\u540D\u96A7\u9053\u4EE4\u724C\uFF08Cloudflare Tunnel\uFF09",
-  "settings.tunnelTokenHint": '\u586B\u5165 Cloudflare \u547D\u540D\u96A7\u9053\u7684 Token\uFF08\u5373 cloudflared tunnel run --token \u7684\u503C\uFF09\uFF0C\u63D2\u4EF6\u4F1A\u81EA\u52A8\u8FD0\u884C\u8BE5\u96A7\u9053\uFF1A\u516C\u5171\u4E3B\u673A\u540D\u56FA\u5B9A\u4E0D\u53D8\uFF0C\u624B\u673A\u914D\u5BF9\u4E00\u6B21\u540E\u91CD\u542F\u4E5F\u65E0\u9700\u91CD\u65B0\u914D\u5BF9\u3002\u9700\u5148\u5728 Cloudflare \u63A7\u5236\u53F0\u628A\u516C\u5171\u4E3B\u673A\u540D\u6620\u5C04\u5230 http://127.0.0.1:<\u7AEF\u53E3>\uFF0C\u5E76\u5728\u4E0A\u65B9"\u516C\u7F51\u5730\u5740"\u586B\u5199\u540C\u4E00\u57DF\u540D\u3002\u4F18\u5148\u7EA7\u4F4E\u4E8E"\u81EA\u52A8\u516C\u7F51\u96A7\u9053"\u3002',
-  "settings.lanBind": "\u5C40\u57DF\u7F51\u8BBF\u95EE\uFF08\u7ED1\u5B9A 0.0.0.0\uFF09",
-  "settings.lanBindHint": "\u5F00\u542F\u540E\u63D2\u4EF6\u628A\u7ED1\u5B9A\u9ED8\u8BA4\u6539\u5199\u4E3A 0.0.0.0 \u5E76\u5199\u5165 profile \u8865\u4E01\uFF08\u663E\u5F0F --host \u4ECD\u4F18\u5148\uFF09\uFF0C\u540C\u65F6\u7EF4\u62A4\u4E3B\u673A\u9632\u706B\u5899\u653E\u884C\uFF08Windows/Linux\uFF1BmacOS \u65E0\u9700\u7BA1\u7406\uFF09\uFF1B\u5173\u95ED\u56DE\u9000 127.0.0.1\u3002\u7ED1\u5B9A\u53D8\u5316\u901A\u5E38\u5728\u91CD\u542F dsh web \u540E\u751F\u6548\u3002",
+  "settings.requirePairingForLanHint": "\u5F00\u542F\uFF1A\u975E\u672C\u673A\u56DE\u73AF\u7684\u684C\u9762 Web GUI \u6539\u8D70\u95E8\u63A7\u7684 /remote\uFF0C\u5FC5\u987B\u643A\u5E26\u6709\u6548\u914D\u5BF9 Cookie\uFF1B\u5173\u95ED\uFF1A\u684C\u9762\u7EE7\u7EED\u8D70\u666E\u901A\u8DEF\u5F84\uFF08\u4EC5\u5728\u8BE5\u6765\u6E90\u5DF2\u88AB\u4FE1\u4EFB\u65F6\u6709\u610F\u4E49\uFF09\u3002",
+  "settings.tokenTtlMs": "\u914D\u5BF9\u94FE\u63A5\u6709\u6548\u671F\uFF08\u6BEB\u79D2\uFF09",
+  "settings.tokenTtlMsHint": "\u65B0\u751F\u6210\u7684\u4E8C\u7EF4\u7801\u94FE\u63A5\u5728\u6B64\u65F6\u95F4\u540E\u5931\u6548\u3002",
   "lan.cardTitle": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
   "lan.bind": "\u7ED1\u5B9A\uFF1A{host}:{port}",
   "lan.off": "\u5F53\u524D\u4EC5\u672C\u673A\u53EF\u8BBF\u95EE\u3002",
@@ -3231,9 +3129,8 @@ var zh = {
   "lan.firewall.ok": "\u9632\u706B\u5899\u5DF2\u653E\u884C",
   "lan.firewall.bad": "\u9632\u706B\u5899\u672A\u653E\u884C\uFF08\u9700\u7BA1\u7406\u5458\u6743\u9650\uFF09",
   "lan.firewall.unmanaged": "\u9632\u706B\u5899\u4E0D\u7531\u63D2\u4EF6\u7BA1\u7406\uFF08\u672A\u68C0\u6D4B\u5230\u53D7\u652F\u6301\u7684\u9632\u706B\u5899\uFF09",
-  "lan.untouched": "\u5F00\u5173\u5C1A\u672A\u4F7F\u7528\uFF1A\u6253\u5F00\u540E\u63D2\u4EF6\u624D\u4F1A\u6539\u5199 profile \u8865\u4E01\u3002",
+  "lan.untouched": "\u5C1A\u672A\u63A5\u7BA1\uFF1A\u7ED1\u5B9A\u7531\u542F\u52A8\u53C2\u6570\u51B3\u5B9A\u3002",
   "lan.pendingRestart": "\u7ED1\u5B9A\u5C06\u5728\u91CD\u542F dsh web \u540E\u751F\u6548\u3002",
-  "settings.inherit": "\u7EE7\u627F",
   "settings.on": "\u5F00",
   "settings.off": "\u5173",
   "settings.overridden": "\u5DF2\u8986\u76D6",
@@ -3323,26 +3220,39 @@ var en = {
   // Plugin settings card (the family list seat, or the official bundle-config seat).
   "settings.title": "Remote connection settings",
   "settings.description": "Phone pairing, the public tunnel and LAN access.",
+  "settings.sectionAccess": "Remote access",
   "settings.enabled": "Enable remote access",
   "settings.enabledHint": "When off, every paired device is revoked and the public tunnel stops; the sidebar entry stays so you can turn it back on.",
-  "settings.tokenTtlMs": "Pairing token lifetime (ms)",
-  "settings.tokenTtlMsHint": "How long a minted QR link stays valid before it dies.",
-  "settings.offlineAfterMs": "Device offline threshold (ms)",
-  "settings.offlineAfterMsHint": "A paired device flips to offline when it has not been seen for this long.",
-  "settings.idleExpireMs": "Idle expiry (ms)",
-  "settings.idleExpireMsHint": "A paired device with no heartbeat or request for this long is deleted and must scan again. Default is 7 days.",
-  "settings.cookieName": "Device cookie name",
-  "settings.cookieNameHint": "Cookie that carries the paired device id.",
+  "settings.sectionPublic": "Public access",
+  "settings.tunnel": "How the GUI is reached publicly",
+  "settings.tunnelHint": "Let a phone on another network reach this machine. One mode at a time.",
+  "settings.tunnelOff": "Off",
+  "settings.tunnelOffDetail": "Only this machine and the local network can connect.",
+  "settings.tunnelQuick": "Temporary tunnel",
+  "settings.tunnelQuickDetail": "The plugin runs a Cloudflare quick tunnel with no setup; the address changes on every start, so a phone has to scan again after a restart.",
+  "settings.tunnelNamed": "Fixed-domain tunnel",
+  "settings.tunnelNamedDetail": "The plugin runs your own Cloudflare named tunnel: the hostname never changes, so a phone pairs once and keeps its bookmark across restarts. Map that hostname to http://127.0.0.1:port in the Cloudflare dashboard first.",
+  "settings.tunnelHost": "Public hostname",
+  "settings.tunnelHostHint": "The address the fixed-domain tunnel serves, e.g. https://dsh.example.com.",
+  "settings.tunnelToken": "Cloudflare tunnel token",
+  "settings.tunnelTokenHint": "The value of cloudflared tunnel run --token. Leave blank to keep the stored token.",
+  "settings.tunnelHostMissing": "The fixed-domain tunnel needs its public hostname.",
+  "settings.tunnelHostInvalid": "The public hostname must be an http(s) URL.",
+  "settings.tunnelTokenMissing": "The fixed-domain tunnel needs its Cloudflare tunnel token.",
+  "settings.sectionLan": "LAN access",
+  "settings.lanBind": "Bind address",
+  "settings.lanBindHint": "Whether the web server listens on the local network. A change is written into the profile patch and usually applies after dsh web restarts.",
+  "settings.lanFollow": "Follow the launch flags",
+  "settings.lanFollowDetail": "The plugin leaves the profile patch alone; dsh web --host decides the bind.",
+  "settings.lanOn": "Open to the LAN (0.0.0.0)",
+  "settings.lanOnDetail": "Writes the profile patch to default the bind to 0.0.0.0 and opens the host firewall.",
+  "settings.lanOff": "This machine only (127.0.0.1)",
+  "settings.lanOffDetail": "Writes the profile patch to pin the bind to 127.0.0.1.",
+  "settings.sectionOther": "Other",
   "settings.requirePairingForLan": "Require pairing for LAN access",
-  "settings.requirePairingForLanHint": "On: a desktop Web GUI at a non-loopback origin rides the gated /remote channel and must carry a live paired-device cookie. Off: the desktop stays on its original paths (only useful when that origin is already trusted) and pairing only manages tokens/status.",
-  "settings.publicBaseUrl": "Public address (optional)",
-  "settings.publicBaseUrlHint": "The public URL of a tunnel in front of this server, e.g. a Cloudflare Tunnel: https://xxx.trycloudflare.com; a fixed-hostname tunnel (token below) also goes here. When set, the QR link is built from it so a phone anywhere can pair; leave blank for LAN-only usage.",
-  "settings.autoTunnel": "Auto public tunnel",
-  "settings.autoTunnelHint": "When on, the plugin runs its own Cloudflare quick tunnel (no tool installation needed) and keeps the public address and trust config in sync automatically, so a phone anywhere can pair at any time; note the ephemeral hostname changes on every restart, so phones must scan again. The named-tunnel token below and the manual public address above are ignored while this is on.",
-  "settings.tunnelToken": "Fixed-hostname tunnel token (Cloudflare Tunnel)",
-  "settings.tunnelTokenHint": "Paste a Cloudflare named-tunnel token (the value of cloudflared tunnel run --token) and the plugin runs the tunnel itself: the public hostname stays fixed, so a phone pairs once and never again across restarts. First map the public hostname to http://127.0.0.1:<port> in the Cloudflare dashboard and enter the same hostname as the public address above. Lower precedence than the auto quick tunnel.",
-  "settings.lanBind": "LAN access (bind 0.0.0.0)",
-  "settings.lanBindHint": "When on, the plugin writes a managed block into the profile patch defaulting the bind to 0.0.0.0 (an explicit --host flag still wins), and maintains the matching host firewall rule (Windows/Linux; other platforms need none). When off, the block pins 127.0.0.1. The bind change usually takes effect after dsh web restarts.",
+  "settings.requirePairingForLanHint": "On: a desktop Web GUI at a non-loopback origin rides the gated /remote channel and must carry a live paired-device cookie. Off: the desktop stays on its original paths (only useful when that origin is already trusted).",
+  "settings.tokenTtlMs": "Pairing link lifetime (ms)",
+  "settings.tokenTtlMsHint": "How long a minted QR link stays valid before it dies.",
   "lan.cardTitle": "LAN access",
   "lan.bind": "Bind: {host}:{port}",
   "lan.off": "Currently localhost-only.",
@@ -3350,9 +3260,8 @@ var en = {
   "lan.firewall.ok": "firewall open",
   "lan.firewall.bad": "firewall blocked (needs admin)",
   "lan.firewall.unmanaged": "firewall not managed (no supported firewall detected)",
-  "lan.untouched": "The toggle has never been used; the profile patch is only written once you flip it.",
+  "lan.untouched": "Not managed: the bind comes from the launch flags.",
   "lan.pendingRestart": "The bind change takes effect after dsh web restarts.",
-  "settings.inherit": "Inherit",
   "settings.on": "On",
   "settings.off": "Off",
   "settings.overridden": "Overridden",
@@ -3704,7 +3613,7 @@ function channelTransition(active, installed) {
 
 // packages/dsh-remote-web/src/client/panel/FenceNotice.tsx
 var import_react7 = require("react");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_jsx_runtime9 = require("react/jsx-runtime");
 function extractPairToken(input) {
   const trimmed = input.trim();
   if (trimmed === "") return void 0;
@@ -3743,19 +3652,19 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
       setSubmitting(false);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: remote_default.fencePage, role: "dialog", "aria-modal": "true", "aria-labelledby": "remote-fence-title", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("main", { className: remote_default.fenceCard, "data-dsh-plugin": "remote-web-ui", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: remote_default.fenceMark, "aria-hidden": "true", children: "\xD7" }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceEyebrow, children: t("fence.unpaired.eyebrow") }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { id: "remote-fence-title", className: remote_default.fenceTitle, children: t("fence.unpaired.title") }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceDetail, children: t("fence.unpaired.hint") }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("ol", { className: remote_default.fenceSteps, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepDesktop") }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepLink") }),
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepOpen") })
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: remote_default.fencePage, role: "dialog", "aria-modal": "true", "aria-labelledby": "remote-fence-title", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("main", { className: remote_default.fenceCard, "data-dsh-plugin": "remote-web-ui", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: remote_default.fenceMark, "aria-hidden": "true", children: "\xD7" }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceEyebrow, children: t("fence.unpaired.eyebrow") }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { id: "remote-fence-title", className: remote_default.fenceTitle, children: t("fence.unpaired.title") }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceDetail, children: t("fence.unpaired.hint") }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("ol", { className: remote_default.fenceSteps, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepDesktop") }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepLink") }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepOpen") })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("form", { className: remote_default.fenceForm, onSubmit: handleSubmit, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: remote_default.fenceInputRow, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("form", { className: remote_default.fenceForm, onSubmit: handleSubmit, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: remote_default.fenceInputRow, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "input",
           {
             type: "text",
@@ -3770,7 +3679,7 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
             "aria-label": t("fence.unpaired.tokenPlaceholder")
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
           "button",
           {
             className: remote_default.fencePairButton,
@@ -3780,10 +3689,10 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
           }
         )
       ] }),
-      errorMsg !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceError, role: "alert", children: errorMsg })
+      errorMsg !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceError, role: "alert", children: errorMsg })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { className: remote_default.fenceRetry, type: "button", onClick: onRetry, children: t("fence.unpaired.retry") }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceFootnote, children: t("fence.unpaired.footnote") })
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { className: remote_default.fenceRetry, type: "button", onClick: onRetry, children: t("fence.unpaired.retry") }),
+    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceFootnote, children: t("fence.unpaired.footnote") })
   ] }) });
 }
 
@@ -4726,7 +4635,7 @@ function createServedEntryForm(options) {
       served = void 0;
     }
     if (served === void 0 || served.length === 0) return fallbackId;
-    return entryIds.find((id3) => served.includes(id3)) ?? namespaceId;
+    return entryIds.find((id4) => served.includes(id4)) ?? namespaceId;
   };
   const bind = () => {
     const target = resolve();
@@ -4782,7 +4691,7 @@ function servedEntryId(forms) {
     served = void 0;
   }
   if (served === void 0 || served.length === 0) return AGGREGATE_ENTRY_ID;
-  return REMOTE_WEB_UI_ENTRY_IDS.find((id3) => served.includes(id3)) ?? REMOTE_WEB_UI_NS;
+  return REMOTE_WEB_UI_ENTRY_IDS.find((id4) => served.includes(id4)) ?? REMOTE_WEB_UI_NS;
 }
 function bindSettingsForm(ctx) {
   const family = ctx.get("webUiSettings");
@@ -4801,7 +4710,7 @@ function apply(ctx) {
   ctx.effect(() => () => {
     ;
     window.__dshRemoteAdapt?.setEnabled?.(false);
-  }, "remote-web-ui: mobile-adapt");
+  }, "dsh-remote-web: mobile-adapt");
   ctx.effect(() => {
     try {
       return ctx.locale.register(NS, { zh, en });
@@ -4809,7 +4718,7 @@ function apply(ctx) {
       return () => {
       };
     }
-  }, "remote-web-ui: dictionaries");
+  }, "dsh-remote-web: dictionaries");
   const layout = ctx.get("layout");
   const adapt = window.__dshRemoteAdapt;
   const layoutCall = (call) => {
@@ -4865,7 +4774,7 @@ function apply(ctx) {
   ctx.effect(() => () => {
     publishSettingsFace(void 0);
     remoteSettings.dispose();
-  }, "remote-web-ui: settings card");
+  }, "dsh-remote-web: settings card");
   let disposeRuntime;
   const syncRuntime = () => {
     if (enabled() && disposeRuntime === void 0) {
@@ -4884,7 +4793,7 @@ function apply(ctx) {
         return () => {
           window.clearInterval(timer);
         };
-      }, "remote-web-ui: pair flow + heartbeats");
+      }, "dsh-remote-web: pair flow + heartbeats");
     } else if (!enabled() && disposeRuntime !== void 0) {
       disposeRuntime();
       disposeRuntime = void 0;
@@ -4940,12 +4849,12 @@ function apply(ctx) {
         disposeChannel = ctx.effect(() => () => {
           seat.onUnpaired = null;
           seat.onPaired = null;
-        }, "remote-web-ui: remote desktop channel (boot patch)");
+        }, "dsh-remote-web: remote desktop channel (boot patch)");
       } else {
         disposeChannel = ctx.effect(() => {
           const restore = installRemoteChannel(window, { onUnpaired: handleUnpaired, onPaired: hideFenceNotice });
           return restore;
-        }, "remote-web-ui: remote desktop channel");
+        }, "dsh-remote-web: remote desktop channel");
       }
     } else if (transition === "retire" && disposeChannel !== void 0) {
       disposeChannel();
@@ -4985,7 +4894,7 @@ function apply(ctx) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, "remote-web-ui: failed-pair notice");
+  }, "dsh-remote-web: failed-pair notice");
 }
 /*! Bundled license information:
 

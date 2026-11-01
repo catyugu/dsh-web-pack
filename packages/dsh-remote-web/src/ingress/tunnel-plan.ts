@@ -1,11 +1,10 @@
 /**
- * Pure planner for the settings-sync tunnel branch: given the resolved
- * settings slice, decide which tunnel mode runs and with what target. Kept
- * free of cordis types so the precedence matrix is unit-testable without a
- * host context.
+ * Pure planner for the tunnel branch of the settings sync: one resolved
+ * `tunnel` mode in, one runtime plan out. Kept free of cordis types so the
+ * matrix is unit-testable without a host context.
  */
 
-/** Whether a configured public base is a parseable http(s) URL with a host. */
+/** Whether a configured public host is a parseable http(s) URL with a host. */
 export function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value)
@@ -15,37 +14,40 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
-/** How the settings sync should drive the tunnel for one resolved value. */
+/** Why a `named` tunnel cannot run, as reported to the panel. */
+export type TunnelProblem = 'host-missing' | 'host-invalid' | 'token-missing'
+
+/** How the settings sync should drive cloudflared for one resolved value. */
 export type TunnelPlan =
-  | { mode: 'off' }
-  | { mode: 'quick'; targetUrl: string; ignored: Array<'tunnelToken' | 'publicBaseUrl'> }
+  | { mode: 'off'; problem?: TunnelProblem }
+  | { mode: 'quick'; targetUrl: string }
   | { mode: 'named'; token: string; publicUrl: string }
 
 /**
- * Decide the tunnel mode and target from one resolved settings value.
- * Precedence: the quick tunnel wins when `autoTunnel` is on (anything else
- * configured is reported as ignored); the named tunnel runs only with a
- * token AND a valid public hostname (the token does not carry the hostname,
- * so the QR base and the fence trust would have no source without it);
- * otherwise no tunnel and the manual public base applies.
+ * Decide the tunnel the settings ask for.
+ *
+ * `off` runs nothing (the GUI stays on its LAN addresses). `quick` runs a
+ * Cloudflare quick tunnel whose hostname is minted on every start. `named`
+ * runs the tunnel from `tunnelToken` toward the fixed `tunnelHost` the
+ * operator mapped in the Cloudflare dashboard: the token carries the tunnel,
+ * not its hostname, so both inputs are required.
+ *
+ * An incomplete `named` setting still resolves to `off`, but carries the
+ * `problem` so the panel can name what is missing instead of leaving the row
+ * silently public-less. An unknown mode value is treated as `off`.
  * @param value - the resolved settings slice that drives the tunnel.
  * @param port - the local webServer port the tunnel forwards to.
  */
 export function tunnelPlanOf(
-  value: { autoTunnel?: boolean; tunnelToken?: string; publicBaseUrl?: string },
+  value: { tunnel?: string; tunnelHost?: string; tunnelToken?: string },
   port: number,
 ): TunnelPlan {
-  if (value.autoTunnel === true) {
-    const ignored: Array<'tunnelToken' | 'publicBaseUrl'> = []
-    if (value.tunnelToken !== undefined && value.tunnelToken !== '') ignored.push('tunnelToken')
-    if (value.publicBaseUrl !== undefined && value.publicBaseUrl !== '') ignored.push('publicBaseUrl')
-    return { mode: 'quick', targetUrl: `http://127.0.0.1:${String(port)}`, ignored }
-  }
-  if (value.tunnelToken !== undefined && value.tunnelToken !== '') {
-    if (value.publicBaseUrl !== undefined && isHttpUrl(value.publicBaseUrl)) {
-      return { mode: 'named', token: value.tunnelToken, publicUrl: value.publicBaseUrl }
-    }
-    return { mode: 'off' }
-  }
-  return { mode: 'off' }
+  if (value.tunnel === 'quick') return { mode: 'quick', targetUrl: `http://127.0.0.1:${String(port)}` }
+  if (value.tunnel !== 'named') return { mode: 'off' }
+  const host = value.tunnelHost?.trim() ?? ''
+  const token = value.tunnelToken?.trim() ?? ''
+  if (host === '') return { mode: 'off', problem: 'host-missing' }
+  if (!isHttpUrl(host)) return { mode: 'off', problem: 'host-invalid' }
+  if (token === '') return { mode: 'off', problem: 'token-missing' }
+  return { mode: 'named', token, publicUrl: host }
 }

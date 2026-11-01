@@ -55,6 +55,12 @@ Rules that keep it readable:
   pairing panel render inside one sheet (`RemoteEntry.tsx` → `SettingsSection`);
   no second card is contributed to the plugin manager. `settings-face.ts` is the
   single bridge between the apply-owned form and that sheet.
+- The popup renders decisions, not the schema. Three questions — remote access,
+  public access (`off` / `quick` / `named`), LAN access — carry the whole user
+  surface, with two leftovers under a collapsed group. Which keys reach a form
+  at all is decided by `volatile()` in `Config`: the heartbeat tunables and the
+  deployment fields stay in the profile patch, so the card cannot mis-tune them
+  and needs no per-field "inherit" choice.
 - The Host half never serves a file from `node_modules`: the tunnel binary is
   downloaded into `$DSH_HOME/dsh-web-pack/remote-web/bin/` and validated by
   running `--version` before it is trusted. `DSH_REMOTE_CLOUDFLARED_BIN` is the
