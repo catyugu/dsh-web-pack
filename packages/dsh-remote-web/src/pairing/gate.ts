@@ -22,15 +22,6 @@ import type { PairingService } from './pairing.ts'
 import { isLoopbackAddress, isLoopbackHostname } from '../http/loopback.ts'
 
 /**
- * Loopback classification for the desktop client. The predicates now live in
- * the shared synced copy (shared/host/loopback.ts, mirrored to ./loopback.ts
- * by scripts/sync-shared.mjs): localhost, IPv6 loopback, and any IPv4 address
- * in 127/8.
- * @param hostname - WHATWG URL hostname (IPv6 literals retain brackets).
- * @returns true for localhost, IPv6 loopback, or any IPv4 address in 127/8.
- */
-
-/**
  * Read one cookie value from a Cookie header.
  * @param header - the raw Cookie header value (or undefined).
  * @param name - the cookie name.

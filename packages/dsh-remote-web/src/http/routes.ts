@@ -22,11 +22,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { z, type ZodType } from 'zod'
 import { UnknownLanAddressError, type PairingService, type PairingSnapshot } from '../pairing/pairing.ts'
 import { isLoopbackAddress } from './loopback.ts'
 import { isLoopbackClient, readCookie } from '../pairing/gate.ts'
-import { readJsonBody, writeJson } from './http.ts'
+import { isJsonObject, readJsonBody, writeJson } from './http.ts'
 import { appServiceWorkerScript } from './reopen-worker.ts'
 import { createPairGrantStore, type PairGrantStore } from '../pairing/pair-grant.ts'
 import { REMOTE_HOST_GRANT_GLOBAL } from './remote-channel-rules.ts'
@@ -374,34 +373,47 @@ export const PAIR_PATHS = {
 } as const
 
 /**
- * /api/pair request payload contracts. Each POST endpoint validates its body
- * against one of these instead of reaching into a hand-parsed object: the
- * control-plane endpoints that carry no meaningful payload use the permissive
- * pairActionPayloadSchema so their smoke calls keep working unchanged, while
- * issue/accept enforce their optional/required fields. Unknown (extra) keys
- * are tolerated exactly as the previous manual reads ignored them.
+ * /api/pair request payload contracts. Each POST endpoint narrows the parsed
+ * body itself, so the accepted input is stated once instead of through a
+ * schema library: a missing or unparseable body reads as `{}` (the desktop's
+ * stop/heartbeat send no body), unknown keys are ignored, and a field of the
+ * wrong type refuses the call with `bad-payload`.
  */
-export const issuePayloadSchema = z.object({
-  address: z.string().min(1).optional(),
-})
-export const acceptPayloadSchema = z.object({
-  token: z.string().default(''),
-})
-export const revokePayloadSchema = z.object({
-  deviceId: z.string().min(1),
-})
-export const pairActionPayloadSchema = z.object({}).passthrough()
 
 /**
- * Parse a pair request body through schema. A missing/empty, unparseable
- * or non-object body (shared readJsonBody with objectOnly yields null for
- * all of them) is treated as an empty object — the desktop stop/heartbeat
- * send no body — and a value that fails the schema returns `undefined` so
- * the caller can answer with the existing error shape.
+ * The issue payload: an optional non-empty LAN address literal.
+ * @param body - the parsed request body.
+ * @returns the payload, or undefined when the shape is refused.
  */
-function parsePairPayload<T>(schema: ZodType<T>, body: unknown | null): T | undefined {
-  const result = schema.safeParse(body ?? {})
-  return result.success ? result.data : undefined
+function issuePayloadOf(body: unknown): { address?: string } | undefined {
+  const record = isJsonObject(body) ? body : {}
+  const address = record.address
+  if (address === undefined) return {}
+  return typeof address === 'string' && address.length > 0 ? { address } : undefined
+}
+
+/**
+ * The accept payload: the pairing token from the QR link (absent reads as an
+ * empty token, which the service then refuses like any other invalid one).
+ * @param body - the parsed request body.
+ * @returns the payload, or undefined when the shape is refused.
+ */
+function acceptPayloadOf(body: unknown): { token: string } | undefined {
+  const record = isJsonObject(body) ? body : {}
+  const token = record.token
+  if (token === undefined) return { token: '' }
+  return typeof token === 'string' ? { token } : undefined
+}
+
+/**
+ * The revoke payload: the device id of the session to drop.
+ * @param body - the parsed request body.
+ * @returns the payload, or undefined when the shape is refused.
+ */
+function revokePayloadOf(body: unknown): { deviceId: string } | undefined {
+  const record = isJsonObject(body) ? body : {}
+  const deviceId = record.deviceId
+  return typeof deviceId === 'string' && deviceId.length > 0 ? { deviceId } : undefined
 }
 
 /** One open desktop status stream. */
@@ -643,7 +655,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       return
     }
     const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    const payload = parsePairPayload(issuePayloadSchema, body)
+    const payload = issuePayloadOf(body)
     if (payload === undefined) {
       writeJson(res, 400, { ok: false, code: 'bad-payload' })
       return
@@ -695,7 +707,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       return
     }
     const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    const payload = parsePairPayload(acceptPayloadSchema, body)
+    const payload = acceptPayloadOf(body)
     if (payload === undefined) {
       writeJson(res, 400, { ok: false, code: 'bad-payload' })
       return
@@ -728,11 +740,9 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       writeJson(res, 403, { ok: false, code: 'forbidden' })
       return
     }
-    const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    if (parsePairPayload(pairActionPayloadSchema, body) === undefined) {
-      writeJson(res, 400, { ok: false, code: 'bad-payload' })
-      return
-    }
+    // The body is drained (the desktop sends none) and ignored: stop takes no
+    // payload, and reading it keeps the connection reusable.
+    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
     service.stop()
     writeJson(res, 200, { ok: true })
   }
@@ -744,7 +754,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       return
     }
     const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    const payload = parsePairPayload(revokePayloadSchema, body)
+    const payload = revokePayloadOf(body)
     if (payload === undefined) {
       writeJson(res, 400, { ok: false, code: 'bad-payload' })
       return
@@ -763,11 +773,9 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
       writeJson(res, 403, { ok: false, code: 'forbidden' })
       return
     }
-    const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    if (parsePairPayload(pairActionPayloadSchema, body) === undefined) {
-      writeJson(res, 400, { ok: false, code: 'bad-payload' })
-      return
-    }
+    // The phone's heartbeat carries no payload; the body is drained so the
+    // connection stays reusable.
+    await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
     const deviceId = readCookie(req.headers.cookie, service.config.cookieName)
     if (deviceId === undefined || !service.heartbeat(deviceId)) {
       writeJson(res, 401, { ok: false, code: 'unpaired' })

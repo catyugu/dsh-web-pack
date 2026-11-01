@@ -73,6 +73,12 @@ Rules that keep it readable:
   and `exports["./invariant"]` (the invariant companion). Everything else is
   internal. A name that is exported owes a docstring; none of the internal
   modules are reachable from outside the package.
+- Every source module is maintained here. There is no generated copy of a
+  module and no cross-repository sync step: a module two rows need is either
+  bundled into both from a repository-internal source tree or does not exist.
+  The one published cross-repository contract is `mountOnce`'s
+  `Symbol.for('dsh-web.mounted-plugins')` registry, whose shape sibling
+  packages in other repositories read — changing it breaks them.
 
 ## Types and data
 
