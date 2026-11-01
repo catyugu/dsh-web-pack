@@ -66,13 +66,50 @@ export const REMOTE_DEVICE_QUERY = 'device'
  * paired remote desktop may use the full host API (chat, sessions,
  * settings, credentials, presets — it is a full-control credential), but it
  * must not reach the machine-control planes: pairing control itself, the
- * dsh-web self-update installer, and plugin install/remove.
+ * dsh-web self-update installer, plugin install/remove, and the settings
+ * bridge the browser half already refuses to route here (a policy only one
+ * side enforces is not a policy).
  */
 export const LOCAL_ONLY_PREFIXES: readonly string[] = [
   '/api/pair',
   '/api/update',
   PLUGIN_MANAGER_PATH,
+  WEB_UI_SETTINGS_BRIDGE_PATH,
 ] as const
+
+/**
+ * Normalize a path for the local-only decision the way the upstream routers
+ * see it: percent-decoded, case-insensitive, and with empty segments dropped.
+ * Without this, `/API//pair`, `/%70air` or `/api/./pair` would reach a route
+ * the raw prefix test never matched.
+ * @param innerPath - the inner path as received (query included or not).
+ * @returns a lower-case path with single separators and decoded segments.
+ */
+export function policyPathOf(innerPath: string): string {
+  const pathname = innerPath.split('?')[0] ?? ''
+  const segments: string[] = []
+  for (const raw of pathname.split('/')) {
+    if (raw === '') continue
+    let decoded = raw
+    try {
+      decoded = decodeURIComponent(raw)
+    } catch {
+      // A malformed escape stays literal; the upstream rejects it the same way.
+      decoded = raw
+    }
+    for (const part of decoded.split('/')) {
+      // Resolve the dot segments the upstream router resolves: keeping them
+      // literal would let `/api/./update` reach a prefix this table denies.
+      if (part === '' || part === '.') continue
+      if (part === '..') {
+        segments.pop()
+        continue
+      }
+      segments.push(part.toLowerCase())
+    }
+  }
+  return `/${segments.join('/')}`
+}
 
 /**
  * Whether a paired inner path must stay physically local.
@@ -80,8 +117,10 @@ export const LOCAL_ONLY_PREFIXES: readonly string[] = [
  * @returns a denial message, or undefined when the path may be proxied.
  */
 export function localOnlyDenial(innerPath: string): string | undefined {
+  const path = policyPathOf(innerPath)
   for (const prefix of LOCAL_ONLY_PREFIXES) {
-    if (innerPath === prefix || innerPath.startsWith(`${prefix}/`)) {
+    const normalized = policyPathOf(prefix)
+    if (path === normalized || path.startsWith(`${normalized}/`)) {
       return `${prefix.slice(1)} stays physically local and stays unreachable from a paired remote desktop`
     }
   }

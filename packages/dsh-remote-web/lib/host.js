@@ -28738,16 +28738,42 @@ var REMOTE_UPGRADE_PATHS = [
   `${REMOTE_API_PREFIX}/dsh-ssh/terminal`
 ];
 var PLUGIN_MANAGER_PATH = "/api/plugin-manager";
+var WEB_UI_SETTINGS_BRIDGE_PATH = "/api/dsh-web-ui-settings";
 var REMOTE_DEVICE_HEADER = "x-dsh-remote-device";
 var REMOTE_DEVICE_QUERY = "device";
 var LOCAL_ONLY_PREFIXES = [
   "/api/pair",
   "/api/update",
-  PLUGIN_MANAGER_PATH
+  PLUGIN_MANAGER_PATH,
+  WEB_UI_SETTINGS_BRIDGE_PATH
 ];
+function policyPathOf(innerPath) {
+  const pathname = innerPath.split("?")[0] ?? "";
+  const segments = [];
+  for (const raw of pathname.split("/")) {
+    if (raw === "") continue;
+    let decoded = raw;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      decoded = raw;
+    }
+    for (const part of decoded.split("/")) {
+      if (part === "" || part === ".") continue;
+      if (part === "..") {
+        segments.pop();
+        continue;
+      }
+      segments.push(part.toLowerCase());
+    }
+  }
+  return `/${segments.join("/")}`;
+}
 function localOnlyDenial(innerPath) {
+  const path = policyPathOf(innerPath);
   for (const prefix of LOCAL_ONLY_PREFIXES) {
-    if (innerPath === prefix || innerPath.startsWith(`${prefix}/`)) {
+    const normalized = policyPathOf(prefix);
+    if (path === normalized || path.startsWith(`${normalized}/`)) {
       return `${prefix.slice(1)} stays physically local and stays unreachable from a paired remote desktop`;
     }
   }
