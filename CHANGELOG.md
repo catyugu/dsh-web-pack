@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.4
+
+Turning remote access off pauses it instead of unpairing every device.
+
+### Changed
+
+- The master switch drops the QR token, closes open streams and stops the
+  tunnel, but keeps the paired devices. The `/remote` channel refuses while the
+  switch is off, so keeping them is not access, and turning it back on needs no
+  new scan. The explicit "停止" action stays destructive: it pauses and forgets
+  every device.
+- The on/off policy lives only with the routes that already receive `enabled`.
+  The pairing service holds no on/off state any more; it just drops the token
+  and the connections when the row is switched off.
+
 ## 0.5.3
 
 The remote-access settings surface is back: 0.5.2's client threw on every mount.

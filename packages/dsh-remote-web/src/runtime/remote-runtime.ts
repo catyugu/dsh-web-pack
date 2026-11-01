@@ -158,10 +158,10 @@ export class RemoteRuntime {
     // Cohort honesty (see the README security model): the pairing gate covers
     // the plugin's own /remote channel; direct /api from LAN origins is
     // governed by the harness fence + browser-auth cookie, and this cohort's
-    // api/gate seam has no emitter — so stop()/revoke() cannot invalidate a
-    // browser credential a device has already redeemed.
+    // api/gate seam has no emitter — so pausing or revoking here cannot
+    // invalidate a browser credential a device has already redeemed.
     if (this.ctx.webServer.host === '0.0.0.0') {
-      console.warn('dsh-remote-web: LAN-exposed bind — pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)')
+      console.warn('dsh-remote-web: LAN-exposed bind — pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (a pause or revoke does not invalidate an already-redeemed browser credential)')
     }
 
     this.ctx.effect(() => () => { this.lanBindWorkPending = false }, 'dsh-remote-web: lan-bind work')
@@ -255,9 +255,10 @@ export class RemoteRuntime {
       }
     }
     if (!value.enabled) {
-      // Everything remote goes quiet; the route family below stays mounted so
-      // the popup can still report the stopped state and flip the switch back.
-      this.service.stop()
+      // Off means off at the edge: the routes refuse while the switch is off,
+      // and the service drops the QR and closes the streams a phone holds. The
+      // pairings stay, so turning it back on needs no new scan.
+      this.service.pause()
     }
     // The route family and the sweep are mounted once for the plugin lifetime,
     // not per switch state: a disabled row still answers the panel so the
@@ -282,12 +283,14 @@ export class RemoteRuntime {
         ...makeRemoteApiRoutes({
           service: this.service,
           port: this.ctx.webServer.port,
+          enabled: () => this.resolve().enabled,
           auth: this.innerAuth,
         }),
       ]
       const upgrades = makeRemoteApiUpgradeRoutes({
         service: this.service,
         port: this.ctx.webServer.port,
+        enabled: () => this.resolve().enabled,
         auth: this.innerAuth,
       })
       this.disposeRoutes.current = this.ctx.effect(

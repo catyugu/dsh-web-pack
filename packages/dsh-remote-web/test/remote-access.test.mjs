@@ -153,18 +153,29 @@ test('status splits the view by credential, and a heartbeat needs a live device'
   assert.equal(unpaired.statusCode, 401)
 })
 
-test('revoke, stop and the status stream stay on the desktop', async () => {
+test('the switch pauses, the stop action unpairs, and the stream stays on the desktop', async () => {
   const service = makeService()
   const routes = routesOf(service)
 
   assert.equal((await call(routes, PAIR_PATHS.revoke, { ...desktop, method: 'POST', body: { deviceId: 'ghost' } })).json.code, 'unknown-device')
-  const deviceId = pairDevice(service)
-  assert.equal((await call(routes, PAIR_PATHS.revoke, { ...desktop, method: 'POST', body: { deviceId } })).statusCode, 200)
-  assert.equal(service.hasDevice(deviceId), false)
+  const revokedId = pairDevice(service)
+  const keptId = pairDevice(service)
+  assert.equal((await call(routes, PAIR_PATHS.revoke, { ...desktop, method: 'POST', body: { deviceId: revokedId } })).statusCode, 200)
+  assert.equal(service.hasDevice(revokedId), false)
 
+  // The master switch is a pause: no QR, no open streams, pairings kept.
+  service.pause()
+  assert.equal(service.hasDevice(keptId), true, 'pausing keeps the pairing')
+  assert.equal(service.activeToken(), undefined, 'pausing drops the QR token')
+  const paused = routesOf(service, { enabled: () => false })
+  assert.equal((await call(paused, PAIR_PATHS.status, { ...desktop })).json.phase, 'stopped')
+  assert.equal(service.deviceCount(), 1, 'the paused row still has its device')
+
+  // The stop action is the explicit one that forgets the devices.
   assert.equal((await call(routes, PAIR_PATHS.stop, { ...lan, method: 'POST', body: {} })).statusCode, 403)
   assert.equal((await call(routes, PAIR_PATHS.stop, { ...desktop, method: 'POST', body: {} })).statusCode, 200)
-  assert.equal(service.snapshot().phase, 'stopped')
+  assert.equal(service.hasDevice(keptId), false)
+
   assert.equal((await call(routes, PAIR_PATHS.lanBind, { ...lan })).statusCode, 403)
   assert.equal((await call(routes, PAIR_PATHS.lanBind, { ...desktop })).json.profile, 'web')
 
@@ -217,7 +228,13 @@ test('the gated channel refuses the unpaired and re-issues the paired to loopbac
     res.end('{"ok":true}')
   })
   const innerPort = await listen(inner)
-  const [route] = makeRemoteApiRoutes({ service, port: innerPort, auth: { ready: async () => 'dsh-auth-test=1', invalidate() {} } })
+  let enabled = true
+  const [route] = makeRemoteApiRoutes({
+    service,
+    port: innerPort,
+    enabled: () => enabled,
+    auth: { ready: async () => 'dsh-auth-test=1', invalidate() {} },
+  })
   const outer = http.createServer((req, res) => { route.handler(req, res) })
   const outerPort = await listen(outer)
   const base = `http://127.0.0.1:${outerPort}`
@@ -243,6 +260,15 @@ test('the gated channel refuses the unpaired and re-issues the paired to loopbac
       assert.equal(denied.status, 403, path)
     }
     assert.equal(innerRequests.length, 1, 'a local-only path never reaches the inner API')
+
+    // The master switch is enforced here, not by forgetting the device: the same
+    // live cookie is refused while remote access is off, and the pairing remains.
+    enabled = false
+    const paused = await fetch(`${base}/remote/api/session.list`, { headers: { cookie: `dsh_pair=${deviceId}` } })
+    assert.equal(paused.status, 403)
+    assert.equal((await paused.json()).result.error.code, 'disabled')
+    assert.equal(service.hasDevice(deviceId), true, 'the pairing outlives the switch')
+    assert.equal(innerRequests.length, 1)
   } finally {
     await new Promise((resolve) => { outer.close(resolve) })
     await new Promise((resolve) => { inner.close(resolve) })

@@ -1,6 +1,6 @@
 {
   "name": "@catyugu/dsh-remote-web",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "type": "module",
   "description": "Scan-to-pair remote access for the dsh web GUI, maintained inside dsh-web-pack.",
   "license": "Apache-2.0",

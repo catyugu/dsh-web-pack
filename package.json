@@ -1,6 +1,6 @@
 {
   "name": "@catyugu/dsh-web-pack",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "type": "module",
   "description": "A pack of switchable DSH Web plugins: session management and session cleanup.",
   "license": "MIT",

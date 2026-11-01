@@ -8,15 +8,15 @@
  * - One active token at a time; `issue()` replaces it, so a refreshed QR
  *   immediately invalidates the previous link.
  * - A token is a bearer credential for its whole window: it is refused only
- *   when unknown, expired, or after `stop()`, and the same link may pair
+ *   when unknown, expired, or after `clearToken()`, and the same link may pair
  *   repeatedly within that window (each accept mints a fresh device session).
  *   Mobile flows routinely split across cookie contexts (camera preview to
  *   in-app browser to the system browser), and the later context must be
  *   able to complete its own pairing from the same link.
  * - Tokens expire; `accept()` on an expired token is refused like an
  *   unknown one (no oracle for validity).
- * - `stop()` revokes every device session and clears the token, so paired
- *   devices are cut off on their next gated request.
+ * - `pause()` drops the token and closes open connections; paired devices stay,
+ *   and the routes refuse while the row is disabled (see `pair-routes.ts`).
  * - `revoke()` drops one device session; idle sessions older than
  *   `idleExpireMs` are deleted on sweep, load, and the next gated request.
  */
@@ -31,7 +31,7 @@ export type { DeviceSession, PairingFsSeams } from './device-store.ts'
 export type PairingPhase =
   /** The server is not bound all-interfaces: no usable QR exists. */
   | 'lan-required'
-  /** Remote control was stopped; a fresh QR (issue) re-enables it. */
+  /** No token and no paired devices, so there is nothing to show. */
   | 'stopped'
   /** A token is live and no device has paired with it yet. */
   | 'waiting'
@@ -154,7 +154,7 @@ export interface PairingConfig {
 /**
  * Result of one accept() attempt. A token is a bearer credential for its whole
  * window (see the module doc), so the only refusal is `invalid`: unknown,
- * expired, or after stop(). There is no "already used" outcome.
+ * expired, or after clearToken(). There is no "already used" outcome.
  */
 export type AcceptResult =
   | { ok: true; deviceId: string }
@@ -197,7 +197,6 @@ export class PairingService {
   private devices: Map<string, DeviceSession>
   private readonly listeners = new Set<(snapshot: PairingSnapshot) => void>()
   private lastEmitted: PairingSnapshot | undefined
-  private stopped = false
   private tokenSerial = 0
   /** LAN base URLs keyed by the advertised IP literal (interface order). */
   private lanBases = new Map<string, string>()
@@ -266,7 +265,7 @@ export class PairingService {
    *   is already gone is closed immediately and yields a no-op release.
    */
   lease(deviceId: string, close: () => void): () => void {
-    if (this.stopped || !this.devices.has(deviceId)) {
+    if (!this.devices.has(deviceId)) {
       close()
       return () => {}
     }
@@ -384,7 +383,7 @@ export class PairingService {
 
   /**
    * Issue a fresh token, replacing (invalidating) any previous one. A
-   * stopped service re-arms through this call (the panel's refresh button).
+   * cleared token is replaced by this call (the panel's refresh button).
    * @param workspaceId - optional workspace the QR link should land in.
    * @param address - optional LAN IP literal the QR must be built from; the
    * default is the public base (when configured) or the first interface.
@@ -404,7 +403,6 @@ export class PairingService {
     const now = this.clock.now()
     const token = this.clock.randomToken()
     this.tokens.clear()
-    this.stopped = false
     this.tokenSerial += 1
     this.tokens.set(token, {
       id: `t${this.tokenSerial}`,
@@ -420,7 +418,7 @@ export class PairingService {
   /**
    * Redeem a token and bind a device session. The token is a bearer
    * credential for its whole window, not a single-use nonce: it is refused
-   * only when unknown, past its expiry, or after stop(), and every successful
+   * only when unknown, past its expiry, or after clearToken(), and every successful
    * call — including a repeat within the same window — mints a fresh device
    * session (see the module doc for the mobile cookie-context rationale).
    * @param token - the token secret from the QR link.
@@ -429,7 +427,7 @@ export class PairingService {
    */
   accept(token: string, userAgent?: string): AcceptResult {
     const record = this.tokens.get(token)
-    if (record === undefined || this.stopped || this.clock.now() > record.expiresAt) {
+    if (record === undefined || this.clock.now() > record.expiresAt) {
       return { ok: false, code: 'invalid' }
     }
     const deviceId = this.clock.randomToken()
@@ -446,16 +444,37 @@ export class PairingService {
   }
 
   /**
-   * Stop remote control: revoke every device session and clear the token.
-   * The phone's next gated /api request 403s and its open sockets close; the
-   * panel falls back to stopped until a fresh QR is issued.
+   * Pause remote control: drop the active token and close every open
+   * connection, keeping the paired devices.
+   *
+   * Access policy is not this class's job: `enabled` lives with the routes that
+   * already receive it, and they refuse there. The service only does the two
+   * mechanical things a pause needs — no QR works, and a phone's open stream
+   * does not keep receiving.
    */
-  stop(): void {
+  pause(): void {
+    this.clearToken()
+    this.closeConnections()
+  }
+
+  /** Drop the active token; paired devices stay. */
+  clearToken(): void {
+    if (this.tokens.size === 0) return
     this.tokens.clear()
+    this.notify()
+  }
+
+  /** Close every connection a paired device holds; the sessions stay. */
+  closeConnections(): void {
+    this.closeAllLeases()
+  }
+
+  /** Drop every paired device (the explicit stop action). */
+  revokeAll(): void {
+    if (this.devices.size === 0) return
     this.devices.clear()
     this.closeAllLeases()
     this.persistRevocation()
-    this.stopped = true
     this.notify()
   }
 
@@ -467,7 +486,6 @@ export class PairingService {
    * @returns true when a live session was removed.
    */
   revoke(deviceId: string): boolean {
-    if (this.stopped) return false
     if (!this.devices.delete(deviceId)) return false
     this.closeLeases(deviceId)
     this.persistRevocation()
@@ -478,7 +496,7 @@ export class PairingService {
   /**
    * The api/gate path: record activity for a device id and report whether
    * the request may proceed. Unknown or revoked ids (including any device
-   * after stop() or idle expiry) are refused.
+   * after revocation or idle expiry) are refused.
    *
    * Presence refreshes are throttled on purpose: every gated request (and
    * the mobile SSE keepalive) lands here, so a broadcast per call would fan
@@ -537,7 +555,12 @@ export class PairingService {
     }
   }
 
-  /** Whether a cookie value names a currently live (non-idle) device session. */
+  /**
+   * Whether a cookie value names a currently live (non-idle) device session.
+   * This is an access decision: an idle device is not live, and the callers
+   * that ask (the gate, the status route, the fence fallback) all treat it as
+   * "may this request proceed".
+   */
   hasDevice(deviceId: string): boolean {
     return this.liveSession(deviceId) !== undefined
   }
@@ -560,7 +583,6 @@ export class PairingService {
 
   private activeToken(): { token: string; record: TokenRecord } | undefined {
     for (const [token, record] of this.tokens) {
-      if (this.stopped) return undefined
       if (this.clock.now() > record.expiresAt) continue
       return { token, record }
     }
@@ -572,7 +594,6 @@ export class PairingService {
    * so a stale cookie cannot pass the gate between sweeps.
    */
   private liveSession(deviceId: string): DeviceSession | undefined {
-    if (this.stopped) return undefined
     const session = this.devices.get(deviceId)
     if (session === undefined) return undefined
     const limit = this.config.idleExpireMs ?? DEFAULT_IDLE_EXPIRE_MS
@@ -597,7 +618,6 @@ export class PairingService {
 
   private derivePhase(onlineCount: number, hasToken: boolean): PairingPhase {
     if (this.lanBases.size === 0 && this.publicBase === undefined) return 'lan-required'
-    if (this.stopped) return 'stopped'
     if (onlineCount > 0) return 'connected'
     if (this.devices.size > 0) return 'disconnected'
     if (hasToken) return 'waiting'

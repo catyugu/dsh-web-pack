@@ -76,6 +76,13 @@ export interface RemoteApiDeps {
   /** Local webServer port the loopback proxy connects to. */
   port: number
   /**
+   * The row's master switch, re-read per request. Remote access off means this
+   * channel serves nothing: the gate below is the only place that decides
+   * whether a paired credential may pass, so the switch is enforced here
+   * instead of inside the device table (which keeps its pairings).
+   */
+  enabled?: () => boolean
+  /**
    * The process's inner browser-auth credential attached to re-issued
    * requests (the connection plugin's /api route enforces that cookie and
    * the pairing gate above already ran). Undefined keeps the previous
@@ -147,6 +154,13 @@ export function makeRemoteApiRoutes(deps: RemoteApiDeps): WebRoute[] {
   const { service, port } = deps
 
   const handler = (req: IncomingMessage, res: ServerResponse): void => {
+    // Remote access off: nothing is served, paired or not. The devices stay
+    // paired on disk, so turning the switch back on restores them.
+    if (deps.enabled?.() === false) {
+      req.resume()
+      envelopeError(res, 403, 'invalid-request', 'disabled', 'remote access is turned off')
+      return
+    }
     // Paired credential first — before any bytes are buffered or forwarded.
     // Unconditional by design: this channel attaches the process's own
     // browser-auth cookie to every re-issued call, so admitting an unpaired
@@ -224,6 +238,12 @@ export function makeRemoteApiUpgradeRoutes(deps: RemoteApiDeps): WebUpgradeRoute
   const { service, port } = deps
 
   const handlerFor = (fallbackPath: string) => (req: IncomingMessage, socket: Duplex, head: Buffer): void => {
+    // Remote access off: the channel serves nothing, paired or not.
+    if (deps.enabled?.() === false) {
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n')
+      socket.destroy()
+      return
+    }
     // WebSocket handshakes cannot carry headers from the Web API, so the
     // cookieless credential rides the query; the cookie stays the primary.
     // The gate is unconditional here too (issue #1665).

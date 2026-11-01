@@ -30,12 +30,16 @@ interface StatusStream {
 /** The SSE fan-out for desktop panel status. */
 export class PairingEventsStream {
   private readonly streams = new Set<StatusStream>()
+  private readonly project: () => PairingSnapshot
 
   /**
-   * @param service - the pairing service whose snapshots are fanned out.
+   * @param service - the pairing service whose changes are fanned out.
+   * @param project - how a change reaches the frame (the routes overlay the
+   * master switch here, so a paused row presents as stopped).
    */
-  constructor(service: PairingService) {
-    service.onState((snapshot) => { this.push(snapshot) })
+  constructor(service: PairingService, project: () => PairingSnapshot) {
+    this.project = project
+    service.onState(() => { this.push(this.project()) })
   }
 
   /** Open one stream; the response is owned to completion. */
@@ -156,7 +160,13 @@ export function makePairRoutes(deps: PairRoutesDeps): WebRoute[] {
     : (deps.requirePairingForLan ?? true)
   const isEnabled = (): boolean => typeof deps.enabled === 'function' ? deps.enabled() : (deps.enabled ?? true)
   const tunnelTokenStored = (): boolean => deps.tunnelTokenStored?.() === true
-  const events = new PairingEventsStream(service)
+  // The master switch is a presentation decision this family owns: the service
+  // keeps the pairings, and a paused row reports itself as stopped.
+  const observableSnapshot = (): PairingSnapshot => {
+    const snapshot = service.snapshot()
+    return isEnabled() ? snapshot : { ...snapshot, phase: 'stopped' }
+  }
+  const events = new PairingEventsStream(service, observableSnapshot)
 
   const requireMethod = (req: IncomingMessage, res: ServerResponse, method: string): boolean => {
     if (req.method === method) return true
@@ -265,7 +275,11 @@ export function makePairRoutes(deps: PairRoutesDeps): WebRoute[] {
     // The body is drained (the desktop sends none) and ignored: stop takes no
     // payload, and reading it keeps the connection reusable.
     await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
-    service.stop()
+    // Stop is the explicit destructive action: no QR, no open streams, and the
+    // pairings are forgotten. Turning the master switch off only pauses — that
+    // is the difference the two surfaces offer.
+    service.pause()
+    service.revokeAll()
     writeJson(res, 200, { ok: true })
   }
 
@@ -293,6 +307,12 @@ export function makePairRoutes(deps: PairRoutesDeps): WebRoute[] {
       writeJson(res, 403, { ok: false, code: 'forbidden' })
       return
     }
+    // While remote access is off the phone should stop waking this host; the
+    // session itself is untouched, so turning the switch back on resumes it.
+    if (!isEnabled()) {
+      writeJson(res, 403, { ok: false, code: 'disabled' })
+      return
+    }
     // The phone's heartbeat carries no payload; the body is drained so the
     // connection stays reusable.
     await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })
@@ -310,13 +330,14 @@ export function makePairRoutes(deps: PairRoutesDeps): WebRoute[] {
       writeJson(res, 403, { ok: false, code: 'forbidden' })
       return
     }
+    const enabled = isEnabled()
     const deviceId = readCookie(req.headers.cookie, service.config.cookieName)
-    const paired = deviceId !== undefined && service.hasDevice(deviceId)
+    const paired = enabled && deviceId !== undefined && service.hasDevice(deviceId)
     // The desktop (loopback) keeps the full pairing-relevant view; the LAN IP
     // literals stay behind a live pairing or loopback so an unauthenticated
     // caller on a tunnel cannot map the internal network.
     const local = isLoopbackClient(req)
-    const snapshot = service.snapshot()
+    const snapshot = observableSnapshot()
     // Unpaired LAN/tunnel clients get only the pairing-relevant fields; the
     // token expiry, public tunnel URL, and counts are an oracle for targeting
     // and stay behind a live device cookie. The per-device roster (ids are
@@ -337,7 +358,7 @@ export function makePairRoutes(deps: PairRoutesDeps): WebRoute[] {
     }
     events.open(req, res)
     // Snapshot on open: a late-opening panel converges without history.
-    events.push(service.snapshot())
+    events.push(observableSnapshot())
   }
 
   /** LAN-bind facts for the settings card; loopback-only, read per request. */

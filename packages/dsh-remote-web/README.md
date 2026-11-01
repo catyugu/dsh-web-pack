@@ -22,8 +22,11 @@ lifetime — sit under a collapsed "Other". There is no second settings card in
 the plugin manager: the pairing sheet and the staged form are one modal
 (`src/client/entry/RemoteEntry.tsx`).
 
-Turning remote access off revokes every paired device, drops the token and
-stops the public tunnel, but the sidebar entry stays mounted: the switch is
+Turning remote access off pauses it: the token goes, open streams close and the
+public tunnel stops, while the paired devices are kept — the gate refuses while
+the switch is off, so a kept pairing is not access, and turning it back on needs
+no new scan. The explicit "停止" action is the destructive one: it pauses and
+forgets every device. Either way the sidebar entry stays mounted: the switch is
 edited inside the popup that entry opens, so the popup reports the stopped
 state and offers the way back instead of disappearing.
 
@@ -64,7 +67,7 @@ deployment fact (the popup cannot even show it).
 
 | Key | Default | Where | Meaning |
 | --- | --- | --- | --- |
-| `enabled` | `true` | popup | master switch: off revokes every device and stops the tunnel |
+| `enabled` | `true` | popup | master switch: off pauses remote access (pairings kept), stops the tunnel and refuses the `/remote` channel |
 | `tunnel` | `off` | popup | `off`, `quick` (ephemeral hostname) or `named` (fixed hostname) |
 | `tunnelHost` | — | popup | the fixed public hostname `named` serves |
 | `tunnelToken` | — | popup | Cloudflare tunnel token for `named`; stored redacted |

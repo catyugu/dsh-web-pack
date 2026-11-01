@@ -70,7 +70,7 @@ test('a live cookie wins over the header, and a stale cookie never shadows a liv
   assert.equal(pairedDeviceIdOf(request(undefined, 'no-such-device'), service), undefined)
 })
 
-test('revoking, stopping and idling out close the connections a device holds', () => {
+test('revoking, pausing and idling out close the connections a device holds', () => {
   const { service, clock } = makeService()
   const revoked = pair(service)
   const kept = pair(service)
@@ -86,9 +86,11 @@ test('revoking, stopping and idling out close the connections a device holds', (
   const release = service.lease(kept, released.close)
   release()
   release()
-  service.stop()
+  service.pause()
   assert.equal(released.count, 0, 'a socket that ended on its own is not closed again')
-  assert.equal(keptCloser.count, 1, 'stop closes what the device still holds')
+  assert.equal(keptCloser.count, 1, 'pause closes what the device still holds')
+  assert.equal(service.hasDevice(kept), true, 'a pause keeps the pairing')
+  assert.equal(service.activeToken(), undefined, 'a pause drops the QR token')
 
   const { service: idling, clock: idleClock } = makeService()
   const device = pair(idling)

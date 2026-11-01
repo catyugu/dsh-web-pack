@@ -8325,7 +8325,6 @@ var PairingService = class {
   devices;
   listeners = /* @__PURE__ */ new Set();
   lastEmitted;
-  stopped = false;
   tokenSerial = 0;
   /** LAN base URLs keyed by the advertised IP literal (interface order). */
   lanBases = /* @__PURE__ */ new Map();
@@ -8388,7 +8387,7 @@ var PairingService = class {
    *   is already gone is closed immediately and yields a no-op release.
    */
   lease(deviceId, close) {
-    if (this.stopped || !this.devices.has(deviceId)) {
+    if (!this.devices.has(deviceId)) {
       close();
       return () => {
       };
@@ -8492,7 +8491,7 @@ var PairingService = class {
   }
   /**
    * Issue a fresh token, replacing (invalidating) any previous one. A
-   * stopped service re-arms through this call (the panel's refresh button).
+   * cleared token is replaced by this call (the panel's refresh button).
    * @param workspaceId - optional workspace the QR link should land in.
    * @param address - optional LAN IP literal the QR must be built from; the
    * default is the public base (when configured) or the first interface.
@@ -8512,7 +8511,6 @@ var PairingService = class {
     const now = this.clock.now();
     const token = this.clock.randomToken();
     this.tokens.clear();
-    this.stopped = false;
     this.tokenSerial += 1;
     this.tokens.set(token, {
       id: `t${this.tokenSerial}`,
@@ -8527,7 +8525,7 @@ var PairingService = class {
   /**
    * Redeem a token and bind a device session. The token is a bearer
    * credential for its whole window, not a single-use nonce: it is refused
-   * only when unknown, past its expiry, or after stop(), and every successful
+   * only when unknown, past its expiry, or after clearToken(), and every successful
    * call — including a repeat within the same window — mints a fresh device
    * session (see the module doc for the mobile cookie-context rationale).
    * @param token - the token secret from the QR link.
@@ -8536,7 +8534,7 @@ var PairingService = class {
    */
   accept(token, userAgent) {
     const record = this.tokens.get(token);
-    if (record === void 0 || this.stopped || this.clock.now() > record.expiresAt) {
+    if (record === void 0 || this.clock.now() > record.expiresAt) {
       return { ok: false, code: "invalid" };
     }
     const deviceId = this.clock.randomToken();
@@ -8552,16 +8550,34 @@ var PairingService = class {
     return { ok: true, deviceId };
   }
   /**
-   * Stop remote control: revoke every device session and clear the token.
-   * The phone's next gated /api request 403s and its open sockets close; the
-   * panel falls back to stopped until a fresh QR is issued.
+   * Pause remote control: drop the active token and close every open
+   * connection, keeping the paired devices.
+   *
+   * Access policy is not this class's job: `enabled` lives with the routes that
+   * already receive it, and they refuse there. The service only does the two
+   * mechanical things a pause needs — no QR works, and a phone's open stream
+   * does not keep receiving.
    */
-  stop() {
+  pause() {
+    this.clearToken();
+    this.closeConnections();
+  }
+  /** Drop the active token; paired devices stay. */
+  clearToken() {
+    if (this.tokens.size === 0) return;
     this.tokens.clear();
+    this.notify();
+  }
+  /** Close every connection a paired device holds; the sessions stay. */
+  closeConnections() {
+    this.closeAllLeases();
+  }
+  /** Drop every paired device (the explicit stop action). */
+  revokeAll() {
+    if (this.devices.size === 0) return;
     this.devices.clear();
     this.closeAllLeases();
     this.persistRevocation();
-    this.stopped = true;
     this.notify();
   }
   /**
@@ -8572,7 +8588,6 @@ var PairingService = class {
    * @returns true when a live session was removed.
    */
   revoke(deviceId) {
-    if (this.stopped) return false;
     if (!this.devices.delete(deviceId)) return false;
     this.closeLeases(deviceId);
     this.persistRevocation();
@@ -8582,7 +8597,7 @@ var PairingService = class {
   /**
    * The api/gate path: record activity for a device id and report whether
    * the request may proceed. Unknown or revoked ids (including any device
-   * after stop() or idle expiry) are refused.
+   * after revocation or idle expiry) are refused.
    *
    * Presence refreshes are throttled on purpose: every gated request (and
    * the mobile SSE keepalive) lands here, so a broadcast per call would fan
@@ -8635,7 +8650,12 @@ var PairingService = class {
       devices
     };
   }
-  /** Whether a cookie value names a currently live (non-idle) device session. */
+  /**
+   * Whether a cookie value names a currently live (non-idle) device session.
+   * This is an access decision: an idle device is not live, and the callers
+   * that ask (the gate, the status route, the fence fallback) all treat it as
+   * "may this request proceed".
+   */
   hasDevice(deviceId) {
     return this.liveSession(deviceId) !== void 0;
   }
@@ -8657,7 +8677,6 @@ var PairingService = class {
   }
   activeToken() {
     for (const [token, record] of this.tokens) {
-      if (this.stopped) return void 0;
       if (this.clock.now() > record.expiresAt) continue;
       return { token, record };
     }
@@ -8668,7 +8687,6 @@ var PairingService = class {
    * so a stale cookie cannot pass the gate between sweeps.
    */
   liveSession(deviceId) {
-    if (this.stopped) return void 0;
     const session = this.devices.get(deviceId);
     if (session === void 0) return void 0;
     const limit = this.config.idleExpireMs ?? DEFAULT_IDLE_EXPIRE_MS;
@@ -8691,7 +8709,6 @@ var PairingService = class {
   }
   derivePhase(onlineCount, hasToken) {
     if (this.lanBases.size === 0 && this.publicBase === void 0) return "lan-required";
-    if (this.stopped) return "stopped";
     if (onlineCount > 0) return "connected";
     if (this.devices.size > 0) return "disconnected";
     if (hasToken) return "waiting";
@@ -9276,12 +9293,16 @@ var PAIR_PATHS = {
 var MAX_BODY_BYTES = 4096;
 var PairingEventsStream = class {
   streams = /* @__PURE__ */ new Set();
+  project;
   /**
-   * @param service - the pairing service whose snapshots are fanned out.
+   * @param service - the pairing service whose changes are fanned out.
+   * @param project - how a change reaches the frame (the routes overlay the
+   * master switch here, so a paused row presents as stopped).
    */
-  constructor(service) {
-    service.onState((snapshot2) => {
-      this.push(snapshot2);
+  constructor(service, project) {
+    this.project = project;
+    service.onState(() => {
+      this.push(this.project());
     });
   }
   /** Open one stream; the response is owned to completion. */
@@ -9342,7 +9363,11 @@ function makePairRoutes(deps) {
   const pairingRequired = () => typeof deps.requirePairingForLan === "function" ? deps.requirePairingForLan() : deps.requirePairingForLan ?? true;
   const isEnabled = () => typeof deps.enabled === "function" ? deps.enabled() : deps.enabled ?? true;
   const tunnelTokenStored = () => deps.tunnelTokenStored?.() === true;
-  const events = new PairingEventsStream(service);
+  const observableSnapshot = () => {
+    const snapshot2 = service.snapshot();
+    return isEnabled() ? snapshot2 : { ...snapshot2, phase: "stopped" };
+  };
+  const events = new PairingEventsStream(service, observableSnapshot);
   const requireMethod = (req, res, method) => {
     if (req.method === method) return true;
     res.writeHead(405);
@@ -9427,7 +9452,8 @@ function makePairRoutes(deps) {
       return;
     }
     await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
-    service.stop();
+    service.pause();
+    service.revokeAll();
     writeJson(res, 200, { ok: true });
   };
   const handleRevoke = async (req, res) => {
@@ -9453,6 +9479,10 @@ function makePairRoutes(deps) {
       writeJson(res, 403, { ok: false, code: "forbidden" });
       return;
     }
+    if (!isEnabled()) {
+      writeJson(res, 403, { ok: false, code: "disabled" });
+      return;
+    }
     await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
     const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
     if (deviceId === void 0 || !service.heartbeat(deviceId)) {
@@ -9467,10 +9497,11 @@ function makePairRoutes(deps) {
       writeJson(res, 403, { ok: false, code: "forbidden" });
       return;
     }
+    const enabled = isEnabled();
     const deviceId = readCookie(req.headers.cookie, service.config.cookieName);
-    const paired = deviceId !== void 0 && service.hasDevice(deviceId);
+    const paired = enabled && deviceId !== void 0 && service.hasDevice(deviceId);
     const local = isLoopbackClient(req);
-    const snapshot2 = service.snapshot();
+    const snapshot2 = observableSnapshot();
     const { devices: _devices, ...rest } = snapshot2;
     const visible = paired || local ? { ...rest, tunnelTokenStored: tunnelTokenStored() } : { phase: snapshot2.phase, lanAvailable: snapshot2.lanAvailable };
     writeJson(res, 200, { ok: true, paired, requirePairingForLan: pairingRequired(), ...visible });
@@ -9482,7 +9513,7 @@ function makePairRoutes(deps) {
       return;
     }
     events.open(req, res);
-    events.push(service.snapshot());
+    events.push(observableSnapshot());
   };
   const handleLanBind = (req, res) => {
     if (!requireMethod(req, res, "GET")) return;
@@ -10003,6 +10034,11 @@ function pairedDeviceIdOf(req, service) {
 function makeRemoteApiRoutes(deps) {
   const { service, port } = deps;
   const handler = (req, res) => {
+    if (deps.enabled?.() === false) {
+      req.resume();
+      envelopeError(res, 403, "invalid-request", "disabled", "remote access is turned off");
+      return;
+    }
     const paired = pairedDeviceIdOf(req, service);
     if (paired === void 0) {
       req.resume();
@@ -10048,6 +10084,11 @@ function upgradeInnerPath(reqUrl, fallbackPath) {
 function makeRemoteApiUpgradeRoutes(deps) {
   const { service, port } = deps;
   const handlerFor = (fallbackPath) => (req, socket, head) => {
+    if (deps.enabled?.() === false) {
+      socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     let queryDevice;
     try {
       queryDevice = new URL(req.url ?? "/", "http://127.0.0.1").searchParams.get(REMOTE_DEVICE_QUERY) ?? void 0;
@@ -11471,7 +11512,7 @@ var RemoteRuntime = class {
       console.log(`dsh-remote-web: the paired Web GUI is reachable on LAN at ${urls}`);
     }
     if (this.ctx.webServer.host === "0.0.0.0") {
-      console.warn("dsh-remote-web: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)");
+      console.warn("dsh-remote-web: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (a pause or revoke does not invalidate an already-redeemed browser credential)");
     }
     this.ctx.effect(() => () => {
       this.lanBindWorkPending = false;
@@ -11529,7 +11570,7 @@ var RemoteRuntime = class {
       }
     }
     if (!value.enabled) {
-      this.service.stop();
+      this.service.pause();
     }
     if (this.disposeRoutes.current === void 0) {
       const routes = [
@@ -11551,12 +11592,14 @@ var RemoteRuntime = class {
         ...makeRemoteApiRoutes({
           service: this.service,
           port: this.ctx.webServer.port,
+          enabled: () => this.resolve().enabled,
           auth: this.innerAuth
         })
       ];
       const upgrades = makeRemoteApiUpgradeRoutes({
         service: this.service,
         port: this.ctx.webServer.port,
+        enabled: () => this.resolve().enabled,
         auth: this.innerAuth
       });
       this.disposeRoutes.current = this.ctx.effect(
