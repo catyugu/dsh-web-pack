@@ -251,25 +251,29 @@ export function installRemoteChannel(window: ChannelWindow, options: RemoteChann
       return null
     }
   })()
-  const attach = (init?: RequestInit): RequestInit | undefined => {
+  /**
+   * Merge the cookieless device credential into a gated request's headers.
+   *
+   * `HeadersInit` has three shapes (a `Headers` instance, a record, or a tuple
+   * list) and a `Request` input carries its own set, so the merge goes through
+   * `Headers` rather than guessing: the cases that used to lose the credential
+   * were `fetch(url)` with no init at all and `fetch(request)` with the headers
+   * on the request.
+   * @param init - the caller's init, when there is one.
+   * @param inherited - headers the request object itself carries.
+   * @returns an init carrying the credential, or the caller's init unchanged
+   *   when there is no credential or the headers cannot be read.
+   */
+  const attach = (init: RequestInit | undefined, inherited?: HeadersInit): RequestInit | undefined => {
     if (device === null) return init
-    const headers = init?.headers
-    if (typeof Headers !== 'undefined' && headers instanceof Headers) {
-      // Copy instead of mutating: the instance belongs to the caller, which may
-      // reuse it for a request this channel does not rewrite (the device
-      // credential must not ride along there).
-      try {
-        const copy = new Headers(headers)
-        copy.set(RULES.deviceHeader, device)
-        return { ...init, headers: copy }
-      } catch {
-        return init
-      }
+    try {
+      const merged = new Headers(init?.headers ?? inherited)
+      merged.set(RULES.deviceHeader, device)
+      return { ...init, headers: merged }
+    } catch {
+      // A header shape `Headers` refuses is one fetch would refuse as well.
+      return init
     }
-    if (typeof headers === 'object' && headers !== null) {
-      return { ...init, headers: { ...(headers as Record<string, string>), [RULES.deviceHeader]: device } } as RequestInit
-    }
-    return init
   }
   const withDeviceQuery = (url: URL): URL => {
     if (device !== null) url.searchParams.set(RULES.deviceQuery, device)
@@ -287,7 +291,8 @@ export function installRemoteChannel(window: ChannelWindow, options: RemoteChann
       const next: RequestInfo | URL = typeof input === 'string' || input instanceof URL
         ? rewritten.toString()
         : new Request(rewritten, input)
-      return Promise.resolve(originalFetch.call(window, next, attach(init))).then(async (response) => {
+      const inherited = typeof input === 'object' && 'headers' in input ? (input as Request).headers : undefined
+      return Promise.resolve(originalFetch.call(window, next, attach(init, inherited))).then(async (response) => {
         // The clone tees the response body; only the 403 branch inspects it, so
         // every other status skips the copy (a large upload or session dump
         // would otherwise be duplicated per gated request).

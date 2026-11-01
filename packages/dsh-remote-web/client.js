@@ -3530,22 +3530,15 @@ function installRemoteChannel(window2, options = {}) {
       return null;
     }
   })();
-  const attach = (init) => {
+  const attach = (init, inherited) => {
     if (device === null) return init;
-    const headers = init?.headers;
-    if (typeof Headers !== "undefined" && headers instanceof Headers) {
-      try {
-        const copy = new Headers(headers);
-        copy.set(RULES.deviceHeader, device);
-        return { ...init, headers: copy };
-      } catch {
-        return init;
-      }
+    try {
+      const merged = new Headers(init?.headers ?? inherited);
+      merged.set(RULES.deviceHeader, device);
+      return { ...init, headers: merged };
+    } catch {
+      return init;
     }
-    if (typeof headers === "object" && headers !== null) {
-      return { ...init, headers: { ...headers, [RULES.deviceHeader]: device } };
-    }
-    return init;
   };
   const withDeviceQuery = (url) => {
     if (device !== null) url.searchParams.set(RULES.deviceQuery, device);
@@ -3560,7 +3553,8 @@ function installRemoteChannel(window2, options = {}) {
       const rewritten = new URL(url);
       rewritten.pathname = rewritePath(url.pathname);
       const next = typeof input === "string" || input instanceof URL ? rewritten.toString() : new Request(rewritten, input);
-      return Promise.resolve(originalFetch.call(window2, next, attach(init))).then(async (response) => {
+      const inherited = typeof input === "object" && "headers" in input ? input.headers : void 0;
+      return Promise.resolve(originalFetch.call(window2, next, attach(init, inherited))).then(async (response) => {
         if (response.status === 403 && await isUnpairedDenied(response.clone())) options.onUnpaired?.();
         else options.onPaired?.();
         return response;

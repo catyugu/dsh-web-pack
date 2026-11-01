@@ -70,13 +70,19 @@ export function buildRemoteChannelBootScript(rules: RemoteChannelRules = REMOTE_
     // /pair-app capture script sets it in head AFTER this boot script ran,
     // so a parse-time read would always see null.
     'function rdv(){try{return w.sessionStorage.getItem(R.deviceKey)}catch(e){return null}}' +
-    'function att(init){' +
+    'function att(init,inherited){' +
     'var dv=rdv();' +
     'if(dv===null)return init;' +
-    'var h=init&&init.headers;' +
-    'if(typeof Headers!=="undefined"&&h instanceof Headers){try{h.set(R.deviceHeader,dv)}catch(e){}return init}' +
-    'if(typeof h==="object"&&h!==null){var o={};for(var k in h)o[k]=h[k];o[R.deviceHeader]=dv;return Object.assign({},init,{headers:o})}' +
-    'return init}' +
+    // HeadersInit has three shapes (Headers, a record, a tuple list) and a
+    // Request input carries its own set, so the merge goes through Headers
+    // instead of guessing: a missing init, an init without headers, and a
+    // Request are exactly the cases that used to lose the credential.
+    'var src=init&&init.headers!==undefined&&init.headers!==null?init.headers:inherited;' +
+    'try{' +
+    'var hh=new Headers(src);' +
+    'hh.set(R.deviceHeader,dv);' +
+    'return Object.assign({},init,{headers:hh})' +
+    '}catch(e){return init}}' +
     'function sf(p){' +
     'if(p.indexOf(R.pairPrefix)===0)return false;' +
     'if(p.indexOf(R.updatePrefix)===0)return false;' +
@@ -123,7 +129,8 @@ export function buildRemoteChannelBootScript(rules: RemoteChannelRules = REMOTE_
     'var next=new URL(url);' +
     'next.pathname=rp(url.pathname);' +
     'var target=typeof input==="string"||input instanceof URL?next.toString():new Request(next,input);' +
-    'return Promise.resolve(of.call(w,target,att(init))).then(function(res){' +
+    'var inherited=typeof input==="object"&&input!==null&&input.headers?input.headers:undefined;' +
+    'return Promise.resolve(of.call(w,target,att(init,inherited))).then(function(res){' +
     // denied() is sync-false for non-403 and a promise otherwise.
     'void Promise.resolve(denied(res)).then(signal);' +
     'return res})}' +
