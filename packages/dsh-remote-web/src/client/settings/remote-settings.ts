@@ -205,6 +205,8 @@ export class RemoteSettingsModel {
   private saveQueued = false
   private failed = false
   private failedReason: string | undefined
+  /** The projected state, reused until a change invalidates it (see getState). */
+  private state: RemoteSettingsState | undefined
 
   /** @param form - the configuration form for the `remote-web-ui` row. */
   constructor(form: ConfigForm<RemoteSettings>) {
@@ -230,8 +232,20 @@ export class RemoteSettingsModel {
     return () => { this.listeners.delete(listener) }
   }
 
-  /** The current projection (a fresh object per call). */
+  /**
+   * The current projection. The same object is returned until something
+   * changes: `useSyncExternalStore` compares snapshots by identity, so a fresh
+   * object per call reads as an endless change and re-renders until React
+   * aborts the tree.
+   * @returns the current state.
+   */
   getState(): RemoteSettingsState {
+    this.state ??= this.project()
+    return this.state
+  }
+
+  /** Build the state object for the current form and drafts. */
+  private project(): RemoteSettingsState {
     const snapshot = this.form.getSnapshot()
     const plan = this.plan()
     const fields = {} as Record<RemoteField, RemoteFieldState>
@@ -392,6 +406,7 @@ export class RemoteSettingsModel {
   }
 
   private publish(): void {
+    this.state = undefined
     for (const listener of [...this.listeners]) listener()
   }
 }

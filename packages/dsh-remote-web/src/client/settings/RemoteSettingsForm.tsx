@@ -41,6 +41,22 @@ export function RemoteSettingsForm({ model, t }: RemoteSettingsFormProps) {
   const read = useCallback(() => model.getState(), [model])
   const state = useSyncExternalStore(subscribe, read, read)
   const [open, setOpen] = useState(false)
+  // A `named` tunnel needs both inputs, but the token is a secret the form can
+  // never read back: the host says whether one is stored, and an empty draft
+  // then means "keep it" rather than "missing". Declared before the loading
+  // return so the hook order is fixed across renders — a conditional return
+  // before the last hooks makes the namespace's arrival throw.
+  const [tokenStored, setTokenStored] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void readPairFacts().then((facts) => {
+      if (alive) setTokenStored(facts.tunnelTokenStored)
+    }).catch(() => {
+      // The status endpoint is loopback-first: on a phone the card still works,
+      // it just cannot corroborate a stored token.
+    })
+    return () => { alive = false }
+  }, [state.dirty, state.saving])
   if (!state.available) return null
 
   const expanded = open
@@ -56,20 +72,6 @@ export function RemoteSettingsForm({ model, t }: RemoteSettingsFormProps) {
   const lanValue = state.fields.lanBind.text === ''
     ? 'follow'
     : state.fields.lanBind.text === 'true' ? 'on' : 'off'
-  // A `named` tunnel needs both inputs, but the token is a secret the form can
-  // never read back: the host says whether one is stored, and an empty draft
-  // then means "keep it" rather than "missing".
-  const [tokenStored, setTokenStored] = useState(false)
-  useEffect(() => {
-    let alive = true
-    void readPairFacts().then((facts) => {
-      if (alive) setTokenStored(facts.tunnelTokenStored)
-    }).catch(() => {
-      // The status endpoint is loopback-first: on a phone the card still works,
-      // it just cannot corroborate a stored token.
-    })
-    return () => { alive = false }
-  }, [state.dirty, state.saving])
   const namedProblemKey = namedTunnelProblem({
     tunnel: tunnelValue,
     host: state.fields.tunnelHost.text,

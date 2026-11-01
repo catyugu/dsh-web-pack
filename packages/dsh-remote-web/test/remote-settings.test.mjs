@@ -66,10 +66,15 @@ test('staging shows the draft, marks overrides, and refuses invalid text', async
   })
   const model = new RemoteSettingsModel(form)
   assert.equal(model.getState().dirty, false)
+  // useSyncExternalStore compares snapshots by identity: a fresh object per call
+  // reads as an endless change and aborts the rendered tree.
+  assert.equal(model.getState(), model.getState())
+  const before = model.getState()
   assert.equal(model.getState().fields.tunnelHost.overridden, true)
   assert.equal(model.getState().fields.tokenTtlMs.text, '600000')
 
   model.edit('tunnelHost', 'https://new.example')
+  assert.notEqual(model.getState(), before, 'a change produces a new snapshot')
   model.edit('tokenTtlMs', 'soon')
   const state = model.getState()
   assert.equal(state.dirty, true)

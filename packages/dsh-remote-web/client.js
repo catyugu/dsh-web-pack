@@ -1615,6 +1615,17 @@ function RemoteSettingsForm({ model, t }) {
   const read = (0, import_react3.useCallback)(() => model.getState(), [model]);
   const state = (0, import_react3.useSyncExternalStore)(subscribe, read, read);
   const [open, setOpen] = (0, import_react3.useState)(false);
+  const [tokenStored, setTokenStored] = (0, import_react3.useState)(false);
+  (0, import_react3.useEffect)(() => {
+    let alive = true;
+    void readPairFacts().then((facts) => {
+      if (alive) setTokenStored(facts.tunnelTokenStored);
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, [state.dirty, state.saving]);
   if (!state.available) return null;
   const expanded = open;
   const disabled = !state.writable;
@@ -1627,17 +1638,6 @@ function RemoteSettingsForm({ model, t }) {
   const enabledOn = boolOf(state.fields.enabled.text, true);
   const tunnelValue = state.fields.tunnel.text === "" ? "off" : state.fields.tunnel.text;
   const lanValue = state.fields.lanBind.text === "" ? "follow" : state.fields.lanBind.text === "true" ? "on" : "off";
-  const [tokenStored, setTokenStored] = (0, import_react3.useState)(false);
-  (0, import_react3.useEffect)(() => {
-    let alive = true;
-    void readPairFacts().then((facts) => {
-      if (alive) setTokenStored(facts.tunnelTokenStored);
-    }).catch(() => {
-    });
-    return () => {
-      alive = false;
-    };
-  }, [state.dirty, state.saving]);
   const namedProblemKey = namedTunnelProblem({
     tunnel: tunnelValue,
     host: state.fields.tunnelHost.text,
@@ -2229,6 +2229,8 @@ var RemoteSettingsModel = class {
   saveQueued = false;
   failed = false;
   failedReason;
+  /** The projected state, reused until a change invalidates it (see getState). */
+  state;
   /** @param form - the configuration form for the `remote-web-ui` row. */
   constructor(form) {
     this.form = form;
@@ -2254,8 +2256,19 @@ var RemoteSettingsModel = class {
       this.listeners.delete(listener);
     };
   }
-  /** The current projection (a fresh object per call). */
+  /**
+   * The current projection. The same object is returned until something
+   * changes: `useSyncExternalStore` compares snapshots by identity, so a fresh
+   * object per call reads as an endless change and re-renders until React
+   * aborts the tree.
+   * @returns the current state.
+   */
   getState() {
+    this.state ??= this.project();
+    return this.state;
+  }
+  /** Build the state object for the current form and drafts. */
+  project() {
     const snapshot = this.form.getSnapshot();
     const plan = this.plan();
     const fields = {};
@@ -2399,6 +2412,7 @@ var RemoteSettingsModel = class {
     return user !== void 0 && Object.hasOwn(user, field);
   }
   publish() {
+    this.state = void 0;
     for (const listener of [...this.listeners]) listener();
   }
 };

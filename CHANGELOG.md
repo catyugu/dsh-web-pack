@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.3
+
+The remote-access settings surface is back: 0.5.2's client threw on every mount.
+
+### Fixed
+
+- The settings model hands `useSyncExternalStore` the same snapshot object
+  until something changes. It used to build a fresh object per call, which React
+  reads as an endless change: the slot entry aborted with "Maximum update depth
+  exceeded" and the sidebar's remote-access surface never rendered.
+- The card's hooks are declared before its loading return, so the namespace
+  arriving no longer changes the hook count mid-mount.
+
 ## 0.5.2
 
 The pack is rebuilt from the inside: same three rows, same install, smaller
