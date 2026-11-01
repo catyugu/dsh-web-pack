@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.5.2
+
+The pack is rebuilt from the inside: same three rows, same install, smaller
+artifacts and one settings model per row.
+
+### Changed
+
+- `dsh-remote-web`'s settings surface is one dedicated model plus one form. The
+  seven editable fields keep their behavior — staged drafts, invalid input
+  blocking the save, one atomic write, inherited values reset by link, a
+  save pressed mid-flight running once the first settles — with roughly half
+  the code.
+- The Host half is split by responsibility: the plugin surface mounts a
+  runtime that owns the pairing service, the ingress, the route table and the
+  presence sweep. The `/api/pair` family, the phone landing pages and the
+  origin fence now live in modules of their own.
+- The npm tarball carries runtime files only: 123 files / 447 kB before,
+  41 files / 223 kB now. The release check imports every Host entry point from
+  the packed tarball instead of counting files.
+- The portrait stylesheet is a CSS asset rather than a JS array; the injected
+  rules are unchanged.
+- The tunnel binary, tunnel settings and pairing semantics are untouched.
+
+### Fixed
+
+- The posture probe counted an unreachable `/api` as an open fence, so a
+  stopped port could paint a CRITICAL exposure line in the log. An unreachable
+  probe now counts as closed, matching the timeout path.
+- A manual Release run compares the version against the tag it was given
+  instead of the branch it was started from.
+- Staged publishing is the fallback only for an authentication refusal; any
+  other publish failure is reported as itself.
+- CSS module class names hash the repository-relative stylesheet path, so two
+  machines building the same source produce the same client bundle.
+
+### Removed
+
+- The zod schemas on the pair payloads: the routes narrow the four tiny shapes
+  directly, which also drops zod from the 1.2 MB Host bundle.
+- The `scripts/sync-shared.mjs` markers and the shared-card machinery the rows
+  never had: every module is maintained here, in the package that ships it.
+
 ## 0.4.3
 
 The card's subtitle stops promising a device limit the row no longer has.

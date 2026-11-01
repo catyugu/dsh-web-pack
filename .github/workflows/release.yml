@@ -36,7 +36,9 @@ jobs:
         run: node scripts/check-tarball.mjs
       - name: version matches the tag
         run: |
-          tag="${GITHUB_REF_NAME:-${INPUT_TAG}}"
+          # A manual run passes the tag as an input; GITHUB_REF_NAME is then the
+          # branch the run was started from, so the input must win.
+          tag="${INPUT_TAG:-$GITHUB_REF_NAME}"
           version="$(node -p "require('./package.json').version")"
           if [ "$tag" != "v$version" ]; then
             echo "the tag $tag does not match the manifest version $version" >&2

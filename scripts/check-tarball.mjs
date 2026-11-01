@@ -1,10 +1,13 @@
 /**
- * Verify the tarball this package would publish carries its rows.
+ * Verify the tarball this package would publish is installable, not merely
+ * populated.
  *
  * The rows are `file:` dependencies, so they only reach a reader if the tarball
- * contains `packages/<row>` with the row's manifest and browser bundle, and if
- * the patch names exactly the packages those manifests declare. A packaging
- * change that drops either leaves readers with a bundle whose rows never start.
+ * carries each row with its manifest, its Host module and its browser bundle,
+ * and if the patch names exactly the packages those manifests declare. File
+ * presence alone would let a broken import ship: the tarball is therefore
+ * unpacked into a temporary directory and every Host entry point is imported
+ * from there, which is what a reader's `dsh plugin add` does with it.
  *
  * The tarball is packed into a temporary directory and read directly, because
  * npm's own file report mixes lifecycle output into stdout.
@@ -12,27 +15,35 @@
  * @module dsh-web-pack/check-tarball
  */
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
+
+/** Longest header field the tar format stores inline. */
+const NAME_BYTES = 100
 
 /**
  * Walk the entries of a tar archive.
  * @param archive - the uncompressed tar bytes.
- * @returns each entry's name.
+ * @returns every regular file with its bytes.
  */
 function tarEntries(archive) {
-  const names = []
+  const entries = []
   for (let offset = 0; offset + 512 <= archive.length;) {
     const header = archive.subarray(offset, offset + 512)
     if (header.every((byte) => byte === 0)) break
     const text = (start, length) => header.subarray(start, start + length).toString('utf8').replace(/\0.*$/s, '').trim()
+    const name = text(0, NAME_BYTES)
     const size = Number.parseInt(text(124, 12) || '0', 8)
-    names.push(text(0, 100))
-    offset += 512 + Math.ceil(size / 512) * 512
+    const type = text(156, 1)
+    const start = offset + 512
+    // Only regular files (typeflag '0' or the end-of-archive default) carry bytes.
+    if (type === '0' || type === '') entries.push({ name, data: archive.subarray(start, start + size) })
+    offset = start + Math.ceil(size / 512) * 512
   }
-  return names
+  return entries
 }
 
 const root = join(import.meta.dirname, '..')
@@ -46,27 +57,38 @@ try {
   execFileSync(command, shell ? [] : args, { cwd: root, shell, stdio: ['ignore', 'ignore', 'inherit'] })
 
   const [tarball] = (await readdir(destination)).filter((file) => file.endsWith('.tgz'))
-  const files = new Set(tarEntries(gunzipSync(await readFile(join(destination, tarball)))))
-  const patch = await readFile(join(root, 'cordis.patch.yml'), 'utf8')
+  const entries = tarEntries(gunzipSync(await readFile(join(destination, tarball))))
+  const files = new Set(entries.map((entry) => entry.name))
 
-  for (const directory of (await readdir(join(root, 'packages'))).sort()) {
+  // Unpack exactly what the archive carries, so an import resolves against the
+  // installed layout instead of this checkout's node_modules.
+  const installed = join(destination, 'installed')
+  for (const entry of entries) {
+    const target = join(installed, entry.name)
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, entry.data)
+  }
+
+  const patch = await readFile(join(root, 'cordis.patch.yml'), 'utf8')
+  const rows = (await readdir(join(root, 'packages'))).sort()
+  for (const directory of rows) {
     const manifest = JSON.parse(await readFile(join(root, 'packages', directory, 'package.json'), 'utf8'))
     if (!patch.includes(`"${manifest.name}"`)) throw new Error(`${manifest.name} has no row in the patch`)
-    // Every entry point the manifest promises must be in the tarball: the
-    // Host module, the invariant companion and the browser bundle. Reading
-    // them from `exports` keeps one source of truth — a row that builds to
-    // `lib/host.js` instead of `src/host.js` is checked for what it ships.
     const entryPoints = Object.entries(manifest.exports ?? {})
       .filter(([key]) => key === '.' || key === './invariant' || key === './client')
-      .map(([, target]) => (typeof target === 'string' ? target : undefined))
-      .filter((target) => target !== undefined)
+      .flatMap(([key, target]) => (typeof target === 'string' ? [{ key, target }] : []))
     if (entryPoints.length === 0) throw new Error(`${manifest.name} declares no entry points`)
-    for (const entry of entryPoints) {
-      const path = `package/packages/${directory}/${entry.replace(/^\.\//, '')}`
-      if (!files.has(path)) throw new Error(`${manifest.name} ships without ${entry}`)
+    for (const { key, target } of entryPoints) {
+      const path = `package/packages/${directory}/${target.replace(/^\.\//, '')}`
+      if (!files.has(path)) throw new Error(`${manifest.name} ships without ${target}`)
+      // The browser half is a classic script for the page's module loader, not
+      // an ES module, so only the Host half is imported.
+      if (key === './client') continue
+      const module = await import(pathToFileURL(join(installed, path)).href)
+      if (typeof module.apply !== 'function') throw new Error(`${manifest.name}: ${key} exports no apply`)
     }
   }
-  console.log(`the tarball carries ${(await readdir(join(root, 'packages'))).length} rows`)
+  console.log(`the tarball carries ${rows.length} importable rows`)
 } finally {
   await rm(destination, { recursive: true, force: true })
 }

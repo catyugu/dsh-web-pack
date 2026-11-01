@@ -15,11 +15,18 @@
   },
   "files": [
     "cordis.patch.yml",
-    "packages",
-    "!packages/*/node_modules",
     "icon.svg",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "packages/*/package.json",
+    "packages/*/README.md",
+    "packages/*/LICENSE",
+    "packages/*/icon.svg",
+    "packages/*/locale",
+    "packages/*/client.js",
+    "packages/*/src/*.js",
+    "!packages/*/src/client.js",
+    "packages/dsh-remote-web/lib"
   ],
   "scripts": {
     "build": "node scripts/build-client.mjs && node scripts/build-remote-web.mjs",

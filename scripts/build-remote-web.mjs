@@ -23,7 +23,7 @@
 import { build } from 'esbuild'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 
 const root = join(import.meta.dirname, '..')
 const packageDirectory = join(root, 'packages', 'dsh-remote-web')
@@ -90,7 +90,10 @@ const cssModulesPlugin = {
   setup(build) {
     build.onLoad({ filter: /\.module\.css$/ }, async (args) => {
       const text = await readFile(args.path, 'utf8')
-      const hash = createHash('sha256').update(args.path).digest('hex').slice(0, 6)
+      // Hash the repository-relative path, not the absolute one: the same
+      // source must produce the same class names on every machine and in CI.
+      const relativePath = relative(root, args.path).replaceAll('\\', '/')
+      const hash = createHash('sha256').update(relativePath).digest('hex').slice(0, 6)
       const classes = new Map()
       let css = ''
       let index = 0

@@ -21,6 +21,23 @@ against the modern runtime. `engines.dsh` pins the Harness line
 (`>=0.2.1-rc.4 <0.3.0-0`), so the plugin manager refuses an incompatible
 Harness instead of mounting a row against APIs it does not have.
 
+## Packaging and release
+
+- The root `files` list is an allowlist of runtime files: each row's manifest,
+  browser bundle, Host sources (`src/*.js`, minus the build input) and the
+  compiled `lib/` of the TypeScript row. Tests, TypeScript sources and tooling
+  stay out, which is what the size went from 447 kB to 223 kB for.
+- `scripts/check-tarball.mjs` packs the artifact, unpacks it, and imports every
+  Host entry point from the unpacked tree. A tarball that lists the right files
+  but cannot be imported fails the check.
+- `scripts/stage.mjs` publishes directly when the credential may, and stages
+  only when the registry refused for an authentication reason; any other
+  failure is rethrown as itself.
+- The release workflow releases the tag it was given (`inputs.tag` on a manual
+  run), not the branch the run started from.
+- CSS module class names hash the repository-relative stylesheet path, so the
+  same source builds the same bundle on every machine and in CI.
+
 ## Rows and their shape
 
 A row is one package under `packages/`. Its Host half is an ESM module the
