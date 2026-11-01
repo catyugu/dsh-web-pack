@@ -25,7 +25,8 @@ import {
   type FieldState as CardFieldState,
 } from './settings-form.ts'
 import { RadioField, SwitchField, type RadioOption } from './controls.tsx'
-import { LanBindStatusError, readLanBindStatus, shouldStopLanBindPoll, type LanBindFrame } from '../pair-api.ts'
+import { namedTunnelProblem } from './tunnel-readiness.ts'
+import { LanBindStatusError, readLanBindStatus, readPairFacts, shouldStopLanBindPoll, type LanBindFrame } from '../pair-api.ts'
 import cardCss from './settings-card.module.css'
 import css from './controls.module.css'
 
@@ -158,17 +159,26 @@ export function RemoteSettingsCard(props: RemoteSettingsCardProps) {
   const lanValue = state.lanBind.text === ''
     ? 'follow'
     : state.lanBind.text === 'true' ? 'on' : 'off'
-  // A `named` tunnel needs both inputs, but the token is stored redacted: an
-  // empty draft means "keep the stored token" unless the user cleared it.
-  const hostDraft = state.tunnelHost.text.trim()
-  const tokenReady = state.tunnelToken.text.trim() !== '' || state.tunnelToken.overridden
-  const namedProblemKey = tunnelValue !== 'named'
-    ? undefined
-    : hostDraft === ''
-      ? 'settings.tunnelHostMissing'
-      : !/^https?:\/\/\S+$/i.test(hostDraft)
-        ? 'settings.tunnelHostInvalid'
-        : !tokenReady ? 'settings.tunnelTokenMissing' : undefined
+  // A `named` tunnel needs both inputs, but the token is a secret the form can
+  // never read back: the host says whether one is stored, and an empty draft
+  // then means "keep it" rather than "missing".
+  const [tokenStored, setTokenStored] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void readPairFacts().then((facts) => {
+      if (alive) setTokenStored(facts.tunnelTokenStored)
+    }).catch(() => {
+      // The status endpoint is loopback-first: on a phone the card still works,
+      // it just cannot corroborate a stored token.
+    })
+    return () => { alive = false }
+  }, [state.dirty, state.saving])
+  const namedProblemKey = namedTunnelProblem({
+    tunnel: tunnelValue,
+    host: state.tunnelHost.text,
+    tokenDraft: state.tunnelToken.text,
+    tokenStored,
+  })
 
   const tunnelOptions: RadioOption[] = [
     { value: 'off', label: t('settings.tunnelOff'), detail: t('settings.tunnelOffDetail') },

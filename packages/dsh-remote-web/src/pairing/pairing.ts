@@ -227,6 +227,8 @@ export class PairingService {
   private posture: PostureSnapshot | undefined
   /** True when lastSeenAt changed since the last persist (flushed on sweep). */
   private dirty = false
+  /** Live gated connections keyed by the device session that owns them. */
+  private readonly leases = new Map<string, Set<() => void>>()
 
   /**
    * @param config - tunables. The settings surface replaces the object (a
@@ -291,6 +293,59 @@ export class PairingService {
       }
     }
     return removed
+  }
+
+  /**
+   * Register a live connection (the gated WebSocket proxy) as owned by a
+   * device session. A connection is only as good as the authorization that
+   * opened it: revoking the device, stopping remote control, and an idle
+   * eviction each close every lease the device holds, so a socket opened
+   * while paired cannot outlive the pairing.
+   * @param deviceId - the device session that owns the connection.
+   * @param close - terminates the connection; it is called at most once per
+   *   lease and must tolerate an already-closed socket.
+   * @returns an idempotent release: call it when the connection ends on its
+   *   own, so the lease table does not grow with dead sockets. A device that
+   *   is already gone is closed immediately and yields a no-op release.
+   */
+  lease(deviceId: string, close: () => void): () => void {
+    if (this.stopped || !this.devices.has(deviceId)) {
+      close()
+      return () => {}
+    }
+    let owned = this.leases.get(deviceId)
+    if (owned === undefined) {
+      owned = new Set()
+      this.leases.set(deviceId, owned)
+    }
+    owned.add(close)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      owned.delete(close)
+      if (owned.size === 0) this.leases.delete(deviceId)
+    }
+  }
+
+  /** Close every connection one device owns, and forget it. */
+  private closeLeases(deviceId: string): void {
+    const owned = this.leases.get(deviceId)
+    if (owned === undefined) return
+    this.leases.delete(deviceId)
+    for (const close of [...owned]) {
+      try {
+        close()
+      } catch (error) {
+        // One broken socket must not strand the others that share a device.
+        console.error('dsh-remote-web: closing a gated connection failed', error)
+      }
+    }
+  }
+
+  /** Close every leased connection (stop, or process teardown). */
+  private closeAllLeases(): void {
+    for (const deviceId of [...this.leases.keys()]) this.closeLeases(deviceId)
   }
 
   /**

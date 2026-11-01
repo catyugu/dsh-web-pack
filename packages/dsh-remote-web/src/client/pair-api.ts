@@ -51,6 +51,24 @@ export interface PairGatePolicy {
   requirePairingForLan: boolean
 }
 
+/** Host facts the settings card needs but cannot read from its own form. */
+export interface PairFacts {
+  /** Whether the host holds a tunnel token (the form only ever sees it redacted). */
+  tunnelTokenStored: boolean
+}
+
+/**
+ * Read the host-owned facts the settings card cannot derive from the form.
+ * The tunnel token is a secret: the form read-back strips it, so "a token is
+ * configured" has to come from the host rather than from an empty input.
+ */
+export async function readPairFacts(): Promise<PairFacts> {
+  const response = await fetch('api/pair/status')
+  if (!response.ok) throw new Error(`dsh-remote-web: status failed with ${String(response.status)}`)
+  const value = await response.json() as { tunnelTokenStored?: unknown }
+  return { tunnelTokenStored: value.tunnelTokenStored === true }
+}
+
 /** Read the host-authoritative desktop pairing policy. */
 export async function readPairGatePolicy(): Promise<PairGatePolicy> {
   const response = await fetch('api/pair/status')

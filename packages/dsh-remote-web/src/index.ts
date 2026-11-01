@@ -605,6 +605,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       service,
       requirePairingForLan: () => resolve().requirePairingForLan,
       enabled: () => resolve().enabled,
+      tunnelTokenStored: () => (resolve().tunnelToken ?? '') !== '',
       lanBindStatus,
       indexDocument: fetchAppShell,
       trustedHosts: () => {

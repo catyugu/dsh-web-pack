@@ -541,6 +541,13 @@ export interface PairRoutesDeps {
    */
   enabled?: boolean | (() => boolean)
   /**
+   * Whether the host currently holds a tunnel token. The settings card cannot
+   * read the secret back (the form strips redacted fields), so "already
+   * configured" has to come from here — otherwise the card reads its own empty
+   * input as "no token" and blocks a perfectly good save. Defaults to false.
+   */
+  tunnelTokenStored?: () => boolean
+  /**
    * LAN-bind facts for the settings card (managed patch block state, live
    * bind host/port, firewall summary). Re-read per request so a hot-reloaded
    * rebind and a fresh toggle round are both reflected without a restart.
@@ -576,6 +583,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
     ? requirePairingForLan()
     : requirePairingForLan
   const isEnabled = (): boolean => typeof enabled === 'function' ? enabled() : enabled
+  const tunnelTokenStored = (): boolean => deps.tunnelTokenStored?.() === true
   const grants = deps.grants ?? createPairGrantStore()
   const events = new PairingEventsStream(service)
   const dynamicTrustedHosts = new Set<string>()
@@ -858,7 +866,7 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
     // stream carries it to the desktop panel.
     const { devices: _devices, ...rest } = snapshot
     const visible = paired || local
-      ? rest
+      ? { ...rest, tunnelTokenStored: tunnelTokenStored() }
       : { phase: snapshot.phase, lanAvailable: snapshot.lanAvailable }
     writeJson(res, 200, { ok: true, paired, requirePairingForLan: pairingRequired(), ...visible })
   }

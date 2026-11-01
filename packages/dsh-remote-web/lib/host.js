@@ -8291,6 +8291,8 @@ var PairingService = class {
   posture;
   /** True when lastSeenAt changed since the last persist (flushed on sweep). */
   dirty = false;
+  /** Live gated connections keyed by the device session that owns them. */
+  leases = /* @__PURE__ */ new Map();
   /**
    * Restore device sessions persisted by a previous process run. A corrupt
    * or missing file is tolerated (an empty device table, never a throw) —
@@ -8334,6 +8336,56 @@ var PairingService = class {
       }
     }
     return removed;
+  }
+  /**
+   * Register a live connection (the gated WebSocket proxy) as owned by a
+   * device session. A connection is only as good as the authorization that
+   * opened it: revoking the device, stopping remote control, and an idle
+   * eviction each close every lease the device holds, so a socket opened
+   * while paired cannot outlive the pairing.
+   * @param deviceId - the device session that owns the connection.
+   * @param close - terminates the connection; it is called at most once per
+   *   lease and must tolerate an already-closed socket.
+   * @returns an idempotent release: call it when the connection ends on its
+   *   own, so the lease table does not grow with dead sockets. A device that
+   *   is already gone is closed immediately and yields a no-op release.
+   */
+  lease(deviceId, close) {
+    if (this.stopped || !this.devices.has(deviceId)) {
+      close();
+      return () => {
+      };
+    }
+    let owned = this.leases.get(deviceId);
+    if (owned === void 0) {
+      owned = /* @__PURE__ */ new Set();
+      this.leases.set(deviceId, owned);
+    }
+    owned.add(close);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      owned.delete(close);
+      if (owned.size === 0) this.leases.delete(deviceId);
+    };
+  }
+  /** Close every connection one device owns, and forget it. */
+  closeLeases(deviceId) {
+    const owned = this.leases.get(deviceId);
+    if (owned === void 0) return;
+    this.leases.delete(deviceId);
+    for (const close of [...owned]) {
+      try {
+        close();
+      } catch (error62) {
+        console.error("dsh-remote-web: closing a gated connection failed", error62);
+      }
+    }
+  }
+  /** Close every leased connection (stop, or process teardown). */
+  closeAllLeases() {
+    for (const deviceId of [...this.leases.keys()]) this.closeLeases(deviceId);
   }
   /**
    * Write the current device table to the configured file. Called on the
@@ -28964,6 +29016,7 @@ function makeRoutes(deps) {
   const { service, requirePairingForLan = true, enabled = true } = deps;
   const pairingRequired = () => typeof requirePairingForLan === "function" ? requirePairingForLan() : requirePairingForLan;
   const isEnabled = () => typeof enabled === "function" ? enabled() : enabled;
+  const tunnelTokenStored = () => deps.tunnelTokenStored?.() === true;
   const grants = deps.grants ?? createPairGrantStore();
   const events = new PairingEventsStream(service);
   const dynamicTrustedHosts = /* @__PURE__ */ new Set();
@@ -29175,7 +29228,7 @@ function makeRoutes(deps) {
     const local = isLoopbackClient(req);
     const snapshot2 = service.snapshot();
     const { devices: _devices, ...rest } = snapshot2;
-    const visible = paired || local ? rest : { phase: snapshot2.phase, lanAvailable: snapshot2.lanAvailable };
+    const visible = paired || local ? { ...rest, tunnelTokenStored: tunnelTokenStored() } : { phase: snapshot2.phase, lanAvailable: snapshot2.lanAvailable };
     writeJson(res, 200, { ok: true, paired, requirePairingForLan: pairingRequired(), ...visible });
   };
   const handleEvents = (req, res) => {
@@ -31156,6 +31209,7 @@ function applyImpl(ctx, config2) {
       service,
       requirePairingForLan: () => resolve3().requirePairingForLan,
       enabled: () => resolve3().enabled,
+      tunnelTokenStored: () => (resolve3().tunnelToken ?? "") !== "",
       lanBindStatus,
       indexDocument: fetchAppShell,
       trustedHosts: () => {

@@ -1175,6 +1175,12 @@ QRCodeSVG.displayName = "QRCodeSVG";
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // packages/dsh-remote-web/src/client/pair-api.ts
+async function readPairFacts() {
+  const response = await fetch("api/pair/status");
+  if (!response.ok) throw new Error(`dsh-remote-web: status failed with ${String(response.status)}`);
+  const value = await response.json();
+  return { tunnelTokenStored: value.tunnelTokenStored === true };
+}
 async function readPairGatePolicy() {
   const response = await fetch("api/pair/status");
   if (!response.ok) throw new Error(`dsh-remote-web: status failed with ${String(response.status)}`);
@@ -2442,6 +2448,16 @@ function RadioField(props) {
   ] }, option.value)) }) });
 }
 
+// packages/dsh-remote-web/src/client/settings/tunnel-readiness.ts
+function namedTunnelProblem(inputs) {
+  if (inputs.tunnel !== "named") return void 0;
+  const host = inputs.host.trim();
+  if (host === "") return "settings.tunnelHostMissing";
+  if (!/^https?:\/\/\S+$/i.test(host)) return "settings.tunnelHostInvalid";
+  if (inputs.tokenDraft.trim() === "" && !inputs.tokenStored) return "settings.tunnelTokenMissing";
+  return void 0;
+}
+
 // packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
 var import_jsx_runtime4 = require("react/jsx-runtime");
 var TUNNEL_MODES = ["off", "quick", "named"];
@@ -2506,9 +2522,23 @@ function RemoteSettingsCard(props) {
   const enabledOn = boolOf(state.enabled.text, true);
   const tunnelValue = state.tunnel.text === "" ? "off" : state.tunnel.text;
   const lanValue = state.lanBind.text === "" ? "follow" : state.lanBind.text === "true" ? "on" : "off";
-  const hostDraft = state.tunnelHost.text.trim();
-  const tokenReady = state.tunnelToken.text.trim() !== "" || state.tunnelToken.overridden;
-  const namedProblemKey = tunnelValue !== "named" ? void 0 : hostDraft === "" ? "settings.tunnelHostMissing" : !/^https?:\/\/\S+$/i.test(hostDraft) ? "settings.tunnelHostInvalid" : !tokenReady ? "settings.tunnelTokenMissing" : void 0;
+  const [tokenStored, setTokenStored] = (0, import_react4.useState)(false);
+  (0, import_react4.useEffect)(() => {
+    let alive = true;
+    void readPairFacts().then((facts) => {
+      if (alive) setTokenStored(facts.tunnelTokenStored);
+    }).catch(() => {
+    });
+    return () => {
+      alive = false;
+    };
+  }, [state.dirty, state.saving]);
+  const namedProblemKey = namedTunnelProblem({
+    tunnel: tunnelValue,
+    host: state.tunnelHost.text,
+    tokenDraft: state.tunnelToken.text,
+    tokenStored
+  });
   const tunnelOptions = [
     { value: "off", label: t("settings.tunnelOff"), detail: t("settings.tunnelOffDetail") },
     { value: "quick", label: t("settings.tunnelQuick"), detail: t("settings.tunnelQuickDetail") },
