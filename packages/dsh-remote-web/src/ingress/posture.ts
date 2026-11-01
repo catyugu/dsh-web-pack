@@ -105,7 +105,7 @@ async function probeHost(port: number, hostHeader: string, request: ProbeRequest
       path: '/api/session.list',
       headers: { host: hostHeader, 'content-type': 'application/json' },
       timeout: timeoutMs,
-    }, status => { finish(status !== 403 && status !== 401) })
+    }, status => { finish(status !== 0 && status !== 403 && status !== 401) })
     const timer = setTimeout(() => { finish(false) }, timeoutMs + 1_000)
     handle.on('error', () => { finish(false) })
     handle.end('{}')

@@ -7366,9 +7366,8 @@ var require_dist = __commonJS({
   }
 });
 
-// packages/dsh-remote-web/src/index.ts
-import { join as join5 } from "node:path";
-import { setInterval as nodeSetInterval, setTimeout as nodeSetTimeout } from "node:timers";
+// packages/dsh-remote-web/src/config.ts
+import { join as join2 } from "node:path";
 
 // node_modules/.pnpm/@deepseek-ai+cosmokit@1.8.6/node_modules/@deepseek-ai/cosmokit/lib/index.js
 function isNullable(value) {
@@ -8767,6 +8766,115 @@ function dshHome(env = process.env, home = homedir()) {
   return isAbsolute(expanded) ? expanded : join(process.cwd(), expanded);
 }
 
+// packages/dsh-remote-web/src/ingress/lan-bind-plan.ts
+function desiredBindHost(lanBind, startupHost) {
+  if (startupHost === "0.0.0.0" || startupHost === "127.0.0.1") return startupHost;
+  return lanBind ? "0.0.0.0" : "127.0.0.1";
+}
+function desiredBindPort(startupPort, livePort) {
+  if (typeof startupPort === "number" && Number.isFinite(startupPort)) return startupPort;
+  return typeof livePort === "number" && Number.isFinite(livePort) ? livePort : void 0;
+}
+function pendingRestartOf(lanBind, desiredHost, liveHost) {
+  if (lanBind === void 0 || desiredHost === void 0) return false;
+  return liveHost !== desiredHost;
+}
+var DEFAULT_MANAGED_PROFILE = "web";
+function resolveManagedProfile(configured, launched, env) {
+  return configured ?? launched ?? env ?? DEFAULT_MANAGED_PROFILE;
+}
+function firewallActionNeeded(previous, next) {
+  if (next === void 0) return false;
+  if (previous === void 0) return true;
+  return previous.enabled !== next.enabled || previous.port !== next.port;
+}
+
+// packages/dsh-remote-web/src/config.ts
+var REMOTE_WEB_UI_SETTINGS_NAMESPACE = "remote-web-ui";
+var Config = Schema.object({
+  tokenTtlMs: Schema.number().step(1).min(6e4).default(10 * 6e4).volatile(),
+  offlineAfterMs: Schema.number().step(1).min(5e3).default(25e3),
+  idleExpireMs: Schema.number().step(1).min(6e4).default(DEFAULT_IDLE_EXPIRE_MS),
+  cookieName: Schema.string().min(1).default("dsh_pair"),
+  requirePairingForLan: Schema.boolean().default(true).volatile(),
+  tunnel: Schema.string().default("off").volatile(),
+  tunnelHost: Schema.string().volatile(),
+  trustedHosts: Schema.array(Schema.string()),
+  devicesFile: Schema.string(),
+  tunnelToken: Schema.string().role("secret").volatile(),
+  lanBind: Schema.boolean().volatile(),
+  profile: Schema.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+  enabled: Schema.boolean().default(true).volatile()
+});
+function isConfigRef(field) {
+  return typeof field === "object" && field !== null && typeof field.get === "function";
+}
+function readConfigField(field, fallback) {
+  if (field === void 0) return fallback;
+  if (isConfigRef(field)) {
+    const value = field.get();
+    return value === void 0 ? fallback : value;
+  }
+  return field;
+}
+function readOptionalConfigField(field) {
+  if (field === void 0) return void 0;
+  if (isConfigRef(field)) return field.get();
+  return field;
+}
+function pairingConfigOf(resolved) {
+  return {
+    tokenTtlMs: resolved.tokenTtlMs,
+    offlineAfterMs: resolved.offlineAfterMs,
+    idleExpireMs: resolved.idleExpireMs,
+    cookieName: resolved.cookieName,
+    devicesFile: resolved.devicesFile
+  };
+}
+function defaultDevicesFile(home = dshHome()) {
+  return join2(home, "dsh-web-pack", "remote-web", "devices.json");
+}
+var DEFAULTS = {
+  tokenTtlMs: 10 * 6e4,
+  offlineAfterMs: 25e3,
+  idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
+  cookieName: "dsh_pair",
+  requirePairingForLan: true,
+  tunnel: "off",
+  tunnelHost: void 0,
+  trustedHosts: void 0,
+  devicesFile: defaultDevicesFile(),
+  tunnelToken: void 0,
+  lanBind: void 0,
+  profile: resolveManagedProfile(void 0, void 0, process.env.DSH_PROFILE),
+  enabled: true
+};
+function launchedProfileName(ctx) {
+  const fact = ctx.get("profileContext");
+  return typeof fact?.name === "string" && fact.name.length > 0 ? fact.name : void 0;
+}
+function resolveConfig(ctx, config) {
+  const envTunnelHost = process.env.DSH_REMOTE_TUNNEL_HOST?.trim() || void 0;
+  return {
+    tokenTtlMs: readConfigField(config?.tokenTtlMs, DEFAULTS.tokenTtlMs),
+    offlineAfterMs: readConfigField(config?.offlineAfterMs, DEFAULTS.offlineAfterMs),
+    idleExpireMs: readConfigField(config?.idleExpireMs, DEFAULTS.idleExpireMs),
+    cookieName: readConfigField(config?.cookieName, DEFAULTS.cookieName),
+    requirePairingForLan: readConfigField(config?.requirePairingForLan, DEFAULTS.requirePairingForLan),
+    tunnel: readConfigField(config?.tunnel, DEFAULTS.tunnel),
+    tunnelHost: readOptionalConfigField(config?.tunnelHost) ?? envTunnelHost,
+    trustedHosts: readOptionalConfigField(config?.trustedHosts),
+    devicesFile: readConfigField(config?.devicesFile, DEFAULTS.devicesFile),
+    tunnelToken: readOptionalConfigField(config?.tunnelToken),
+    lanBind: readOptionalConfigField(config?.lanBind),
+    profile: resolveManagedProfile(readOptionalConfigField(config?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
+    enabled: readConfigField(config?.enabled, DEFAULTS.enabled)
+  };
+}
+
+// packages/dsh-remote-web/src/runtime/remote-runtime.ts
+import { setInterval as nodeSetInterval, setTimeout as nodeSetTimeout } from "node:timers";
+
 // packages/dsh-remote-web/src/http/loopback.ts
 function isIPv4Loopback(v4) {
   const parts = v4.split(".");
@@ -10089,7 +10197,7 @@ async function probeHost(port, hostHeader, request, timeoutMs) {
       headers: { host: hostHeader, "content-type": "application/json" },
       timeout: timeoutMs
     }, (status) => {
-      finish(status !== 403 && status !== 401);
+      finish(status !== 0 && status !== 403 && status !== 401);
     });
     const timer = setTimeout(() => {
       finish(false);
@@ -10267,7 +10375,7 @@ function firewallSummary(port, lanEnabled) {
 // packages/dsh-remote-web/src/ingress/lan-bind.ts
 var import_yaml = __toESM(require_dist(), 1);
 import { existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, statSync, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname as dirname2, join as join2, resolve as resolve2, sep } from "node:path";
+import { dirname as dirname2, join as join3, resolve as resolve2, sep } from "node:path";
 var PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 var LAN_BIND_BLOCK_BEGIN = "# --- remote-web-ui lan-bind block (managed - do not edit) ---";
 var LAN_BIND_BLOCK_END = "# --- end remote-web-ui lan-bind block ---";
@@ -10275,8 +10383,8 @@ function profilePatchFile(profile, home = dshHome()) {
   if (!PROFILE_PATTERN.test(profile)) {
     throw new Error(`dsh-remote-web: unsafe lan-bind profile ${JSON.stringify(profile)}`);
   }
-  const file = resolve2(join2(home, "profiles", profile, "cordis.patch.yml"));
-  const root = resolve2(join2(home, "profiles")) + sep;
+  const file = resolve2(join3(home, "profiles", profile, "cordis.patch.yml"));
+  const root = resolve2(join3(home, "profiles")) + sep;
   if (!file.startsWith(root)) {
     throw new Error(`dsh-remote-web: lan-bind profile ${JSON.stringify(profile)} escapes the profiles directory`);
   }
@@ -10428,7 +10536,7 @@ function tunnelPlanOf(value, port) {
 // packages/dsh-remote-web/src/ingress/relay-registry.ts
 import { randomBytes as randomBytes3 } from "node:crypto";
 import { existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname as dirname3, join as join3 } from "node:path";
+import { dirname as dirname3, join as join4 } from "node:path";
 var RELAY_REGISTER_URL = "https://dsh-market.com/api/relay/register";
 var RELAY_UNREGISTER_URL = "https://dsh-market.com/api/relay/unregister";
 var RELAY_BASE_SUFFIX = ".dsh-market.com";
@@ -10438,7 +10546,7 @@ function relayIdentityFile(profile, home = dshHome()) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(profile)) {
     throw new Error(`relay registry: profile ${JSON.stringify(profile)} is not a safe path segment`);
   }
-  return join3(home, "dsh-web-pack", "remote-web", "registry", `${profile}.json`);
+  return join4(home, "dsh-web-pack", "remote-web", "registry", `${profile}.json`);
 }
 function generateRelayIdentity(random = randomBytes3) {
   return {
@@ -10570,29 +10678,6 @@ var RelayRegistrar = class {
   }
 };
 
-// packages/dsh-remote-web/src/ingress/lan-bind-plan.ts
-function desiredBindHost(lanBind, startupHost) {
-  if (startupHost === "0.0.0.0" || startupHost === "127.0.0.1") return startupHost;
-  return lanBind ? "0.0.0.0" : "127.0.0.1";
-}
-function desiredBindPort(startupPort, livePort) {
-  if (typeof startupPort === "number" && Number.isFinite(startupPort)) return startupPort;
-  return typeof livePort === "number" && Number.isFinite(livePort) ? livePort : void 0;
-}
-function pendingRestartOf(lanBind, desiredHost, liveHost) {
-  if (lanBind === void 0 || desiredHost === void 0) return false;
-  return liveHost !== desiredHost;
-}
-var DEFAULT_MANAGED_PROFILE = "web";
-function resolveManagedProfile(configured, launched, env) {
-  return configured ?? launched ?? env ?? DEFAULT_MANAGED_PROFILE;
-}
-function firewallActionNeeded(previous, next) {
-  if (next === void 0) return false;
-  if (previous === void 0) return true;
-  return previous.enabled !== next.enabled || previous.port !== next.port;
-}
-
 // packages/dsh-remote-web/src/http/inner-auth.ts
 var BROWSER_AUTH_COOKIE_PREFIX = "dsh-auth-";
 function createInnerAuth(launchUrl, fetchImpl = fetch) {
@@ -10643,7 +10728,7 @@ import { EventEmitter } from "node:events";
 import { chmodSync, existsSync as existsSync3, mkdirSync as mkdirSync4, renameSync as renameSync3, rmSync as rmSync2 } from "node:fs";
 import { createWriteStream } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { dirname as dirname4, isAbsolute as isAbsolute2, join as join4 } from "node:path";
+import { dirname as dirname4, isAbsolute as isAbsolute2, join as join5 } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
@@ -10660,15 +10745,15 @@ var RELEASE_ASSETS = {
 };
 function dshHome2(env = process.env, home = homedir2()) {
   const raw = env.DSH_HOME;
-  return raw !== void 0 && raw.trim() !== "" ? raw.trim() : join4(home, ".dsh");
+  return raw !== void 0 && raw.trim() !== "" ? raw.trim() : join5(home, ".dsh");
 }
 function cloudflaredBinaryPath(env = process.env, home = homedir2()) {
   const override = env[BINARY_OVERRIDE_ENV];
   if (override !== void 0 && override.trim() !== "") {
     const value = override.trim();
-    return isAbsolute2(value) ? value : join4(process.cwd(), value);
+    return isAbsolute2(value) ? value : join5(process.cwd(), value);
   }
-  return join4(dshHome2(env, home), "dsh-web-pack", "remote-web", "bin", process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
+  return join5(dshHome2(env, home), "dsh-web-pack", "remote-web", "bin", process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
 }
 function releaseAsset(platform, arch) {
   const asset = RELEASE_ASSETS[`${platform}-${arch}`];
@@ -10719,7 +10804,7 @@ async function downloadCloudflared(options) {
         else resolve3();
       });
     });
-    renameSync3(join4(dirname4(options.path), "cloudflared"), extracted);
+    renameSync3(join5(dirname4(options.path), "cloudflared"), extracted);
     rmSync2(downloadPath, { force: true });
     binary = extracted;
   }
@@ -11247,6 +11332,500 @@ var PublicBaseKeeper = class {
   }
 };
 
+// packages/dsh-remote-web/src/lifecycle/detached-work.ts
+import { AsyncResource } from "node:async_hooks";
+var DETACHED = new AsyncResource("dsh-web:detached-work", { triggerAsyncId: 0 });
+function runDetached(work) {
+  return DETACHED.runInAsyncScope(work);
+}
+
+// packages/dsh-remote-web/src/http/remote-channel-boot.ts
+function buildRemoteChannelBootScript(rules = REMOTE_CHANNEL_RULES) {
+  const json = JSON.stringify(rules);
+  const seat = JSON.stringify(REMOTE_CHANNEL_BOOT_GLOBAL);
+  return "(function(){try{var w=window,loc=w.location,h=loc.hostname;var R=" + json + `;if(h==='localhost'||h==='::1'||h==='[::1]'||/^127(\\.\\d{1,3}){3}$/.test(h))return;var pr=loc.protocol;if(typeof pr==="string"&&pr!==""&&R.webProtocols.indexOf(pr)===-1)return;try{if(w.__DSH_TRANSPORT__&&w.__DSH_TRANSPORT__.ownsHost===true&&h.indexOf(".")===-1&&h.indexOf(":")===-1)return}catch(e){}try{if(w[R.hostGrantGlobal]===true){if(w.__DSH_TRANSPORT__===undefined)w.__DSH_TRANSPORT__={};w.__DSH_TRANSPORT__.ownsHost=true}}catch(e){}function rdv(){try{return w.sessionStorage.getItem(R.deviceKey)}catch(e){return null}}function att(init,inherited){var dv=rdv();if(dv===null)return init;var src=init&&init.headers!==undefined&&init.headers!==null?init.headers:inherited;try{var hh=new Headers(src);hh.set(R.deviceHeader,dv);return Object.assign({},init,{headers:hh})}catch(e){return init}}function sf(p){if(p.indexOf(R.pairPrefix)===0)return false;if(p.indexOf(R.updatePrefix)===0)return false;if(p===R.settingsBridgePrefix||p.indexOf(R.settingsBridgePrefix+"/")===0)return false;if(p.indexOf(R.apiPrefix)===0)return true;if(p.indexOf(R.sidebarPrefix)===0||p==="/sidebar")return true;if(p.indexOf(R.gitPrefix)===0||p==="/git")return true;if(p.indexOf(R.petPrefix)===0||p==="/pet")return true;return false}function sw(p){return R.wsPaths.indexOf(p)!==-1}function rp(p){return R.remotePrefix+p}function so(u){return u.origin===loc.origin}function rr(raw){var u;try{u=new URL(raw,loc.href)}catch(e){return raw}if(u.origin!==loc.origin)return raw;if(!sf(u.pathname))return raw;u.pathname=rp(u.pathname);if(raw.charAt(0)==="/"&&raw.charAt(1)!=="/")return u.pathname+u.search+u.hash;return u.href}function uc(v){if(typeof v!=="object"||v===null)return undefined;var n=v.result;if(typeof n==="object"&&n!==null){var e=n.error;if(typeof e==="object"&&e!==null&&typeof e.code==="string")return e.code}var t=v.error;if(typeof t==="object"&&t!==null&&typeof t.code==="string")return t.code;return undefined}var seat={onUnpaired:null,onPaired:null,pendingUnpaired:false,restore:function(){}};function denied(res){if(res.status!==403)return false;return res.clone().json().then(function(b){return uc(b)==="unpaired"}).catch(function(){return false})}function signal(unpaired){if(unpaired){if(seat.onUnpaired)seat.onUnpaired();else seat.pendingUnpaired=true}else{seat.pendingUnpaired=false;if(seat.onPaired)seat.onPaired()}}var of=w.fetch;w.fetch=function(input,init){var raw=typeof input==="string"||input instanceof URL?input.toString():input.url;var url=new URL(raw,loc.href);if(so(url)&&sf(url.pathname)){var next=new URL(url);next.pathname=rp(url.pathname);var target=typeof input==="string"||input instanceof URL?next.toString():new Request(next,input);var inherited=typeof input==="object"&&input!==null&&input.headers?input.headers:undefined;return Promise.resolve(of.call(w,target,att(init,inherited))).then(function(res){void Promise.resolve(denied(res)).then(signal);return res})}return of.call(w,input,init)};var OW=w.WebSocket;w.WebSocket=function(url,protocols){var p=new URL(url.toString(),loc.href);var o=p.protocol==="wss:"?"https://"+p.host:p.protocol==="ws:"?"http://"+p.host:"";if(o!==""&&o===loc.origin&&sw(p.pathname)){var nx=new URL(p);nx.pathname=rp(p.pathname);var dvv=rdv();if(dvv!==null)nx.searchParams.set(R.deviceQuery,dvv);return protocols!==undefined?new OW(nx,protocols):new OW(nx)}return protocols!==undefined?new OW(url,protocols):new OW(url)};w.WebSocket.prototype=OW.prototype;w.WebSocket.CONNECTING=OW.CONNECTING;w.WebSocket.OPEN=OW.OPEN;w.WebSocket.CLOSING=OW.CLOSING;w.WebSocket.CLOSED=OW.CLOSED;var OE=w.EventSource;if(OE!==undefined){w.EventSource=function(url,cfg){var p=new URL(url.toString(),loc.href);if(so(p)&&sf(p.pathname)){var nx=new URL(p);nx.pathname=rp(p.pathname);var dvv=rdv();if(dvv!==null)nx.searchParams.set(R.deviceQuery,dvv);return new OE(nx,cfg)}return new OE(url,cfg)};w.EventSource.prototype=OE.prototype}var restores=[];function patchSrc(C){if(C===undefined)return;var d=Object.getOwnPropertyDescriptor(C.prototype,"src");if(d===undefined||d.configurable===false||d.set===undefined)return;var os=d.set;Object.defineProperty(C.prototype,"src",{configurable:true,enumerable:d.enumerable!==false,get:d.get,set:function(v){os.call(this,rr(String(v)))}});restores.push(function(){Object.defineProperty(C.prototype,"src",d)})}patchSrc(w.HTMLImageElement);patchSrc(w.HTMLScriptElement);patchSrc(w.HTMLIFrameElement);function uf(u,init){var raw=typeof u==="string"?u:u.href;if(typeof raw!=="string")return of.call(w,u,init||{});var q=new URL(raw,loc.href);if(so(q)&&q.pathname===R.uploadPath)return w.fetch(raw,init||{});return of.call(w,u,init||{})}try{if(w[R.uploadHookGlobal]===undefined)w[R.uploadHookGlobal]={fetch:uf}}catch(e){}seat.restore=function(){w.fetch=of;w.WebSocket=OW;if(OE!==undefined)w.EventSource=OE;for(var i=0;i<restores.length;i++)restores[i]();try{delete w[` + seat + "]}catch(e){w[" + seat + "]=undefined}};w[" + seat + "]=seat" + // The boot watchdog rides the same IIFE and skip conditions: it needs
+  // the non-loopback gate above (the desktop boots over loopback without
+  // a tunnel in the path) and the try/catch fail-closed envelope.
+  buildBootWatchdogScript() + "}catch(e){}})();";
+}
+var BOOT_WATCHDOG_KEY = "dsh-remote-boot-reload";
+var BOOT_WATCHDOG_WAIT_MS = 15e3;
+var BOOT_WATCHDOG_POLL_MS = 1e3;
+function buildBootWatchdogScript(waitMs = BOOT_WATCHDOG_WAIT_MS, pollMs = BOOT_WATCHDOG_POLL_MS) {
+  const key = JSON.stringify(BOOT_WATCHDOG_KEY);
+  return (
+    // Leading semicolon: the preceding seat assignment ends without one,
+    // and the fragment must parse when spliced into the IIFE.
+    ';function wBoot(){try{return !!(w.document&&w.document.querySelector&&(w.document.querySelector("[data-conversation-scroll]")||w.document.querySelector("[data-slot=\\"conversation\\"]")))}catch(e){return false}}function wTick(n){try{if(wBoot()){try{w.sessionStorage.removeItem(' + key + ')}catch(e){}return}if(!w.document||w.document.readyState!=="complete"){w.setTimeout(function(){wTick(0)},' + pollMs + ");return}if(n<" + waitMs + "){w.setTimeout(function(){wTick(n+" + pollMs + ")}," + pollMs + ");return}var done=false;try{done=w.sessionStorage.getItem(" + key + ')==="1"}catch(e){}if(done)return;try{w.sessionStorage.setItem(' + key + ',"1")}catch(e){}w.location.reload()}catch(e){}}if(typeof w.setTimeout==="function")w.setTimeout(function(){wTick(0)},' + pollMs + ");"
+  );
+}
+var REMOTE_CHANNEL_BOOT_SCRIPT = buildRemoteChannelBootScript();
+
+// packages/dsh-remote-web/src/http/uuid-polyfill.ts
+var UUID_POLYFILL_SCRIPT = [
+  "(function(){",
+  'var g=typeof globalThis!=="undefined"?globalThis:typeof window!=="undefined"?window:self;',
+  'if(typeof g.crypto==="undefined"){g.crypto={};}',
+  'if(typeof g.crypto.randomUUID!=="function"){',
+  "g.crypto.randomUUID=function(){",
+  "var a=new Uint8Array(16);",
+  "if(g.crypto.getRandomValues){g.crypto.getRandomValues(a);}",
+  "else{for(var j=0;j<16;j++){a[j]=Math.random()*256|0;}}",
+  "a[6]=(a[6]&0x0f)|0x40;",
+  "a[8]=(a[8]&0x3f)|0x80;",
+  'var h="",x="0123456789abcdef";',
+  "for(var i=0;i<16;i++){h+=x[a[i]>>4]+x[a[i]&0x0f];",
+  'if(i===3||i===5||i===7||i===9)h+="-";}',
+  "return h;",
+  "};",
+  "}",
+  "})();"
+].join("");
+
+// packages/dsh-remote-web/src/runtime/remote-runtime.ts
+var SWEEP_INTERVAL_MS = 1e4;
+var TUNNEL_PROBLEMS = {
+  "host-missing": "the fixed-domain tunnel needs its public hostname",
+  "host-invalid": "the fixed-domain tunnel hostname is not an http(s) URL",
+  "token-missing": "the fixed-domain tunnel needs its Cloudflare tunnel token"
+};
+var APP_SHELL_TTL_MS = 3e4;
+var RemoteRuntime = class {
+  ctx;
+  resolve;
+  service;
+  tunnel = new TunnelManager();
+  publicBase;
+  innerAuth;
+  relayRegistrar;
+  /** The tunnel target the registrar last announced (dedupes sync re-runs). */
+  relayAnnouncedFor;
+  tunnelMode = "off";
+  appShellCache;
+  postureKey;
+  postureWasExposed = false;
+  /** LAN-bind facts for the settings card, re-read per request. */
+  lastKnownPort;
+  lastFirewallApplied;
+  lanBindWorkPending = false;
+  disposeRoutes = {};
+  disposeSweep = {};
+  /**
+   * @param ctx - the host plugin context (webServer, connection, logger).
+   * @param resolve - reads the effective config at call time.
+   */
+  constructor(ctx, resolve3) {
+    this.ctx = ctx;
+    this.resolve = resolve3;
+    this.service = new PairingService(pairingConfigOf(resolve3()));
+    this.publicBase = new PublicBaseKeeper((base) => {
+      this.service.setPublicBaseUrl(base);
+    });
+    this.innerAuth = createInnerAuth(() => {
+      if (!Number.isFinite(ctx.webServer.port)) return void 0;
+      try {
+        return ctx.connection.authenticatedUrl?.(`http://127.0.0.1:${String(ctx.webServer.port)}/`);
+      } catch {
+        return void 0;
+      }
+    });
+    this.tunnel.onPhase((info) => {
+      this.onTunnelPhase(info);
+    });
+  }
+  /** Mount everything that lives for the fiber's lifetime, then apply config once. */
+  start() {
+    const bindKnown = (this.ctx.webServer.host === "0.0.0.0" || this.ctx.webServer.host === "127.0.0.1") && Number.isFinite(this.ctx.webServer.port);
+    if (bindKnown) {
+      const lanBases = this.ctx.webServer.host === "0.0.0.0" ? lanIPv4Addresses().map((address) => ({ address, base: `http://${address}:${String(this.ctx.webServer.port)}` })) : [];
+      this.service.setLanBases(lanBases);
+    }
+    const gate = makeGateListener(this.service, () => this.resolve().requirePairingForLan, () => this.resolve().enabled);
+    this.ctx.effect(() => this.ctx.on("api/gate", gate), "dsh-remote-web: api gate");
+    const initialPostureTimer = nodeSetTimeout(() => {
+      this.runPostureProbe();
+    }, 5e3);
+    initialPostureTimer.unref();
+    this.ctx.effect(() => () => {
+      clearTimeout(initialPostureTimer);
+    }, "dsh-remote-web: posture probe boot");
+    providePairingAccess(this.ctx, (request) => {
+      if (!this.resolve().enabled) return false;
+      return isPairedDeviceRequest(this.service, request);
+    });
+    const presencePet = startRemotePresencePet({
+      onState: (listener) => this.service.onState(listener),
+      pet: () => {
+        try {
+          return this.ctx.get("pet");
+        } catch {
+          return void 0;
+        }
+      }
+    });
+    this.ctx.effect(() => presencePet, "dsh-remote-web: remote-presence pet visibility");
+    if (this.service.lanAddresses.length > 0) {
+      const urls = this.service.lanAddresses.map((ip) => `http://${ip}:${String(this.ctx.webServer.port)}`).join(" , ");
+      console.log(`dsh-remote-web: the paired Web GUI is reachable on LAN at ${urls}`);
+    }
+    if (this.ctx.webServer.host === "0.0.0.0") {
+      console.warn("dsh-remote-web: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)");
+    }
+    this.ctx.effect(() => () => {
+      this.lanBindWorkPending = false;
+    }, "dsh-remote-web: lan-bind work");
+    this.ctx.effect(() => this.ctx.on("webserver/index-inject", (table) => {
+      table.push({ kind: "script", placement: "head", text: UUID_POLYFILL_SCRIPT });
+    }), "dsh-remote-web: uuid polyfill");
+    this.ctx.effect(() => this.ctx.on("webserver/index-inject", (table) => {
+      const value = this.resolve();
+      if (!value.enabled || !value.requirePairingForLan) return;
+      table.push({ kind: "script", placement: "head", text: REMOTE_CHANNEL_BOOT_SCRIPT });
+    }), "dsh-remote-web: remote channel boot patch");
+    this.sync();
+  }
+  /** Release everything the row holds outside the fiber's effect registry. */
+  dispose() {
+    this.disposeRelayRegistrar();
+    this.publicBase.dispose();
+    this.tunnel.dispose();
+  }
+  /**
+   * Apply the effective configuration to the running surfaces: the service
+   * tunables, the LAN-bind block and firewall, the tunnel plan, the pairing
+   * routes, the presence sweep and the posture probe. Idempotent, so a save
+   * that changes nothing observable is a no-op.
+   */
+  sync() {
+    const value = this.resolve();
+    this.service.config = pairingConfigOf(value);
+    this.scheduleLanBindWork();
+    const plan = value.enabled ? tunnelPlanOf(value, this.ctx.webServer.port) : { mode: "off" };
+    this.tunnelMode = plan.mode;
+    this.publicBase.setMode(plan.mode);
+    if (plan.mode === "quick") {
+      const liveTunnelUrl = this.publicBase.quickUrl();
+      if (liveTunnelUrl !== void 0) {
+        const registrar2 = this.ensureRelayRegistrar();
+        if (registrar2 !== void 0) this.announceRelay(registrar2, liveTunnelUrl);
+      }
+      const registrar = this.ensureRelayRegistrar();
+      const originHostHeader = registrar === void 0 ? void 0 : new URL(registrar.baseUrl).host;
+      this.tunnel.start(originHostHeader === void 0 ? plan.targetUrl : { kind: "quick", targetUrl: plan.targetUrl, originHostHeader });
+    } else if (plan.mode === "named") {
+      this.disposeRelayRegistrar();
+      this.publicBase.markRunning(plan.publicUrl);
+      this.tunnel.start({ kind: "named", token: plan.token, publicUrl: plan.publicUrl });
+    } else {
+      this.disposeRelayRegistrar();
+      this.tunnel.stop();
+      this.publicBase.reset();
+      if (plan.problem !== void 0) {
+        const message = TUNNEL_PROBLEMS[plan.problem];
+        console.warn(`dsh-remote-web: ${message}`);
+        this.service.setTunnelStatus({ state: "failed", error: message });
+      }
+    }
+    if (!value.enabled) {
+      this.service.stop();
+    }
+    if (this.disposeRoutes.current === void 0) {
+      const routes = [
+        ...makeRoutes({
+          service: this.service,
+          requirePairingForLan: () => this.resolve().requirePairingForLan,
+          enabled: () => this.resolve().enabled,
+          tunnelTokenStored: () => (this.resolve().tunnelToken ?? "") !== "",
+          lanBindStatus: () => this.lanBindStatus(),
+          indexDocument: () => this.fetchAppShell(),
+          trustedHosts: () => this.trustedHosts()
+        }),
+        // The remote desktop channel: a paired-credential-gated `/remote`
+        // prefix that re-issues fenced paths to loopback. The gate is
+        // unconditional — requirePairingForLan governs the plain /api surface
+        // and the desktop's client-side rewrite only; it is never an
+        // authorization input here, because this channel attaches the
+        // process's own browser credential to everything it forwards.
+        ...makeRemoteApiRoutes({
+          service: this.service,
+          port: this.ctx.webServer.port,
+          auth: this.innerAuth
+        })
+      ];
+      const upgrades = makeRemoteApiUpgradeRoutes({
+        service: this.service,
+        port: this.ctx.webServer.port,
+        auth: this.innerAuth
+      });
+      this.disposeRoutes.current = this.ctx.effect(
+        () => {
+          const disposers = [
+            ...routes.map((route) => this.ctx.webServer.register(route)),
+            ...upgrades.map((route) => this.ctx.webServer.registerUpgrade(route))
+          ];
+          return () => {
+            for (const dispose of disposers) dispose();
+          };
+        },
+        "dsh-remote-web: pairing routes"
+      );
+    }
+    if (this.disposeSweep.current === void 0) {
+      this.disposeSweep.current = this.ctx.effect(
+        () => {
+          const timer = nodeSetInterval(() => {
+            this.service.sweep();
+          }, SWEEP_INTERVAL_MS);
+          timer.unref();
+          return () => {
+            clearInterval(timer);
+          };
+        },
+        "dsh-remote-web: presence sweep"
+      );
+    }
+    this.runPostureProbe();
+  }
+  /**
+   * The LAN-bind facts the settings card polls: the managed block's host, the
+   * live bind, the firewall summary and the reachable LAN URLs, re-read per
+   * request so a hot rebind and a fresh toggle round are both reflected.
+   * @returns the status frame.
+   */
+  lanBindStatus() {
+    const resolvedNow = this.resolve();
+    let state;
+    try {
+      state = lanBindState(resolvedNow.profile);
+    } catch {
+      state = { blockPresent: false };
+    }
+    const lanOn = state.host === "0.0.0.0";
+    const port = Number.isFinite(this.ctx.webServer.port) ? this.ctx.webServer.port : this.lastKnownPort;
+    if (Number.isFinite(this.ctx.webServer.port)) this.lastKnownPort = this.ctx.webServer.port;
+    const startup = this.ctx.get("webStartup");
+    const desiredHost = resolvedNow.lanBind === void 0 ? void 0 : desiredBindHost(resolvedNow.lanBind === true, startup?.host);
+    return {
+      profile: resolvedNow.profile,
+      setting: resolvedNow.lanBind ?? null,
+      blockHost: state.host ?? null,
+      bindHost: this.ctx.webServer.host,
+      port,
+      lanUrls: this.ctx.webServer.host === "0.0.0.0" && port !== void 0 ? lanIPv4Addresses().map((address) => `http://${address}:${String(port)}`) : [],
+      firewall: port !== void 0 ? firewallSummary(port, lanOn) : { ok: true, managed: false },
+      platform: process.platform,
+      // The running bind does not follow the block on every deployment (the
+      // live patch watcher is profile-shape dependent): flag the divergence so
+      // the card can ask for a restart instead of looking broken. The
+      // comparison uses the effective desired host (a CLI --host wins over the
+      // toggle), not the raw toggle.
+      pendingRestart: pendingRestartOf(resolvedNow.lanBind, desiredHost, this.ctx.webServer.host)
+    };
+  }
+  /** The extra host authorities the pairing fence trusts (config + environment). */
+  trustedHosts() {
+    const list = [];
+    const envHosts = process.env.DSH_REMOTE_TRUSTED_HOSTS;
+    if (typeof envHosts === "string" && envHosts.trim() !== "") {
+      for (const item of envHosts.split(",")) {
+        const trimmed = item.trim();
+        if (trimmed !== "") list.push(trimmed);
+      }
+    }
+    const cfgHosts = this.resolve().trustedHosts;
+    if (Array.isArray(cfgHosts)) {
+      for (const item of cfgHosts) {
+        if (typeof item === "string") {
+          const trimmed = item.trim();
+          if (trimmed !== "") list.push(trimmed);
+        }
+      }
+    }
+    return list;
+  }
+  /**
+   * The official index document for the /pair-app landing, fetched from the
+   * inner loopback with the process credential and cached briefly (the shell is
+   * static; skins/injections settle right after boot).
+   * @returns the shell, or undefined when it cannot be read.
+   */
+  async fetchAppShell() {
+    if (!Number.isFinite(this.ctx.webServer.port)) return void 0;
+    if (this.appShellCache !== void 0 && Date.now() - this.appShellCache.at < APP_SHELL_TTL_MS) return this.appShellCache.html;
+    const cookie = await this.innerAuth.ready();
+    try {
+      const response = await fetch(`http://127.0.0.1:${String(this.ctx.webServer.port)}/`, withIdentityEncoding({
+        headers: cookie !== void 0 ? { cookie } : void 0
+      }));
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) this.innerAuth.invalidate();
+        return void 0;
+      }
+      const html = await response.text();
+      this.appShellCache = { at: Date.now(), html };
+      return html;
+    } catch {
+      return void 0;
+    }
+  }
+  /**
+   * Probe every advertised /api origin for the forged-Host exposure this row
+   * cannot gate: the connection plugin's fence is the one seam no plugin can
+   * mount a gate into. A re-opened /api (a re-added --trusted-host, or the
+   * SDK's LAN auto-trust under 0.0.0.0) then shows on the panel and the log
+   * instead of silently serving unpaired clients.
+   */
+  runPostureProbe() {
+    if (!this.resolve().enabled) return;
+    const targets = postureTargets(this.service.publicBaseUrl, this.service.lanAddresses, this.ctx.webServer.port);
+    if (targets.length === 0) {
+      this.postureKey = void 0;
+      this.service.setPosture(void 0);
+      return;
+    }
+    const key = targets.join("|");
+    const claim = claimPostureKey(this.postureKey, key);
+    if (!claim.run) return;
+    this.postureKey = claim.next;
+    void probePosture({ port: this.ctx.webServer.port, targets }).then((snapshot2) => {
+      this.service.setPosture(snapshot2);
+      const exposedHosts = snapshot2.hosts.filter((host) => host.exposed).map((host) => host.host);
+      const exposed = exposedHosts.length > 0;
+      if (exposed && !this.postureWasExposed) {
+        console.error(`dsh-remote-web: CRITICAL \u2014 the /api fence is OPEN for [${exposedHosts.join(", ")}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`);
+      } else if (!exposed && this.postureWasExposed) {
+        console.log("dsh-remote-web: the /api posture probe is clean again (every advertised origin refused with 403).");
+      }
+      this.postureWasExposed = exposed;
+    }).catch(() => {
+      this.postureKey = releasePostureKey(this.postureKey, key);
+    });
+  }
+  /** One tunnel phase transition: publish the base, and probe the new posture. */
+  onTunnelPhase(info) {
+    if (this.tunnelMode === "off") return;
+    if (info.phase === "running" && info.url !== void 0) {
+      this.publicBase.markRunning(info.url);
+      this.service.setTunnelStatus({ state: "running", url: info.url });
+      const registrar = this.tunnelMode === "quick" ? this.ensureRelayRegistrar() : void 0;
+      if (registrar !== void 0) this.announceRelay(registrar, info.url);
+      this.runPostureProbe();
+    } else if (info.phase === "starting") {
+      this.publicBase.markReconnecting();
+      this.service.setTunnelStatus({ state: "starting" });
+    } else if (info.phase === "failed") {
+      this.publicBase.markReconnecting();
+      this.service.setTunnelStatus(info.error === void 0 ? { state: "failed" } : { state: "failed", error: info.error });
+    }
+  }
+  /** Relay registry: one stable subdomain per profile in front of the quick tunnel. */
+  ensureRelayRegistrar() {
+    if (this.relayRegistrar === void 0) {
+      try {
+        const identity = loadRelayIdentity(this.resolve().profile);
+        this.relayRegistrar = new RelayRegistrar(identity, (state) => {
+          this.service.setRelayStatus(state.state === "off" ? void 0 : state);
+          if (state.state === "running") {
+            this.publicBase.setRelay(state.url);
+          } else if (state.state === "off") {
+            this.publicBase.setRelay(void 0);
+          } else if (state.state === "failed") {
+            console.warn(`dsh-remote-web: relay registration failed (${state.error}) \u2014 the stable origin may serve its offline page until the retry lands`);
+          }
+        });
+      } catch (error) {
+        console.warn(`dsh-remote-web: relay registry unavailable (${error instanceof Error ? error.message : String(error)}) \u2014 the quick URL is the QR base`);
+      }
+    }
+    return this.relayRegistrar;
+  }
+  /** Announce the running tunnel target to the relay, once per target. */
+  announceRelay(registrar, target) {
+    if (this.relayAnnouncedFor === target) return;
+    this.relayAnnouncedFor = target;
+    void registrar.announce(target);
+  }
+  /**
+   * Drop the relay registrar. Toggle-off removes the registry row so the stable
+   * origin stops proxying; teardown/mode changes keep the row (the phone then
+   * sees the relay's offline page instead of a dangling claim, and re-enabling
+   * reuses the same identity).
+   * @param unregister - whether to remove the registry row.
+   */
+  disposeRelayRegistrar(unregister = false) {
+    const registrar = this.relayRegistrar;
+    this.relayRegistrar = void 0;
+    this.publicBase.setRelay(void 0);
+    this.relayAnnouncedFor = void 0;
+    if (registrar === void 0) return;
+    if (unregister) void registrar.unregister().catch(() => void 0);
+    registrar.dispose();
+  }
+  /**
+   * Schedule the LAN-bind assertion. It never blocks the caller: one pending
+   * work item is enough, and it always re-reads the config at run time so a
+   * toggle flipped twice before the tick lands on the last value.
+   *
+   * The scheduling runs through runDetached: the settings save that drives
+   * sync() holds the Host's exclusive HMR transaction in its async context, and
+   * a write to cordis.patch.yml inside that transaction makes the watcher's
+   * refresh re-enter it ("HMR transactions cannot be nested"). Scheduling from
+   * the module-scope resource starts the timer — and therefore the write — with
+   * no store at all.
+   */
+  scheduleLanBindWork() {
+    if (this.lanBindWorkPending) return;
+    this.lanBindWorkPending = true;
+    runDetached(() => setImmediate(() => {
+      this.lanBindWorkPending = false;
+      try {
+        this.applyLanBindWork(this.resolve());
+      } catch (error) {
+        console.error(`dsh-remote-web: the deferred lan-bind assertion failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }));
+  }
+  /**
+   * Write the managed profile block and align the host firewall with the toggle
+   * (managed platforms only). Desired host/port come from the CLI flags when
+   * given (flags win), else from the toggle and the currently bound port. The
+   * block takes effect on the next start, so the re-assert at every boot keeps
+   * it in sync with both the toggle and the flags.
+   */
+  applyLanBindWork(value) {
+    if (value.lanBind === void 0) return;
+    const startup = this.ctx.get("webStartup");
+    const desiredHost = desiredBindHost(value.lanBind === true, startup?.host);
+    const desiredPort = desiredBindPort(startup?.port, Number.isFinite(this.ctx.webServer.port) ? this.ctx.webServer.port : void 0);
+    if (desiredPort === void 0) {
+      console.error("dsh-remote-web: cannot assert the lan-bind block \u2014 the web server port is not known yet");
+    } else {
+      try {
+        const current = lanBindState(value.profile);
+        if (current.host !== desiredHost || current.port !== desiredPort) {
+          writeLanBind(desiredHost, desiredPort, value.profile);
+          console.log(`dsh-remote-web: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`);
+        }
+      } catch (error) {
+        console.error(`dsh-remote-web: failed to write the lan-bind block: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    const livePort = Number.isFinite(this.ctx.webServer.port) ? this.ctx.webServer.port : void 0;
+    if (livePort === void 0) {
+      console.error("dsh-remote-web: cannot align the host firewall rule \u2014 the web server port is not known yet");
+      return;
+    }
+    const nextFirewall = { enabled: value.lanBind === true, port: livePort };
+    if (!firewallActionNeeded(this.lastFirewallApplied, nextFirewall)) return;
+    const ruleOk = nextFirewall.enabled ? ensureFirewallRule(nextFirewall.port) : removeFirewallRule(nextFirewall.port);
+    if (ruleOk) {
+      this.lastFirewallApplied = nextFirewall;
+    } else {
+      console.error("dsh-remote-web: the host firewall rule could not be updated (admin rights required on managed platforms)");
+    }
+  }
+};
+
 // packages/dsh-remote-web/src/lifecycle/mount-once.ts
 var MOUNTED = /* @__PURE__ */ Symbol.for("dsh-web.mounted-plugins");
 var WAITERS = /* @__PURE__ */ Symbol.for("dsh-web.mounted-plugins.waiters");
@@ -11300,506 +11879,19 @@ function mountOnce(packageName, fn) {
   return mount;
 }
 
-// packages/dsh-remote-web/src/lifecycle/detached-work.ts
-import { AsyncResource } from "node:async_hooks";
-var DETACHED = new AsyncResource("dsh-web:detached-work", { triggerAsyncId: 0 });
-function runDetached(work) {
-  return DETACHED.runInAsyncScope(work);
-}
-
-// packages/dsh-remote-web/src/http/remote-channel-boot.ts
-function buildRemoteChannelBootScript(rules = REMOTE_CHANNEL_RULES) {
-  const json = JSON.stringify(rules);
-  const seat = JSON.stringify(REMOTE_CHANNEL_BOOT_GLOBAL);
-  return "(function(){try{var w=window,loc=w.location,h=loc.hostname;var R=" + json + `;if(h==='localhost'||h==='::1'||h==='[::1]'||/^127(\\.\\d{1,3}){3}$/.test(h))return;var pr=loc.protocol;if(typeof pr==="string"&&pr!==""&&R.webProtocols.indexOf(pr)===-1)return;try{if(w.__DSH_TRANSPORT__&&w.__DSH_TRANSPORT__.ownsHost===true&&h.indexOf(".")===-1&&h.indexOf(":")===-1)return}catch(e){}try{if(w[R.hostGrantGlobal]===true){if(w.__DSH_TRANSPORT__===undefined)w.__DSH_TRANSPORT__={};w.__DSH_TRANSPORT__.ownsHost=true}}catch(e){}function rdv(){try{return w.sessionStorage.getItem(R.deviceKey)}catch(e){return null}}function att(init,inherited){var dv=rdv();if(dv===null)return init;var src=init&&init.headers!==undefined&&init.headers!==null?init.headers:inherited;try{var hh=new Headers(src);hh.set(R.deviceHeader,dv);return Object.assign({},init,{headers:hh})}catch(e){return init}}function sf(p){if(p.indexOf(R.pairPrefix)===0)return false;if(p.indexOf(R.updatePrefix)===0)return false;if(p===R.settingsBridgePrefix||p.indexOf(R.settingsBridgePrefix+"/")===0)return false;if(p.indexOf(R.apiPrefix)===0)return true;if(p.indexOf(R.sidebarPrefix)===0||p==="/sidebar")return true;if(p.indexOf(R.gitPrefix)===0||p==="/git")return true;if(p.indexOf(R.petPrefix)===0||p==="/pet")return true;return false}function sw(p){return R.wsPaths.indexOf(p)!==-1}function rp(p){return R.remotePrefix+p}function so(u){return u.origin===loc.origin}function rr(raw){var u;try{u=new URL(raw,loc.href)}catch(e){return raw}if(u.origin!==loc.origin)return raw;if(!sf(u.pathname))return raw;u.pathname=rp(u.pathname);if(raw.charAt(0)==="/"&&raw.charAt(1)!=="/")return u.pathname+u.search+u.hash;return u.href}function uc(v){if(typeof v!=="object"||v===null)return undefined;var n=v.result;if(typeof n==="object"&&n!==null){var e=n.error;if(typeof e==="object"&&e!==null&&typeof e.code==="string")return e.code}var t=v.error;if(typeof t==="object"&&t!==null&&typeof t.code==="string")return t.code;return undefined}var seat={onUnpaired:null,onPaired:null,pendingUnpaired:false,restore:function(){}};function denied(res){if(res.status!==403)return false;return res.clone().json().then(function(b){return uc(b)==="unpaired"}).catch(function(){return false})}function signal(unpaired){if(unpaired){if(seat.onUnpaired)seat.onUnpaired();else seat.pendingUnpaired=true}else{seat.pendingUnpaired=false;if(seat.onPaired)seat.onPaired()}}var of=w.fetch;w.fetch=function(input,init){var raw=typeof input==="string"||input instanceof URL?input.toString():input.url;var url=new URL(raw,loc.href);if(so(url)&&sf(url.pathname)){var next=new URL(url);next.pathname=rp(url.pathname);var target=typeof input==="string"||input instanceof URL?next.toString():new Request(next,input);var inherited=typeof input==="object"&&input!==null&&input.headers?input.headers:undefined;return Promise.resolve(of.call(w,target,att(init,inherited))).then(function(res){void Promise.resolve(denied(res)).then(signal);return res})}return of.call(w,input,init)};var OW=w.WebSocket;w.WebSocket=function(url,protocols){var p=new URL(url.toString(),loc.href);var o=p.protocol==="wss:"?"https://"+p.host:p.protocol==="ws:"?"http://"+p.host:"";if(o!==""&&o===loc.origin&&sw(p.pathname)){var nx=new URL(p);nx.pathname=rp(p.pathname);var dvv=rdv();if(dvv!==null)nx.searchParams.set(R.deviceQuery,dvv);return protocols!==undefined?new OW(nx,protocols):new OW(nx)}return protocols!==undefined?new OW(url,protocols):new OW(url)};w.WebSocket.prototype=OW.prototype;w.WebSocket.CONNECTING=OW.CONNECTING;w.WebSocket.OPEN=OW.OPEN;w.WebSocket.CLOSING=OW.CLOSING;w.WebSocket.CLOSED=OW.CLOSED;var OE=w.EventSource;if(OE!==undefined){w.EventSource=function(url,cfg){var p=new URL(url.toString(),loc.href);if(so(p)&&sf(p.pathname)){var nx=new URL(p);nx.pathname=rp(p.pathname);var dvv=rdv();if(dvv!==null)nx.searchParams.set(R.deviceQuery,dvv);return new OE(nx,cfg)}return new OE(url,cfg)};w.EventSource.prototype=OE.prototype}var restores=[];function patchSrc(C){if(C===undefined)return;var d=Object.getOwnPropertyDescriptor(C.prototype,"src");if(d===undefined||d.configurable===false||d.set===undefined)return;var os=d.set;Object.defineProperty(C.prototype,"src",{configurable:true,enumerable:d.enumerable!==false,get:d.get,set:function(v){os.call(this,rr(String(v)))}});restores.push(function(){Object.defineProperty(C.prototype,"src",d)})}patchSrc(w.HTMLImageElement);patchSrc(w.HTMLScriptElement);patchSrc(w.HTMLIFrameElement);function uf(u,init){var raw=typeof u==="string"?u:u.href;if(typeof raw!=="string")return of.call(w,u,init||{});var q=new URL(raw,loc.href);if(so(q)&&q.pathname===R.uploadPath)return w.fetch(raw,init||{});return of.call(w,u,init||{})}try{if(w[R.uploadHookGlobal]===undefined)w[R.uploadHookGlobal]={fetch:uf}}catch(e){}seat.restore=function(){w.fetch=of;w.WebSocket=OW;if(OE!==undefined)w.EventSource=OE;for(var i=0;i<restores.length;i++)restores[i]();try{delete w[` + seat + "]}catch(e){w[" + seat + "]=undefined}};w[" + seat + "]=seat" + // The boot watchdog rides the same IIFE and skip conditions: it needs
-  // the non-loopback gate above (the desktop boots over loopback without
-  // a tunnel in the path) and the try/catch fail-closed envelope.
-  buildBootWatchdogScript() + "}catch(e){}})();";
-}
-var BOOT_WATCHDOG_KEY = "dsh-remote-boot-reload";
-var BOOT_WATCHDOG_WAIT_MS = 15e3;
-var BOOT_WATCHDOG_POLL_MS = 1e3;
-function buildBootWatchdogScript(waitMs = BOOT_WATCHDOG_WAIT_MS, pollMs = BOOT_WATCHDOG_POLL_MS) {
-  const key = JSON.stringify(BOOT_WATCHDOG_KEY);
-  return (
-    // Leading semicolon: the preceding seat assignment ends without one,
-    // and the fragment must parse when spliced into the IIFE.
-    ';function wBoot(){try{return !!(w.document&&w.document.querySelector&&(w.document.querySelector("[data-conversation-scroll]")||w.document.querySelector("[data-slot=\\"conversation\\"]")))}catch(e){return false}}function wTick(n){try{if(wBoot()){try{w.sessionStorage.removeItem(' + key + ')}catch(e){}return}if(!w.document||w.document.readyState!=="complete"){w.setTimeout(function(){wTick(0)},' + pollMs + ");return}if(n<" + waitMs + "){w.setTimeout(function(){wTick(n+" + pollMs + ")}," + pollMs + ");return}var done=false;try{done=w.sessionStorage.getItem(" + key + ')==="1"}catch(e){}if(done)return;try{w.sessionStorage.setItem(' + key + ',"1")}catch(e){}w.location.reload()}catch(e){}}if(typeof w.setTimeout==="function")w.setTimeout(function(){wTick(0)},' + pollMs + ");"
-  );
-}
-var REMOTE_CHANNEL_BOOT_SCRIPT = buildRemoteChannelBootScript();
-
-// packages/dsh-remote-web/src/http/uuid-polyfill.ts
-var UUID_POLYFILL_SCRIPT = [
-  "(function(){",
-  'var g=typeof globalThis!=="undefined"?globalThis:typeof window!=="undefined"?window:self;',
-  'if(typeof g.crypto==="undefined"){g.crypto={};}',
-  'if(typeof g.crypto.randomUUID!=="function"){',
-  "g.crypto.randomUUID=function(){",
-  "var a=new Uint8Array(16);",
-  "if(g.crypto.getRandomValues){g.crypto.getRandomValues(a);}",
-  "else{for(var j=0;j<16;j++){a[j]=Math.random()*256|0;}}",
-  "a[6]=(a[6]&0x0f)|0x40;",
-  "a[8]=(a[8]&0x3f)|0x80;",
-  'var h="",x="0123456789abcdef";',
-  "for(var i=0;i<16;i++){h+=x[a[i]>>4]+x[a[i]&0x0f];",
-  'if(i===3||i===5||i===7||i===9)h+="-";}',
-  "return h;",
-  "};",
-  "}",
-  "})();"
-].join("");
-
 // packages/dsh-remote-web/src/index.ts
 var name = "remote-web-ui";
 var inject = ["webServer", "typertGateway", "connection"];
-var REMOTE_WEB_UI_SETTINGS_NAMESPACE = "remote-web-ui";
-var Config = Schema.object({
-  tokenTtlMs: Schema.number().step(1).min(6e4).default(10 * 6e4).volatile(),
-  offlineAfterMs: Schema.number().step(1).min(5e3).default(25e3),
-  idleExpireMs: Schema.number().step(1).min(6e4).default(DEFAULT_IDLE_EXPIRE_MS),
-  cookieName: Schema.string().min(1).default("dsh_pair"),
-  requirePairingForLan: Schema.boolean().default(true).volatile(),
-  tunnel: Schema.string().default("off").volatile(),
-  tunnelHost: Schema.string().volatile(),
-  trustedHosts: Schema.array(Schema.string()),
-  devicesFile: Schema.string(),
-  tunnelToken: Schema.string().role("secret").volatile(),
-  lanBind: Schema.boolean().volatile(),
-  profile: Schema.string().pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
-  enabled: Schema.boolean().default(true).volatile()
-});
-var SWEEP_INTERVAL_MS = 1e4;
-var TUNNEL_PROBLEMS = {
-  "host-missing": "the fixed-domain tunnel needs its public hostname",
-  "host-invalid": "the fixed-domain tunnel hostname is not an http(s) URL",
-  "token-missing": "the fixed-domain tunnel needs its Cloudflare tunnel token"
-};
-function readConfigField(field, fallback) {
-  if (field === void 0) return fallback;
-  if (typeof field === "object" && field !== null && typeof field.get === "function") {
-    const value = field.get();
-    return value === void 0 ? fallback : value;
-  }
-  return field;
-}
-function readOptionalConfigField(field) {
-  if (field === void 0) return void 0;
-  if (typeof field === "object" && field !== null && typeof field.get === "function") {
-    return field.get();
-  }
-  return field;
-}
-function pairingConfigOf(resolved) {
-  return {
-    tokenTtlMs: resolved.tokenTtlMs,
-    offlineAfterMs: resolved.offlineAfterMs,
-    idleExpireMs: resolved.idleExpireMs,
-    cookieName: resolved.cookieName,
-    devicesFile: resolved.devicesFile
-  };
-}
-function defaultDevicesFile(home = dshHome()) {
-  return join5(home, "dsh-web-pack", "remote-web", "devices.json");
-}
-var DEFAULTS = {
-  tokenTtlMs: 10 * 6e4,
-  offlineAfterMs: 25e3,
-  idleExpireMs: DEFAULT_IDLE_EXPIRE_MS,
-  cookieName: "dsh_pair",
-  requirePairingForLan: true,
-  tunnel: "off",
-  tunnelHost: void 0,
-  trustedHosts: void 0,
-  devicesFile: defaultDevicesFile(),
-  tunnelToken: void 0,
-  lanBind: void 0,
-  profile: resolveManagedProfile(void 0, void 0, process.env.DSH_PROFILE),
-  enabled: true
-};
-function launchedProfileName(ctx) {
-  const fact = ctx.get("profileContext");
-  return typeof fact?.name === "string" && fact.name.length > 0 ? fact.name : void 0;
-}
 var apply = mountOnce("@catyugu/dsh-remote-web", applyImpl);
 function applyImpl(ctx, config) {
-  const envTunnelHost = process.env.DSH_REMOTE_TUNNEL_HOST?.trim() || void 0;
-  const resolve3 = () => ({
-    tokenTtlMs: readConfigField(config?.tokenTtlMs, DEFAULTS.tokenTtlMs),
-    offlineAfterMs: readConfigField(config?.offlineAfterMs, DEFAULTS.offlineAfterMs),
-    idleExpireMs: readConfigField(config?.idleExpireMs, DEFAULTS.idleExpireMs),
-    cookieName: readConfigField(config?.cookieName, DEFAULTS.cookieName),
-    requirePairingForLan: readConfigField(config?.requirePairingForLan, DEFAULTS.requirePairingForLan),
-    tunnel: readConfigField(config?.tunnel, DEFAULTS.tunnel),
-    tunnelHost: readOptionalConfigField(config?.tunnelHost) ?? envTunnelHost,
-    trustedHosts: readOptionalConfigField(config?.trustedHosts),
-    devicesFile: readConfigField(config?.devicesFile, DEFAULTS.devicesFile),
-    tunnelToken: readOptionalConfigField(config?.tunnelToken),
-    lanBind: readOptionalConfigField(config?.lanBind),
-    profile: resolveManagedProfile(readOptionalConfigField(config?.profile), launchedProfileName(ctx), process.env.DSH_PROFILE),
-    enabled: readConfigField(config?.enabled, DEFAULTS.enabled)
-  });
-  const service = new PairingService(pairingConfigOf(resolve3()));
-  const tunnel = new TunnelManager();
-  let relayRegistrar;
-  const publicBase = new PublicBaseKeeper((base) => {
-    service.setPublicBaseUrl(base);
-  });
-  let relayAnnouncedFor;
-  const disposeRelayRegistrar = (unregister = false) => {
-    const registrar = relayRegistrar;
-    relayRegistrar = void 0;
-    publicBase.setRelay(void 0);
-    relayAnnouncedFor = void 0;
-    if (registrar === void 0) return;
-    if (unregister) void registrar.unregister().catch(() => void 0);
-    registrar.dispose();
-  };
-  const ensureRelayRegistrar = () => {
-    if (relayRegistrar === void 0) {
-      try {
-        const identity = loadRelayIdentity(resolve3().profile);
-        relayRegistrar = new RelayRegistrar(identity, (state) => {
-          service.setRelayStatus(state.state === "off" ? void 0 : state);
-          if (state.state === "running") {
-            publicBase.setRelay(state.url);
-          } else if (state.state === "off") {
-            publicBase.setRelay(void 0);
-          } else if (state.state === "failed") {
-            console.warn(`dsh-remote-web: relay registration failed (${state.error}) \u2014 the stable origin may serve its offline page until the retry lands`);
-          }
-        });
-      } catch (error) {
-        console.warn(`dsh-remote-web: relay registry unavailable (${error instanceof Error ? error.message : String(error)}) \u2014 the quick URL is the QR base`);
-      }
-    }
-    return relayRegistrar;
-  };
-  const announceRelay = (registrar, target) => {
-    if (relayAnnouncedFor === target) return;
-    relayAnnouncedFor = target;
-    void registrar.announce(target);
-  };
-  let tunnelMode = "off";
-  tunnel.onPhase((info) => {
-    if (tunnelMode === "off") return;
-    if (info.phase === "running" && info.url !== void 0) {
-      publicBase.markRunning(info.url);
-      service.setTunnelStatus({ state: "running", url: info.url });
-      const registrar = tunnelMode === "quick" ? ensureRelayRegistrar() : void 0;
-      if (registrar !== void 0) announceRelay(registrar, info.url);
-      runPostureProbe();
-    } else if (info.phase === "starting") {
-      publicBase.markReconnecting();
-      service.setTunnelStatus({ state: "starting" });
-    } else if (info.phase === "failed") {
-      publicBase.markReconnecting();
-      service.setTunnelStatus(info.error === void 0 ? { state: "failed" } : { state: "failed", error: info.error });
-    }
-  });
+  const runtime = new RemoteRuntime(ctx, () => resolveConfig(ctx, config));
   ctx.effect(() => () => {
-    disposeRelayRegistrar();
-    publicBase.dispose();
-    tunnel.dispose();
-  }, "dsh-remote-web: auto tunnel");
-  const bindKnown = (ctx.webServer.host === "0.0.0.0" || ctx.webServer.host === "127.0.0.1") && Number.isFinite(ctx.webServer.port);
-  if (bindKnown) {
-    const lanBases = ctx.webServer.host === "0.0.0.0" ? lanIPv4Addresses().map((address) => ({ address, base: `http://${address}:${String(ctx.webServer.port)}` })) : [];
-    service.setLanBases(lanBases);
-  }
-  let disposeRoutes;
-  let disposeSweep;
-  let lastKnownPort;
-  let lastFirewallApplied;
-  const lanBindStatus = () => {
-    const resolvedNow = resolve3();
-    let state;
-    try {
-      state = lanBindState(resolvedNow.profile);
-    } catch {
-      state = { blockPresent: false };
-    }
-    const lanOn = state.host === "0.0.0.0";
-    const port = Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : lastKnownPort;
-    if (Number.isFinite(ctx.webServer.port)) lastKnownPort = ctx.webServer.port;
-    const startup = ctx.get("webStartup");
-    const desiredHost = resolvedNow.lanBind === void 0 ? void 0 : desiredBindHost(resolvedNow.lanBind === true, startup?.host);
-    return {
-      profile: resolvedNow.profile,
-      setting: resolvedNow.lanBind ?? null,
-      blockHost: state.host ?? null,
-      bindHost: ctx.webServer.host,
-      port,
-      lanUrls: ctx.webServer.host === "0.0.0.0" && port !== void 0 ? lanIPv4Addresses().map((address) => `http://${address}:${String(port)}`) : [],
-      firewall: port !== void 0 ? firewallSummary(port, lanOn) : { ok: true, managed: false },
-      platform: process.platform,
-      // The running bind does not follow the block on every deployment (the
-      // live patch watcher is profile-shape dependent): flag the divergence
-      // so the card can ask for a restart instead of looking broken. The
-      // comparison uses the effective desired host (a CLI --host wins over
-      // the toggle), not the raw toggle.
-      pendingRestart: pendingRestartOf(resolvedNow.lanBind, desiredHost, ctx.webServer.host)
-    };
-  };
-  const innerAuth = createInnerAuth(() => {
-    if (!Number.isFinite(ctx.webServer.port)) return void 0;
-    try {
-      return ctx.connection.authenticatedUrl?.(`http://127.0.0.1:${String(ctx.webServer.port)}/`);
-    } catch {
-      return void 0;
-    }
-  });
-  const APP_SHELL_TTL_MS = 3e4;
-  let appShellCache;
-  const fetchAppShell = async () => {
-    if (!Number.isFinite(ctx.webServer.port)) return void 0;
-    if (appShellCache !== void 0 && Date.now() - appShellCache.at < APP_SHELL_TTL_MS) return appShellCache.html;
-    const cookie = await innerAuth.ready();
-    try {
-      const response = await fetch(`http://127.0.0.1:${String(ctx.webServer.port)}/`, withIdentityEncoding({
-        headers: cookie !== void 0 ? { cookie } : void 0
-      }));
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) innerAuth.invalidate();
-        return void 0;
-      }
-      const html = await response.text();
-      appShellCache = { at: Date.now(), html };
-      return html;
-    } catch {
-      return void 0;
-    }
-  };
-  const routes = [
-    ...makeRoutes({
-      service,
-      requirePairingForLan: () => resolve3().requirePairingForLan,
-      enabled: () => resolve3().enabled,
-      tunnelTokenStored: () => (resolve3().tunnelToken ?? "") !== "",
-      lanBindStatus,
-      indexDocument: fetchAppShell,
-      trustedHosts: () => {
-        const list = [];
-        const envHosts = process.env.DSH_REMOTE_TRUSTED_HOSTS;
-        if (typeof envHosts === "string" && envHosts.trim() !== "") {
-          for (const item of envHosts.split(",")) {
-            const trimmed = item.trim();
-            if (trimmed !== "") list.push(trimmed);
-          }
-        }
-        const cfgHosts = resolve3().trustedHosts;
-        if (Array.isArray(cfgHosts)) {
-          for (const item of cfgHosts) {
-            if (typeof item === "string") {
-              const trimmed = item.trim();
-              if (trimmed !== "") list.push(trimmed);
-            }
-          }
-        }
-        return list;
-      }
-    }),
-    // The remote desktop channel: a paired-credential-gated `/remote` prefix
-    // that re-issues fenced paths to loopback (see remote-api.ts). The gate is
-    // unconditional — requirePairingForLan governs the plain /api surface and
-    // the desktop's client-side rewrite only; it is never an authorization
-    // input here, because this channel attaches the process's own browser
-    // credential to everything it forwards (issue #1665).
-    ...makeRemoteApiRoutes({
-      service,
-      port: ctx.webServer.port,
-      auth: innerAuth
-    })
-  ];
-  const upgrades = makeRemoteApiUpgradeRoutes({
-    service,
-    port: ctx.webServer.port,
-    auth: innerAuth
-  });
-  const gate = makeGateListener(service, () => resolve3().requirePairingForLan, () => resolve3().enabled);
-  ctx.effect(() => ctx.on("api/gate", gate), "dsh-remote-web: api gate");
-  let postureKey;
-  let postureWasExposed = false;
-  const runPostureProbe = () => {
-    if (!resolve3().enabled) return;
-    const targets = postureTargets(service.publicBaseUrl, service.lanAddresses, ctx.webServer.port);
-    if (targets.length === 0) {
-      postureKey = void 0;
-      service.setPosture(void 0);
-      return;
-    }
-    const key = targets.join("|");
-    const claim = claimPostureKey(postureKey, key);
-    if (!claim.run) return;
-    postureKey = claim.next;
-    void probePosture({ port: ctx.webServer.port, targets }).then((snapshot2) => {
-      service.setPosture(snapshot2);
-      const exposedHosts = snapshot2.hosts.filter((host) => host.exposed).map((host) => host.host);
-      const exposed = exposedHosts.length > 0;
-      if (exposed && !postureWasExposed) {
-        console.error(`dsh-remote-web: CRITICAL \u2014 the /api fence is OPEN for [${exposedHosts.join(", ")}]: unpaired clients reach the full host API. Remove --trusted-host for these hosts (pairing covers them) or bind loopback.`);
-      } else if (!exposed && postureWasExposed) {
-        console.log("dsh-remote-web: the /api posture probe is clean again (every advertised origin refused with 403).");
-      }
-      postureWasExposed = exposed;
-    }).catch(() => {
-      postureKey = releasePostureKey(postureKey, key);
-    });
-  };
-  const initialPostureTimer = nodeSetTimeout(() => {
-    runPostureProbe();
-  }, 5e3);
-  initialPostureTimer.unref();
-  ctx.effect(() => () => {
-    clearTimeout(initialPostureTimer);
-  }, "dsh-remote-web: posture probe boot");
-  providePairingAccess(ctx, (request) => {
-    if (!resolve3().enabled) return false;
-    return isPairedDeviceRequest(service, request);
-  });
-  const presencePet = startRemotePresencePet({
-    onState: (listener) => service.onState(listener),
-    pet: () => {
-      try {
-        return ctx.get("pet");
-      } catch {
-        return void 0;
-      }
-    }
-  });
-  ctx.effect(() => presencePet, "dsh-remote-web: remote-presence pet visibility");
-  if (service.lanAddresses.length > 0) {
-    const urls = service.lanAddresses.map((ip) => `http://${ip}:${String(ctx.webServer.port)}`).join(" , ");
-    console.log(`dsh-remote-web: the paired Web GUI is reachable on LAN at ${urls}`);
-  }
-  if (ctx.webServer.host === "0.0.0.0") {
-    console.warn("dsh-remote-web: LAN-exposed bind \u2014 pairing gates the /remote channel; direct /api stays under the harness fence + browser auth (stop() does not revoke an already-redeemed browser credential)");
-  }
-  const applyLanBindWork = (value) => {
-    if (value.lanBind !== void 0) {
-      const startup = ctx.get("webStartup");
-      const desiredHost = desiredBindHost(value.lanBind === true, startup?.host);
-      const desiredPort = desiredBindPort(startup?.port, Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : void 0);
-      if (desiredPort === void 0) {
-        console.error("dsh-remote-web: cannot assert the lan-bind block \u2014 the web server port is not known yet");
-      } else {
-        try {
-          const current = lanBindState(value.profile);
-          if (current.host !== desiredHost || current.port !== desiredPort) {
-            writeLanBind(desiredHost, desiredPort, value.profile);
-            console.log(`dsh-remote-web: lan-bind block written for profile ${value.profile} (${desiredHost}:${String(desiredPort)}); it takes effect when the profile next applies (the card reports pendingRestart until the running bind follows)`);
-          }
-        } catch (error) {
-          console.error(`dsh-remote-web: failed to write the lan-bind block: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      const livePort = Number.isFinite(ctx.webServer.port) ? ctx.webServer.port : void 0;
-      if (livePort === void 0) {
-        console.error("dsh-remote-web: cannot align the host firewall rule \u2014 the web server port is not known yet");
-      } else {
-        const nextFirewall = { enabled: value.lanBind === true, port: livePort };
-        if (firewallActionNeeded(lastFirewallApplied, nextFirewall)) {
-          const ruleOk = nextFirewall.enabled ? ensureFirewallRule(nextFirewall.port) : removeFirewallRule(nextFirewall.port);
-          if (ruleOk) {
-            lastFirewallApplied = nextFirewall;
-          } else {
-            console.error("dsh-remote-web: the host firewall rule could not be updated (admin rights required on managed platforms)");
-          }
-        }
-      }
-    }
-  };
-  let lanBindWorkPending = false;
-  const scheduleLanBindWork = () => {
-    if (lanBindWorkPending) return;
-    lanBindWorkPending = true;
-    runDetached(() => setImmediate(() => {
-      lanBindWorkPending = false;
-      try {
-        applyLanBindWork(resolve3());
-      } catch (error) {
-        console.error(`dsh-remote-web: the deferred lan-bind assertion failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }));
-  };
-  ctx.effect(() => () => {
-    lanBindWorkPending = false;
-  }, "dsh-remote-web: lan-bind work");
-  const sync = () => {
-    const value = resolve3();
-    service.config = pairingConfigOf(value);
-    scheduleLanBindWork();
-    const plan = value.enabled ? tunnelPlanOf(value, ctx.webServer.port) : { mode: "off" };
-    tunnelMode = plan.mode;
-    publicBase.setMode(plan.mode);
-    if (plan.mode === "quick") {
-      const liveTunnelUrl = publicBase.quickUrl();
-      if (liveTunnelUrl !== void 0) {
-        const registrar2 = ensureRelayRegistrar();
-        if (registrar2 !== void 0) announceRelay(registrar2, liveTunnelUrl);
-      }
-      const registrar = ensureRelayRegistrar();
-      const originHostHeader = registrar === void 0 ? void 0 : new URL(registrar.baseUrl).host;
-      tunnel.start(originHostHeader === void 0 ? plan.targetUrl : { kind: "quick", targetUrl: plan.targetUrl, originHostHeader });
-    } else if (plan.mode === "named") {
-      disposeRelayRegistrar();
-      publicBase.markRunning(plan.publicUrl);
-      tunnel.start({ kind: "named", token: plan.token, publicUrl: plan.publicUrl });
-    } else {
-      disposeRelayRegistrar();
-      tunnel.stop();
-      publicBase.reset();
-      if (plan.problem !== void 0) {
-        const message = TUNNEL_PROBLEMS[plan.problem];
-        console.warn(`dsh-remote-web: ${message}`);
-        service.setTunnelStatus({ state: "failed", error: message });
-      }
-    }
-    if (!value.enabled) {
-      service.stop();
-    }
-    if (disposeRoutes === void 0) {
-      disposeRoutes = ctx.effect(
-        () => {
-          const disposers = [
-            ...routes.map((route) => ctx.webServer.register(route)),
-            ...upgrades.map((route) => ctx.webServer.registerUpgrade(route))
-          ];
-          return () => {
-            for (const dispose of disposers) dispose();
-          };
-        },
-        "dsh-remote-web: pairing routes"
-      );
-    }
-    if (disposeSweep === void 0) {
-      disposeSweep = ctx.effect(
-        () => {
-          const timer = nodeSetInterval(() => {
-            service.sweep();
-          }, SWEEP_INTERVAL_MS);
-          timer.unref();
-          return () => {
-            clearInterval(timer);
-          };
-        },
-        "dsh-remote-web: presence sweep"
-      );
-    }
-    runPostureProbe();
-  };
-  ctx.effect(() => ctx.on("webserver/index-inject", (table) => {
-    table.push({ kind: "script", placement: "head", text: UUID_POLYFILL_SCRIPT });
-  }), "dsh-remote-web: uuid polyfill");
-  ctx.effect(() => ctx.on("webserver/index-inject", (table) => {
-    const value = resolve3();
-    if (!value.enabled || !value.requirePairingForLan) return;
-    table.push({ kind: "script", placement: "head", text: REMOTE_CHANNEL_BOOT_SCRIPT });
-  }), "dsh-remote-web: remote channel boot patch");
+    runtime.dispose();
+  }, "dsh-remote-web: runtime");
   ctx.on("loader/volatile-update", () => {
-    sync();
+    runtime.sync();
   });
-  sync();
+  runtime.start();
 }
 export {
   Config,
