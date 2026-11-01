@@ -126,12 +126,16 @@ export function loopbackOnlyDenial(innerPath: string): string | undefined {
  */
 export function pairedDeviceIdOf(req: IncomingMessage, service: PairingService): string | undefined {
   const cookieDevice = readCookie(req.headers.cookie, service.config.cookieName)
+  // A stale cookie must not shadow a live header: the cookieless flow keeps
+  // working after a browser starts sending an old cookie again.
+  if (cookieDevice !== undefined && service.touchDevice(cookieDevice)) return cookieDevice
   const headerDevice = typeof req.headers[REMOTE_DEVICE_HEADER] === 'string'
     ? (req.headers[REMOTE_DEVICE_HEADER] as string)
     : undefined
-  const id = cookieDevice ?? headerDevice
-  if (id === undefined) return undefined
-  return service.touchDevice(id) ? id : undefined
+  if (headerDevice !== undefined && headerDevice !== cookieDevice && service.touchDevice(headerDevice)) {
+    return headerDevice
+  }
+  return undefined
 }
 
 /**

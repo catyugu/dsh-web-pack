@@ -8260,21 +8260,6 @@ var defaultClock = {
   randomToken: () => randomBytes(16).toString("hex")
 };
 var PairingService = class {
-  /**
-   * @param config - tunables. The settings surface replaces the object (a
-   * fresh literal) when a committed section changes; every operation reads
-   * the current one.
-   * @param clock - clock/entropy source (injectable for tests).
-   */
-  constructor(config2, clock = defaultClock, fs = {}) {
-    this.config = config2;
-    this.clock = clock;
-    this.fs = fs;
-    this.loadPersisted();
-  }
-  config;
-  clock;
-  fs;
   tokens = /* @__PURE__ */ new Map();
   devices = /* @__PURE__ */ new Map();
   listeners = /* @__PURE__ */ new Set();
@@ -8293,6 +8278,26 @@ var PairingService = class {
   dirty = false;
   /** Live gated connections keyed by the device session that owns them. */
   leases = /* @__PURE__ */ new Map();
+  /**
+   * Tunables. The settings surface replaces the whole object (a fresh literal)
+   * when a committed section changes; every operation reads the current one.
+   */
+  config;
+  /** Clock and entropy source, injectable so tests need no real time. */
+  clock;
+  /** Filesystem seams, injectable for the same reason. */
+  fs;
+  /**
+   * @param config - tunables; see {@link config}.
+   * @param clock - clock/entropy source (injectable for tests).
+   * @param fs - filesystem seams (injectable for tests).
+   */
+  constructor(config2, clock = defaultClock, fs = {}) {
+    this.config = config2;
+    this.clock = clock;
+    this.fs = fs;
+    this.loadPersisted();
+  }
   /**
    * Restore device sessions persisted by a previous process run. A corrupt
    * or missing file is tolerated (an empty device table, never a throw) —
@@ -29565,10 +29570,12 @@ function loopbackOnlyDenial(innerPath) {
 }
 function pairedDeviceIdOf(req, service) {
   const cookieDevice = readCookie(req.headers.cookie, service.config.cookieName);
+  if (cookieDevice !== void 0 && service.touchDevice(cookieDevice)) return cookieDevice;
   const headerDevice = typeof req.headers[REMOTE_DEVICE_HEADER] === "string" ? req.headers[REMOTE_DEVICE_HEADER] : void 0;
-  const id = cookieDevice ?? headerDevice;
-  if (id === void 0) return void 0;
-  return service.touchDevice(id) ? id : void 0;
+  if (headerDevice !== void 0 && headerDevice !== cookieDevice && service.touchDevice(headerDevice)) {
+    return headerDevice;
+  }
+  return void 0;
 }
 function makeRemoteApiRoutes(deps) {
   const { service, port } = deps;

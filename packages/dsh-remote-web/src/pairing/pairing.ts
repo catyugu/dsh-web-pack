@@ -231,16 +231,24 @@ export class PairingService {
   private readonly leases = new Map<string, Set<() => void>>()
 
   /**
-   * @param config - tunables. The settings surface replaces the object (a
-   * fresh literal) when a committed section changes; every operation reads
-   * the current one.
-   * @param clock - clock/entropy source (injectable for tests).
+   * Tunables. The settings surface replaces the whole object (a fresh literal)
+   * when a committed section changes; every operation reads the current one.
    */
-  constructor(
-    public config: PairingConfig,
-    private readonly clock: PairingClock = defaultClock,
-    private readonly fs: PairingFsSeams = {},
-  ) {
+  public config: PairingConfig
+  /** Clock and entropy source, injectable so tests need no real time. */
+  private readonly clock: PairingClock
+  /** Filesystem seams, injectable for the same reason. */
+  private readonly fs: PairingFsSeams
+
+  /**
+   * @param config - tunables; see {@link config}.
+   * @param clock - clock/entropy source (injectable for tests).
+   * @param fs - filesystem seams (injectable for tests).
+   */
+  constructor(config: PairingConfig, clock: PairingClock = defaultClock, fs: PairingFsSeams = {}) {
+    this.config = config
+    this.clock = clock
+    this.fs = fs
     this.loadPersisted()
   }
 
