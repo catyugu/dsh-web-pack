@@ -1,29 +1,28 @@
 /**
- * Hands the settings form's injected face from the client apply (which owns
- * the staged form) to the pairing panel (which renders it).
+ * Hands the settings model from the client apply (which owns the staged form)
+ * to the pairing panel (which renders it).
  *
- * This fork keeps one settings surface: the popup a user opens to pair a
- * device. The controller therefore publishes its face here at mount instead
- * of registering a card into the plugin manager.
- *
- * @module dsh-remote-web/settings-face
+ * This row keeps one settings surface: the popup a user opens to pair a device.
+ * The client apply therefore publishes the model here at mount instead of
+ * registering a card into the plugin manager.
  */
-import type { RemoteSettingsCardFace } from './RemoteSettingsCard.tsx'
 
-let published: RemoteSettingsCardFace | undefined
+import type { RemoteSettingsModel } from './remote-settings.ts'
+
+let published: RemoteSettingsModel | undefined
 
 /**
- * Publish (or clear) the face the popup renders.
- * @param face - the controller's injected face, or undefined on dispose.
+ * Publish (or clear) the model the popup renders.
+ * @param model - the settings model, or undefined on dispose.
  */
-export function publishSettingsFace(face: RemoteSettingsCardFace | undefined): void {
-  published = face
+export function publishSettingsModel(model: RemoteSettingsModel | undefined): void {
+  published = model
 }
 
 /**
- * The currently published face, if the client apply has run.
- * @returns the face the popup should render.
+ * The currently published model, if the client apply has run.
+ * @returns the model the popup should render.
  */
-export function currentSettingsFace(): RemoteSettingsCardFace | undefined {
+export function currentSettingsModel(): RemoteSettingsModel | undefined {
   return published
 }

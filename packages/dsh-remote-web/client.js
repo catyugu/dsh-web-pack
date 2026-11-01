@@ -43,11 +43,11 @@ __export(index_exports, {
   servedEntryId: () => servedEntryId
 });
 module.exports = __toCommonJS(index_exports);
-var import_react8 = require("react");
+var import_react7 = require("react");
 var import_client = require("react-dom/client");
 
 // packages/dsh-remote-web/src/client/entry/RemoteEntry.tsx
-var import_react5 = require("react");
+var import_react4 = require("react");
 var import_react_dom = require("react-dom");
 
 // node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
@@ -1502,15 +1502,12 @@ function RemotePanel({
   ] });
 }
 
-// packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
-var import_react4 = require("react");
-
-// packages/dsh-remote-web/src/client/settings/PluginSettingsCard.tsx
+// packages/dsh-remote-web/src/client/settings/RemoteSettingsForm.tsx
 var import_react3 = require("react");
 
-// packages/dsh-remote-web/src/client/settings/settings-card.module.css
-var css2 = "/* Settings card chrome + form fields.\n * Aligned with the official ui-settings-plugins PluginCard / fields CSS:\n * same semantic tokens, radius, typography and states so the card reads as a\n * sibling of the built-in Shell / Agent loop / Web search cards. */\n\n.card_839479 {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  border-radius: 12px;\n  list-style: none;\n  transition: border-color 0.16s, background 0.16s;\n}\n\n.card_839479:hover {\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.cardOpen_839479 {\n  background: var(--dsw-alias-bg-layer-2);\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.header_839479 {\n  appearance: none;\n  width: 100%;\n  /* The suite does not force a global border-box, so width:100% + padding\n     would stretch the row 32px past the card and push the trailing pending\n     badge (last flex item) outside the card border. */\n  box-sizing: border-box;\n  font: inherit;\n  color: inherit;\n  text-align: left;\n  cursor: pointer;\n  background: transparent;\n  border: 0;\n  border-radius: 12px;\n  align-items: center;\n  gap: 13px;\n  padding: 16px;\n  display: flex;\n}\n\n.header_839479:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: -2px;\n}\n\n.headerStatic_839479 {\n  width: 100%;\n  box-sizing: border-box;\n  border-radius: 12px;\n  align-items: center;\n  gap: 13px;\n  padding: 16px;\n  display: flex;\n}\n\n.headText_839479 {\n  flex-direction: column;\n  flex: 1;\n  gap: 4px;\n  min-width: 0;\n  display: flex;\n}\n\n/* Optional leading plugin mark: a quiet tile that takes the ink color on\n   hover and while the card is open, so the whole row reads as one control. */\n.mark_839479 {\n  flex: none;\n  display: grid;\n  place-items: center;\n  width: 34px;\n  height: 34px;\n  border-radius: 10px;\n  background: var(--dsw-alias-bg-module-platform);\n  color: var(--dsw-alias-label-secondary);\n  transition: color 0.16s;\n}\n\n.header_839479:hover .mark_839479,\n.cardOpen_839479 .mark_839479 {\n  color: var(--dsw-alias-label-primary);\n}\n\n.name_839479 {\n  color: var(--dsw-alias-label-primary);\n  font-size: 15px;\n  font-weight: 600;\n  line-height: 1.4;\n}\n\n.description_839479 {\n  /* Secondary, not tertiary: skins whose tertiary token is tuned for large\n     print leave 12-13px hint text below readable contrast (orca-link #778399\n     on cream measures ~3.4:1). */\n  color: var(--dsw-alias-label-secondary);\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.pending_839479 {\n  white-space: nowrap;\n  background: var(--dsw-alias-bg-module-platform);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 999px;\n  flex: none;\n  padding: 1px 8px;\n  font-size: 11px;\n  font-weight: 500;\n  line-height: 17px;\n}\n\n.chevron_839479 {\n  color: var(--dsw-alias-label-tertiary);\n  flex: none;\n  width: 16px;\n  height: 16px;\n  transition: transform 0.16s, color 0.16s;\n}\n\n.header_839479:hover .chevron_839479 {\n  color: var(--dsw-alias-label-secondary);\n}\n\n.chevronOpen_839479 {\n  transform: rotate(180deg);\n}\n\n.body_839479 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  margin: 0 16px;\n  padding-bottom: 8px;\n}\n\n.readOnly_839479 {\n  color: var(--dsw-alias-label-secondary);\n  margin: 12px 0 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.notExposed_839479 {\n  color: var(--dsw-alias-state-warn-primary);\n  margin: 12px 0 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.footer_839479 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  justify-content: flex-end;\n  align-items: center;\n  gap: 8px;\n  padding: 12px 0 4px;\n  display: flex;\n}\n\n.failed_839479 {\n  min-width: 0;\n  /* The suite's error alias is state-error-primary; a label-error token does\n     not exist, so the var() would resolve to nothing and the message would\n     inherit the ink color, losing the failure signal. */\n  color: var(--dsw-alias-state-error-primary, #b42318);\n  flex: 1;\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n  text-overflow: ellipsis;\n  overflow: hidden;\n  white-space: nowrap;\n}\n\n.discard_839479,\n.save_839479 {\n  appearance: none;\n  font: inherit;\n  cursor: pointer;\n  border: 1px solid transparent;\n  border-radius: 8px;\n  padding: 5px 14px;\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.discard_839479 {\n  border-color: var(--dsw-alias-border-l2);\n  color: var(--dsw-alias-label-secondary);\n  background: transparent;\n}\n\n.discard_839479:hover:not(:disabled) {\n  color: var(--dsw-alias-label-primary);\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.save_839479 {\n  background: var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-bg-layer-3);\n}\n\n.discard_839479:disabled,\n.save_839479:disabled {\n  opacity: 0.4;\n  cursor: default;\n}\n\n.discard_839479:focus-visible,\n.save_839479:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 1px;\n}\n\n.field_839479 {\n  flex-direction: column;\n  gap: 6px;\n  padding: 12px 0;\n  display: flex;\n}\n\n.field_839479 + .field_839479 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n}\n\n.head_839479 {\n  align-items: center;\n  gap: 8px;\n  display: flex;\n}\n\n.label_839479 {\n  min-width: 0;\n  color: var(--dsw-alias-label-primary);\n  flex: 1;\n  font-size: 13px;\n  font-weight: 500;\n  line-height: 1.5;\n}\n\n.badges_839479 {\n  align-items: center;\n  gap: 8px;\n  display: inline-flex;\n}\n\n.badge_839479 {\n  white-space: nowrap;\n  background: var(--dsw-alias-bg-module-platform);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 999px;\n  padding: 1px 8px;\n  font-size: 11px;\n  font-weight: 500;\n  line-height: 17px;\n}\n\n.reset_839479 {\n  font: inherit;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  background: transparent;\n  border: none;\n  padding: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.reset_839479:hover:not(:disabled) {\n  color: var(--dsw-alias-label-primary);\n}\n\n.reset_839479:disabled {\n  cursor: default;\n}\n\n.reset_839479:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 2px;\n}\n\n.reset_839479:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 2px;\n}\n\n.input_839479,\n.select_839479 {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  height: 34px;\n  font: inherit;\n  color: var(--dsw-alias-label-primary);\n  border-radius: 8px;\n  padding: 0 12px;\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.input_839479:focus-visible,\n.select_839479:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  outline: none;\n}\n\n.input_839479:disabled,\n.select_839479:disabled {\n  color: var(--dsw-alias-label-tertiary);\n  cursor: default;\n}\n\n.inputInvalid_839479 {\n  border: 1px solid var(--dsw-alias-state-error-primary, #b42318);\n  background: var(--dsw-alias-bg-layer-3);\n  height: 34px;\n  font: inherit;\n  color: var(--dsw-alias-label-primary);\n  border-radius: 8px;\n  padding: 0 12px;\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.inputInvalid_839479:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-error-primary, #b42318);\n  outline-offset: 1px;\n  border-color: var(--dsw-alias-state-error-primary, #b42318);\n}\n\n.selectWrap_839479 {\n  position: relative;\n}\n\n.selectButton_839479 {\n  appearance: none;\n  width: 100%;\n  text-align: left;\n  cursor: pointer;\n  align-items: center;\n  justify-content: space-between;\n  gap: 8px;\n  display: flex;\n}\n\n.selectLabel_839479 {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n\n.selectChevron_839479 {\n  color: var(--dsw-alias-label-tertiary);\n  flex: none;\n  transition: transform 0.16s;\n}\n\n.selectChevronOpen_839479 {\n  transform: rotate(180deg);\n}\n\n.selectPopup_839479 {\n  position: absolute;\n  top: calc(100% + 4px);\n  left: 0;\n  right: 0;\n  z-index: 40;\n  flex-direction: column;\n  max-height: 240px;\n  overflow-y: auto;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 8px;\n  background: var(--dsw-alias-bg-layer-3);\n  box-shadow: 0 8px 24px var(--dsw-alias-bg-mask-2);\n  padding: 4px;\n  opacity: 0;\n  transform: translateY(-4px);\n  transition: opacity 0.1s ease, transform 0.1s ease;\n  display: flex;\n}\n\n.selectPopupOpen_839479 {\n  opacity: 1;\n  transform: none;\n}\n\n.selectPopupClose_839479 {\n  opacity: 0;\n  transform: translateY(-4px);\n  pointer-events: none;\n}\n\n.selectOption_839479 {\n  /* \u5F39\u5C42\u662F max-height \u53D7\u9650\u7684 flex \u5217\uFF1A\u9009\u9879\u5FC5\u987B\u4FDD\u6301\u81EA\u7136\u884C\u9AD8\uFF0C\u8D85\u51FA\u4EA4\u7ED9\u5F39\u5C42\u6EDA\u52A8 */\n  flex-shrink: 0;\n  border-radius: 6px;\n  padding: 6px 10px;\n  font-size: 13px;\n  line-height: 1.5;\n  color: var(--dsw-alias-label-primary);\n  cursor: pointer;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n.selectOption_839479:hover,\n.selectOptionActive_839479 {\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n\n.selectOptionSelected_839479 {\n  color: var(--dsw-alias-brand-primary);\n  font-weight: 500;\n  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 10%, transparent);\n}\n\n.invalid_839479 {\n  color: var(--dsw-alias-state-error-primary, #b42318);\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.hint_839479 {\n  color: var(--dsw-alias-label-secondary);\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .card_839479,\n  .header_839479,\n  .mark_839479,\n  .chevron_839479,\n  .chevronOpen_839479,\n  .discard_839479,\n  .save_839479,\n  .selectChevron_839479,\n  .selectChevronOpen_839479,\n  .selectPopup_839479 {\n    transition: none;\n  }\n}\n";
-var id2 = "@catyugu/dsh-remote-web/settings-card.module.css";
+// packages/dsh-remote-web/src/client/settings/settings.module.css
+var css2 = "/* The remote-connection settings card: chrome, fields and the two controls the\n * card needs beyond a text input. Aligned with the official ui-settings-plugins\n * PluginCard / fields CSS (same semantic tokens, radius, typography and states)\n * so the card reads as a sibling of the built-in settings cards. */\n\n.card_d8a5a3 {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  border-radius: 12px;\n  transition: border-color 0.16s, background 0.16s;\n}\n\n.card_d8a5a3:hover {\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.cardOpen_d8a5a3 {\n  background: var(--dsw-alias-bg-layer-2);\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.header_d8a5a3 {\n  appearance: none;\n  width: 100%;\n  /* The suite does not force a global border-box, so width:100% + padding\n     would stretch the row past the card and push the trailing pending badge\n     outside the card border. */\n  box-sizing: border-box;\n  font: inherit;\n  color: inherit;\n  text-align: left;\n  cursor: pointer;\n  background: transparent;\n  border: 0;\n  border-radius: 12px;\n  align-items: center;\n  gap: 13px;\n  padding: 16px;\n  display: flex;\n}\n\n.header_d8a5a3:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: -2px;\n}\n\n.headText_d8a5a3 {\n  flex-direction: column;\n  flex: 1;\n  gap: 4px;\n  min-width: 0;\n  display: flex;\n}\n\n.name_d8a5a3 {\n  color: var(--dsw-alias-label-primary);\n  font-size: 15px;\n  font-weight: 600;\n  line-height: 1.4;\n}\n\n.description_d8a5a3 {\n  /* Secondary, not tertiary: skins whose tertiary token is tuned for large\n     print leave 12-13px hint text below readable contrast. */\n  color: var(--dsw-alias-label-secondary);\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.pending_d8a5a3 {\n  white-space: nowrap;\n  background: var(--dsw-alias-bg-module-platform);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 999px;\n  flex: none;\n  padding: 1px 8px;\n  font-size: 11px;\n  font-weight: 500;\n  line-height: 17px;\n}\n\n.chevron_d8a5a3 {\n  color: var(--dsw-alias-label-tertiary);\n  flex: none;\n  width: 16px;\n  height: 16px;\n  transition: transform 0.16s, color 0.16s;\n}\n\n.header_d8a5a3:hover .chevron_d8a5a3 {\n  color: var(--dsw-alias-label-secondary);\n}\n\n.chevronOpen_d8a5a3 {\n  transform: rotate(180deg);\n}\n\n.body_d8a5a3 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  margin: 0 16px;\n  padding-bottom: 8px;\n}\n\n.readOnly_d8a5a3 {\n  color: var(--dsw-alias-label-secondary);\n  margin: 12px 0 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.notExposed_d8a5a3 {\n  color: var(--dsw-alias-state-warn-primary);\n  margin: 12px 0 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.footer_d8a5a3 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  justify-content: flex-end;\n  align-items: center;\n  gap: 8px;\n  padding: 12px 0 4px;\n  display: flex;\n}\n\n.failed_d8a5a3 {\n  min-width: 0;\n  /* The suite's error alias is state-error-primary; a label-error token does\n     not exist, so the var() would resolve to nothing and the message would\n     inherit the ink color, losing the failure signal. */\n  color: var(--dsw-alias-state-error-primary, #b42318);\n  flex: 1;\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n  text-overflow: ellipsis;\n  overflow: hidden;\n  white-space: nowrap;\n}\n\n.discard_d8a5a3,\n.save_d8a5a3 {\n  appearance: none;\n  font: inherit;\n  cursor: pointer;\n  border: 1px solid transparent;\n  border-radius: 8px;\n  padding: 5px 14px;\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.discard_d8a5a3 {\n  border-color: var(--dsw-alias-border-l2);\n  color: var(--dsw-alias-label-secondary);\n  background: transparent;\n}\n\n.discard_d8a5a3:hover:not(:disabled) {\n  color: var(--dsw-alias-label-primary);\n  border-color: var(--dsw-alias-label-dimmed);\n}\n\n.save_d8a5a3 {\n  background: var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-bg-layer-3);\n}\n\n.discard_d8a5a3:disabled,\n.save_d8a5a3:disabled {\n  opacity: 0.4;\n  cursor: default;\n}\n\n.discard_d8a5a3:focus-visible,\n.save_d8a5a3:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 1px;\n}\n\n.section_d8a5a3 + .section_d8a5a3 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  margin-top: 4px;\n}\n\n.sectionTitle_d8a5a3 {\n  margin: 16px 0 0;\n  font-size: 12px;\n  font-weight: 600;\n  letter-spacing: 0.02em;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.field_d8a5a3 {\n  flex-direction: column;\n  gap: 6px;\n  padding: 12px 0;\n  display: flex;\n}\n\n.field_d8a5a3 + .field_d8a5a3 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n}\n\n.head_d8a5a3 {\n  align-items: center;\n  gap: 8px;\n  display: flex;\n}\n\n.label_d8a5a3 {\n  min-width: 0;\n  color: var(--dsw-alias-label-primary);\n  flex: 1;\n  font-size: 13px;\n  font-weight: 500;\n  line-height: 1.5;\n}\n\n.badges_d8a5a3 {\n  align-items: center;\n  gap: 8px;\n  display: inline-flex;\n}\n\n.badge_d8a5a3 {\n  white-space: nowrap;\n  background: var(--dsw-alias-bg-module-platform);\n  color: var(--dsw-alias-label-secondary);\n  border-radius: 999px;\n  padding: 1px 8px;\n  font-size: 11px;\n  font-weight: 500;\n  line-height: 17px;\n}\n\n.reset_d8a5a3 {\n  font: inherit;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n  background: transparent;\n  border: none;\n  padding: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.reset_d8a5a3:hover:not(:disabled) {\n  color: var(--dsw-alias-label-primary);\n}\n\n.reset_d8a5a3:disabled {\n  cursor: default;\n}\n\n.reset_d8a5a3:focus-visible {\n  outline: 2px solid var(--dsw-alias-brand-primary);\n  outline-offset: 2px;\n}\n\n.input_d8a5a3,\n.inputInvalid_d8a5a3 {\n  border: 1px solid var(--dsw-alias-border-l2);\n  background: var(--dsw-alias-bg-layer-3);\n  height: 34px;\n  font: inherit;\n  color: var(--dsw-alias-label-primary);\n  border-radius: 8px;\n  padding: 0 12px;\n  font-size: 13px;\n  line-height: 1.5;\n}\n\n.input_d8a5a3:focus-visible {\n  border-color: var(--dsw-alias-brand-primary);\n  outline: none;\n}\n\n.input_d8a5a3:disabled,\n.inputInvalid_d8a5a3:disabled {\n  color: var(--dsw-alias-label-tertiary);\n  cursor: default;\n}\n\n.inputInvalid_d8a5a3 {\n  border-color: var(--dsw-alias-state-error-primary, #b42318);\n}\n\n.inputInvalid_d8a5a3:focus-visible {\n  outline: 2px solid var(--dsw-alias-state-error-primary, #b42318);\n  outline-offset: 1px;\n}\n\n.hint_d8a5a3 {\n  color: var(--dsw-alias-label-secondary);\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.invalid_d8a5a3 {\n  color: var(--dsw-alias-state-error-primary, #b42318);\n  margin: 0;\n  font-size: 12px;\n  line-height: 1.5;\n}\n\n.switchRow_d8a5a3 {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.state_d8a5a3 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.switch_d8a5a3 {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  padding: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 11px;\n  background: var(--dsw-alias-bg-layer-3);\n  cursor: pointer;\n  transition: background 150ms ease;\n}\n\n.switch_d8a5a3:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n\n.switchOn_d8a5a3 {\n  border-color: transparent;\n  background: var(--dsw-alias-brand-primary);\n}\n\n.knob_d8a5a3 {\n  position: absolute;\n  top: 2px;\n  left: 2px;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  transition: transform 150ms ease;\n}\n\n.knobOn_d8a5a3 {\n  transform: translateX(16px);\n}\n\n.radios_d8a5a3 {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.radio_d8a5a3 {\n  display: flex;\n  align-items: flex-start;\n  gap: 8px;\n  cursor: pointer;\n}\n\n.radio_d8a5a3 input {\n  margin: 2px 0 0;\n  accent-color: var(--dsw-alias-brand-primary);\n}\n\n.radioText_d8a5a3 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.radioLabel_d8a5a3 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.radioDetail_d8a5a3 {\n  font-size: 12px;\n  line-height: 17px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.subfield_d8a5a3 {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding-left: 22px;\n}\n\n.other_d8a5a3 {\n  margin-top: 4px;\n  padding-top: 12px;\n  border-top: 1px solid var(--dsw-alias-border-l2);\n}\n\n.otherSummary_d8a5a3 {\n  font-size: 12px;\n  font-weight: 600;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n/* Live facts under the LAN decision (bind host, firewall, reachable URLs). */\n.status_d8a5a3 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 0 0 4px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.statusLine_d8a5a3 {\n  word-break: break-all;\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .card_d8a5a3,\n  .header_d8a5a3,\n  .chevron_d8a5a3,\n  .chevronOpen_d8a5a3,\n  .switch_d8a5a3,\n  .knob_d8a5a3 {\n    transition: none;\n  }\n}\n";
+var id2 = "@catyugu/dsh-remote-web/settings.module.css";
 if (typeof document !== "undefined" && document.getElementById(id2) === null) {
   const tag = document.createElement("style");
   tag.id = id2;
@@ -1518,453 +1515,27 @@ if (typeof document !== "undefined" && document.getElementById(id2) === null) {
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var settings_card_default = { "card": "card_839479", "cardOpen": "cardOpen_839479", "header": "header_839479", "headerStatic": "headerStatic_839479", "headText": "headText_839479", "mark": "mark_839479", "name": "name_839479", "description": "description_839479", "pending": "pending_839479", "chevron": "chevron_839479", "chevronOpen": "chevronOpen_839479", "body": "body_839479", "readOnly": "readOnly_839479", "notExposed": "notExposed_839479", "footer": "footer_839479", "failed": "failed_839479", "discard": "discard_839479", "save": "save_839479", "field": "field_839479", "head": "head_839479", "label": "label_839479", "badges": "badges_839479", "badge": "badge_839479", "reset": "reset_839479", "input": "input_839479", "select": "select_839479", "inputInvalid": "inputInvalid_839479", "selectWrap": "selectWrap_839479", "selectButton": "selectButton_839479", "selectLabel": "selectLabel_839479", "selectChevron": "selectChevron_839479", "selectChevronOpen": "selectChevronOpen_839479", "selectPopup": "selectPopup_839479", "selectPopupOpen": "selectPopupOpen_839479", "selectPopupClose": "selectPopupClose_839479", "selectOption": "selectOption_839479", "selectOptionActive": "selectOptionActive_839479", "selectOptionSelected": "selectOptionSelected_839479", "invalid": "invalid_839479", "hint": "hint_839479" };
-
-// packages/dsh-remote-web/src/client/settings/PluginSettingsCard.tsx
-var import_jsx_runtime2 = require("react/jsx-runtime");
-function PluginSettingsCard(props) {
-  const [open, setOpen] = (0, import_react3.useState)(props.defaultOpen ?? true);
-  const { state, alwaysOpen } = props;
-  if (!state.available) return null;
-  const title = props.t(props.titleKey);
-  const description = props.t(props.descriptionKey);
-  const blocked = !state.dirty || state.invalid || state.saving;
-  const expanded = alwaysOpen === true || open;
-  const cardClass = expanded ? `${settings_card_default.cardOpen} ${settings_card_default.card}` : settings_card_default.card;
-  const header = alwaysOpen === true ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.headerStatic, children: [
-    props.icon !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.mark, "aria-hidden": "true", children: props.icon }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_card_default.headText, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.name, title, children: title }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.description, title: description, children: props.descriptionNode ?? description })
-    ] }),
-    state.dirty ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.pending, title: props.t("settings.unsaved"), children: props.t("settings.unsaved") }) : null
-  ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-    "button",
-    {
-      type: "button",
-      className: settings_card_default.header,
-      "aria-expanded": open,
-      "aria-label": `${props.t(open ? "settings.collapse" : "settings.expand")}: ${title}`,
-      onClick: () => {
-        setOpen(!open);
-      },
-      children: [
-        props.icon !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.mark, "aria-hidden": "true", children: props.icon }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_card_default.headText, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.name, title, children: title }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.description, title: description, children: props.descriptionNode ?? description })
-        ] }),
-        state.dirty ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.pending, title: props.t("settings.unsaved"), children: props.t("settings.unsaved") }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "svg",
-          {
-            width: "14",
-            height: "14",
-            viewBox: "0 0 14 14",
-            fill: "none",
-            xmlns: "http://www.w3.org/2000/svg",
-            className: open ? `${settings_card_default.chevron} ${settings_card_default.chevronOpen}` : settings_card_default.chevron,
-            children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "path",
-              {
-                d: "M11.8486 5.5L11.4238 5.92383L8.69727 8.65137C8.44157 8.90706 8.21562 9.13382 8.01172 9.29785C7.79912 9.46883 7.55595 9.61756 7.25 9.66602C7.08435 9.69222 6.91565 9.69222 6.75 9.66602C6.44405 9.61756 6.20088 9.46883 5.98828 9.29785C5.78438 9.13382 5.55843 8.90706 5.30273 8.65137L2.57617 5.92383L2.15137 5.5L3 4.65137L3.42383 5.07617L6.15137 7.80273C6.42595 8.07732 6.59876 8.24849 6.74023 8.3623C6.87291 8.46904 6.92272 8.47813 6.9375 8.48047C6.97895 8.48703 7.02105 8.48703 7.0625 8.48047C7.07728 8.47813 7.12709 8.46904 7.25977 8.3623C7.40124 8.24849 7.57405 8.07732 7.84863 7.80273L10.5762 5.07617L11 4.65137L11.8486 5.5Z",
-                fill: "currentColor"
-              }
-            )
-          }
-        )
-      ]
-    }
-  );
-  if (!state.exposed && props.renderChildrenWhenNotExposed !== true) {
-    const showNotice = props.hideNotExposedNotice !== true;
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("li", { className: cardClass, children: [
-      header,
-      expanded ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: settings_card_default.body, children: showNotice ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: settings_card_default.notExposed, role: "status", children: props.t("settings.notExposed") }) : null }) : null
-    ] });
-  }
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("li", { className: cardClass, children: [
-    header,
-    expanded ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.body, children: [
-      !state.writable ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: settings_card_default.readOnly, role: "status", children: props.t("settings.readOnly") }) : null,
-      props.children,
-      props.hideFooter === true ? null : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.footer, children: [
-        state.failed ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("p", { className: settings_card_default.failed, role: "status", children: [
-          props.t("settings.saveFailed"),
-          state.failedReason ? " - " + state.failedReason : ""
-        ] }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "button",
-          {
-            type: "button",
-            className: settings_card_default.discard,
-            disabled: !state.dirty || state.saving,
-            onClick: props.onDiscard,
-            children: props.t("settings.discard")
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "button",
-          {
-            type: "button",
-            className: settings_card_default.save,
-            disabled: blocked,
-            onClick: props.onSave,
-            children: props.t(!state.saving ? "settings.save" : "settings.saving")
-          }
-        )
-      ] })
-    ] }) : null
-  ] });
-}
-function ValueField(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.field, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_card_default.head, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { className: settings_card_default.label, htmlFor: props.id, children: props.label }),
-      props.overridden ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_card_default.badges, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_card_default.badge, children: props.overriddenLabel }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "button",
-          {
-            type: "button",
-            className: settings_card_default.reset,
-            disabled: props.disabled,
-            onClick: props.onReset,
-            children: props.resetLabel
-          }
-        )
-      ] }) : null
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-      "input",
-      {
-        id: props.id,
-        className: props.invalid ? settings_card_default.inputInvalid : settings_card_default.input,
-        type: "text",
-        ...props.numeric === true ? { inputMode: "numeric" } : {},
-        ...props.invalid ? { "aria-invalid": true } : {},
-        value: props.text,
-        placeholder: props.placeholder ?? "",
-        disabled: props.disabled,
-        onChange: (event) => {
-          props.onEdit(event.target.value);
-        }
-      }
-    ),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: props.invalid ? settings_card_default.invalid : settings_card_default.hint, children: props.invalid ? props.invalidLabel : props.hint })
-  ] });
-}
-
-// packages/dsh-remote-web/src/client/settings/settings-form.ts
-var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
-function numberField(field, constraints = {}) {
-  const { integer = false, min } = constraints;
-  return {
-    field,
-    format: (value) => typeof value === "number" ? String(value) : "",
-    parse: (text) => {
-      const trimmed = text.trim();
-      if (trimmed === "") return { kind: "clear" };
-      const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed)) return void 0;
-      if (integer && !Number.isInteger(parsed)) return void 0;
-      if (min !== void 0 && parsed < min) return void 0;
-      return { kind: "set", value: parsed };
-    }
-  };
-}
-function textField(field) {
-  return {
-    field,
-    format: (value) => typeof value === "string" ? value : "",
-    parse: (text) => {
-      const trimmed = text.trim();
-      return trimmed === "" ? { kind: "clear" } : { kind: "set", value: trimmed };
-    }
-  };
-}
-function secretField(field) {
-  return { ...textField(field), secret: true };
-}
-function booleanField(field) {
-  return {
-    field,
-    format: (value) => typeof value === "boolean" ? String(value) : "",
-    parse: (text) => {
-      const trimmed = text.trim();
-      if (trimmed === "") return { kind: "clear" };
-      if (trimmed === "true") return { kind: "set", value: true };
-      if (trimmed === "false") return { kind: "set", value: false };
-      return void 0;
-    }
-  };
-}
-function choiceField(field, choices) {
-  return {
-    field,
-    format: (value) => typeof value === "string" && choices.includes(value) ? value : "",
-    parse: (text) => {
-      if (text === "") return { kind: "clear" };
-      return choices.includes(text) ? { kind: "set", value: text } : void 0;
-    }
-  };
-}
-var CardForm = class {
-  /** @param scope - the bound configuration form for this card's namespace. */
-  constructor(scope, specs) {
-    this.scope = scope;
-    this.specs = new Map(specs.map((spec) => [spec.field, spec]));
-    this.disposeForm = scope.subscribe(() => {
-      this.publish();
-    });
-  }
-  scope;
-  specs;
-  staged = /* @__PURE__ */ new Map();
-  listeners = /* @__PURE__ */ new Set();
-  /** The form subscription installed in the constructor; released by dispose(). */
-  disposeForm;
-  disposed = false;
-  saving = false;
-  /** A save asked for while one was in flight; it runs once the first settles (#1754). */
-  saveQueued = false;
-  failed = false;
-  failedReason;
-  /**
-   * Release the form subscription and every bound store listener. The card
-   * must call this on teardown; later calls are no-ops.
-   */
-  dispose() {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.disposeForm();
-    this.listeners.clear();
-  }
-  /** Publish a projection of this form, rebuilt whenever the form or a draft changes. */
-  bind(project) {
-    const store = (0, import_dsh_client_store.createSnapshotStore)(project());
-    this.listeners.add(() => {
-      store.set(project());
-    });
-    return store;
-  }
-  /** Read the card-level state: what the Host serves, and what a save would do. */
-  shell() {
-    const snapshot = this.scope.getSnapshot();
-    const plan = this.plan();
-    return {
-      available: snapshot.status !== "loading",
-      exposed: snapshot.status === "ready",
-      writable: snapshot.writable,
-      dirty: plan.length > 0,
-      invalid: plan.some((item) => item.judge === void 0),
-      saving: this.saving,
-      failed: this.failed,
-      ...this.failedReason === void 0 ? {} : { failedReason: this.failedReason }
-    };
-  }
-  /** Read one field's state from the effective section and its staged draft. */
-  field(field) {
-    const spec = this.specOf(field);
-    const staged = this.staged.get(field);
-    if (staged === void 0) {
-      return { text: spec.format(this.sectionValue(field)), overridden: this.stored(field), invalid: false };
-    }
-    const write = staged.clear ? { kind: "clear" } : spec.parse(staged.text);
-    return {
-      text: staged.text,
-      overridden: write?.kind === "set",
-      invalid: write === void 0
-    };
-  }
-  /** The actions the card's slot registration injects. */
-  actions() {
-    return {
-      edit: (field, text) => {
-        this.stage(field, { text, clear: false });
-      },
-      resetField: (field) => {
-        this.stage(field, { text: this.specOf(field).format(this.baseValue(field)), clear: true });
-      },
-      save: () => {
-        void this.requestSave();
-      },
-      discard: () => {
-        if (this.staged.size === 0 && !this.failed) return;
-        this.staged.clear();
-        this.failed = false;
-        this.failedReason = void 0;
-        this.publish();
-      }
-    };
-  }
-  /**
-   * Write every staged edit in one atomic form mutation, then re-seed from
-   * what the Host accepted.
-   *
-   * The whole batch rides one mutate, so cross-field validate hooks
-   * (baseURL+model) judge it as a unit: the Host either applies every write
-   * or refuses the batch. The form contract answers a refusal or a skipped
-   * write with `false` (it recovers with a fresh Host view instead of
-   * throwing), so the outcome is judged twice: the answer itself, and then the
-   * settled snapshot read back one planned write at a time. One missed write
-   * fails the whole save. A transport that rejects instead (the dsh-web bridge
-   * controller on a dead connection) reports through the same failure path
-   * with its rejection message. A save that did not land keeps its drafts, so
-   * the user can correct them instead of retyping.
-   * @returns settlement after the mutation and the read-back.
-   */
-  /**
-   * Run one save, and re-run it once if another was asked for while this one
-   * was still in flight.
-   *
-   * A save is a Host round trip that also drives the profile reconcile, and
-   * the Host runs that write inside one exclusive transaction. Answering a
-   * press that arrives mid-flight by returning immediately dropped the edit
-   * with no explanation, which is the "the save button stops working after a
-   * few rounds" report (#1754). Serializing instead means a save pressed while
-   * another is still settling runs against the settled state - which is what
-   * the operator meant by pressing it again.
-   * @returns settlement after the mutation and the read-back.
-   */
-  async requestSave() {
-    if (this.saving) {
-      this.saveQueued = true;
-      return;
-    }
-    await this.save();
-    if (!this.saveQueued) return;
-    this.saveQueued = false;
-    await this.requestSave();
-  }
-  async save() {
-    const plan = this.plan();
-    const valid = plan.filter((item) => item.judge !== void 0);
-    if (plan.length === 0 || this.saving || valid.length !== plan.length) return;
-    const pending = /* @__PURE__ */ new Map();
-    for (const item of plan) pending.set(item.field, this.staged.get(item.field));
-    this.saving = true;
-    this.failed = false;
-    this.failedReason = void 0;
-    this.publish();
-    const ops = valid.map((item) => item.op.op === "set" ? { op: "set", path: [item.field], value: item.op.value } : { op: "unset", path: [item.field] });
-    let failedReason;
-    let accepted = false;
-    try {
-      accepted = await this.scope.mutate(ops);
-    } catch (error) {
-      failedReason = error instanceof Error ? error.message : String(error);
-    }
-    const landed = accepted && failedReason === void 0 && valid.every((item) => item.judge());
-    for (const [field, before] of pending) {
-      if (landed && this.staged.get(field) === before) this.staged.delete(field);
-    }
-    this.saving = false;
-    this.failed = !landed;
-    this.failedReason = failedReason;
-    this.publish();
-  }
-  /**
-   * Every staged edit a save would write. An entry whose draft is not a value
-   * its field accepts carries no write: the form is still dirty, and the save
-   * refuses rather than dropping the edit. A staged edit that matches the
-   * effective section is not a write at all.
-   * @returns the planned writes, in the order the fields were staged.
-   */
-  plan() {
-    const plan = [];
-    for (const [field, staged] of this.staged) {
-      const spec = this.specOf(field);
-      if (staged.clear) {
-        if (this.stored(field)) plan.push({ field, op: { field, op: "unset" }, judge: () => this.landedUnset(field) });
-        continue;
-      }
-      if (staged.text === spec.format(this.sectionValue(field))) continue;
-      const write = spec.parse(staged.text);
-      if (write === void 0) plan.push({ field, op: { field, op: "unset" }, judge: void 0 });
-      else if (write.kind === "clear") plan.push({ field, op: { field, op: "unset" }, judge: () => this.landedUnset(field) });
-      else plan.push({ field, op: { field, op: "set", value: write.value }, judge: () => this.landedSet(field, write.value) });
-    }
-    return plan;
-  }
-  /**
-   * Read-back judgment for a planned set: the user layer must hold the
-   * intended value once the mutation has settled.
-   */
-  landedSet(field, value) {
-    if (this.specOf(field).secret) return true;
-    return this.userLayer()?.[field] === value;
-  }
-  /**
-   * Read-back judgment for a planned unset: the field must be gone from the
-   * user layer once the mutation has settled.
-   */
-  landedUnset(field) {
-    return !this.stored(field);
-  }
-  stage(field, edit) {
-    this.staged.set(field, edit);
-    this.failed = false;
-    this.failedReason = void 0;
-    this.publish();
-  }
-  specOf(field) {
-    const spec = this.specs.get(field);
-    if (spec === void 0) throw new Error(`settings card has no field ${field}`);
-    return spec;
-  }
-  snapshotOf() {
-    return this.scope.getSnapshot();
-  }
-  sectionValue(field) {
-    return this.snapshotOf().value?.[field];
-  }
-  baseValue(field) {
-    return this.snapshotOf().base?.[field];
-  }
-  userLayer() {
-    return this.snapshotOf().user;
-  }
-  stored(field) {
-    const user = this.userLayer();
-    return user !== void 0 && Object.hasOwn(user, field);
-  }
-  publish() {
-    for (const listener of this.listeners) listener();
-  }
-};
-
-// packages/dsh-remote-web/src/client/settings/controls.module.css
-var css3 = "/* Card-local controls: a switch, a radio group, and the section frame they sit in. */\n\n.section_38a6f6 + .section_38a6f6 {\n  border-top: 1px solid var(--dsw-alias-border-l2);\n  margin-top: 4px;\n}\n\n.sectionTitle_38a6f6 {\n  margin: 16px 0 0;\n  font-size: 12px;\n  font-weight: 600;\n  letter-spacing: 0.02em;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.field_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 12px 0;\n}\n\n.head_38a6f6 {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.label_38a6f6 {\n  font-size: 13px;\n  font-weight: 500;\n  color: var(--dsw-alias-label-primary);\n}\n\n.badges_38a6f6 {\n  margin-left: auto;\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n\n.badge_38a6f6 {\n  padding: 1px 6px;\n  border-radius: 6px;\n  background: var(--dsw-alias-bg-layer-3);\n  color: var(--dsw-alias-label-secondary);\n  font-size: 11px;\n}\n\n.reset_38a6f6 {\n  padding: 0;\n  border: none;\n  background: none;\n  color: var(--dsw-alias-brand-primary);\n  font-size: 12px;\n  cursor: pointer;\n}\n\n.reset_38a6f6:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n\n.hint_38a6f6 {\n  margin: 0;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 12px;\n  line-height: 18px;\n}\n\n.switchRow_38a6f6 {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n.state_38a6f6 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.switch_38a6f6 {\n  position: relative;\n  width: 38px;\n  height: 22px;\n  padding: 0;\n  border: 1px solid var(--dsw-alias-border-l2);\n  border-radius: 11px;\n  background: var(--dsw-alias-bg-layer-3);\n  cursor: pointer;\n  transition: background 150ms ease;\n}\n\n.switch_38a6f6:disabled {\n  opacity: 0.5;\n  cursor: default;\n}\n\n.switchOn_38a6f6 {\n  border-color: transparent;\n  background: var(--dsw-alias-brand-primary);\n}\n\n.knob_38a6f6 {\n  position: absolute;\n  top: 2px;\n  left: 2px;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  background: var(--dsw-alias-bg-layer-1);\n  transition: transform 150ms ease;\n}\n\n.knobOn_38a6f6 {\n  transform: translateX(16px);\n}\n\n.radios_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n\n.radio_38a6f6 {\n  display: flex;\n  align-items: flex-start;\n  gap: 8px;\n  cursor: pointer;\n}\n\n.radio_38a6f6 input {\n  margin: 2px 0 0;\n  accent-color: var(--dsw-alias-brand-primary);\n}\n\n.radioText_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n\n.radioLabel_38a6f6 {\n  font-size: 13px;\n  color: var(--dsw-alias-label-primary);\n}\n\n.radioDetail_38a6f6 {\n  font-size: 12px;\n  line-height: 17px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.subfield_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  padding-left: 22px;\n}\n\n.other_38a6f6 {\n  margin-top: 4px;\n  padding-top: 12px;\n  border-top: 1px solid var(--dsw-alias-border-l2);\n}\n\n.otherSummary_38a6f6 {\n  font-size: 12px;\n  font-weight: 600;\n  color: var(--dsw-alias-label-secondary);\n  cursor: pointer;\n}\n\n/* Live facts under the LAN decision (bind host, firewall, reachable URLs). */\n.status_38a6f6 {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 0 0 4px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n\n.statusLine_38a6f6 {\n  word-break: break-all;\n}\n";
-var id3 = "@catyugu/dsh-remote-web/controls.module.css";
-if (typeof document !== "undefined" && document.getElementById(id3) === null) {
-  const tag = document.createElement("style");
-  tag.id = id3;
-  tag.dataset.plugin = "@catyugu/dsh-remote-web";
-  tag.textContent = css3;
-  document.head.appendChild(tag);
-}
-var controls_default = { "section": "section_38a6f6", "sectionTitle": "sectionTitle_38a6f6", "field": "field_38a6f6", "head": "head_38a6f6", "label": "label_38a6f6", "badges": "badges_38a6f6", "badge": "badge_38a6f6", "reset": "reset_38a6f6", "hint": "hint_38a6f6", "switchRow": "switchRow_38a6f6", "state": "state_38a6f6", "switch": "switch_38a6f6", "switchOn": "switchOn_38a6f6", "knob": "knob_38a6f6", "knobOn": "knobOn_38a6f6", "radios": "radios_38a6f6", "radio": "radio_38a6f6", "radioText": "radioText_38a6f6", "radioLabel": "radioLabel_38a6f6", "radioDetail": "radioDetail_38a6f6", "subfield": "subfield_38a6f6", "other": "other_38a6f6", "otherSummary": "otherSummary_38a6f6", "status": "status_38a6f6", "statusLine": "statusLine_38a6f6" };
+var settings_default = { "card": "card_d8a5a3", "cardOpen": "cardOpen_d8a5a3", "header": "header_d8a5a3", "headText": "headText_d8a5a3", "name": "name_d8a5a3", "description": "description_d8a5a3", "pending": "pending_d8a5a3", "chevron": "chevron_d8a5a3", "chevronOpen": "chevronOpen_d8a5a3", "body": "body_d8a5a3", "readOnly": "readOnly_d8a5a3", "notExposed": "notExposed_d8a5a3", "footer": "footer_d8a5a3", "failed": "failed_d8a5a3", "discard": "discard_d8a5a3", "save": "save_d8a5a3", "section": "section_d8a5a3", "sectionTitle": "sectionTitle_d8a5a3", "field": "field_d8a5a3", "head": "head_d8a5a3", "label": "label_d8a5a3", "badges": "badges_d8a5a3", "badge": "badge_d8a5a3", "reset": "reset_d8a5a3", "input": "input_d8a5a3", "inputInvalid": "inputInvalid_d8a5a3", "hint": "hint_d8a5a3", "invalid": "invalid_d8a5a3", "switchRow": "switchRow_d8a5a3", "state": "state_d8a5a3", "switch": "switch_d8a5a3", "switchOn": "switchOn_d8a5a3", "knob": "knob_d8a5a3", "knobOn": "knobOn_d8a5a3", "radios": "radios_d8a5a3", "radio": "radio_d8a5a3", "radioText": "radioText_d8a5a3", "radioLabel": "radioLabel_d8a5a3", "radioDetail": "radioDetail_d8a5a3", "subfield": "subfield_d8a5a3", "other": "other_d8a5a3", "otherSummary": "otherSummary_d8a5a3", "status": "status_d8a5a3", "statusLine": "statusLine_d8a5a3" };
 
 // packages/dsh-remote-web/src/client/settings/controls.tsx
-var import_jsx_runtime3 = require("react/jsx-runtime");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 function FieldShell(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.field, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.head, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("label", { className: controls_default.label, htmlFor: props.htmlFor ?? props.id, children: props.label }),
-      props.overridden ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: controls_default.badges, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.badge, children: props.overriddenLabel }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: controls_default.reset, disabled: props.disabled, onClick: props.onReset, children: props.resetLabel })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_default.field, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_default.head, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("label", { className: settings_default.label, htmlFor: props.id, children: props.label }),
+      props.overridden ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_default.badges, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_default.badge, children: props.overriddenLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: settings_default.reset, disabled: props.disabled, onClick: props.onReset, children: props.resetLabel })
       ] }) : null
     ] }),
     props.children,
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: controls_default.hint, children: props.hint })
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: settings_default.hint, children: props.hint })
   ] });
 }
 function SwitchField(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: controls_default.switchRow, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.state, children: props.on ? props.onLabel : props.offLabel }),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: settings_default.switchRow, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_default.state, children: props.on ? props.onLabel : props.offLabel }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "button",
       {
         type: "button",
@@ -1972,19 +1543,19 @@ function SwitchField(props) {
         role: "switch",
         "aria-checked": props.on,
         "aria-label": props.label,
-        className: props.on ? `${controls_default.switch} ${controls_default.switchOn}` : controls_default.switch,
+        className: props.on ? `${settings_default.switch} ${settings_default.switchOn}` : settings_default.switch,
         disabled: props.disabled,
         onClick: () => {
           props.onChange(!props.on);
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: props.on ? `${controls_default.knob} ${controls_default.knobOn}` : controls_default.knob })
+        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: props.on ? `${settings_default.knob} ${settings_default.knobOn}` : settings_default.knob })
       }
     )
   ] }) });
 }
 function RadioField(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: controls_default.radios, role: "radiogroup", "aria-labelledby": `${props.id}-label`, children: props.options.map((option) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: controls_default.radio, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(FieldShell, { ...props, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: settings_default.radios, role: "radiogroup", "aria-labelledby": `${props.id}-label`, children: props.options.map((option) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: settings_default.radio, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       "input",
       {
         type: "radio",
@@ -1997,11 +1568,29 @@ function RadioField(props) {
         }
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: controls_default.radioText, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.radioLabel, children: option.label }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: controls_default.radioDetail, children: option.detail })
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: settings_default.radioText, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_default.radioLabel, children: option.label }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: settings_default.radioDetail, children: option.detail })
     ] })
   ] }, option.value)) }) });
+}
+function TextField(props) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(FieldShell, { ...props, hint: props.invalid ? props.invalidLabel : props.hint, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    "input",
+    {
+      id: props.id,
+      className: props.invalid ? settings_default.inputInvalid : settings_default.input,
+      type: "text",
+      ...props.numeric === true ? { inputMode: "numeric" } : {},
+      ...props.invalid ? { "aria-invalid": true } : {},
+      value: props.text,
+      placeholder: props.placeholder ?? "",
+      disabled: props.disabled,
+      onChange: (event) => {
+        props.onEdit(event.target.value);
+      }
+    }
+  ) });
 }
 
 // packages/dsh-remote-web/src/client/settings/tunnel-readiness.ts
@@ -2014,72 +1603,32 @@ function namedTunnelProblem(inputs) {
   return void 0;
 }
 
-// packages/dsh-remote-web/src/client/settings/RemoteSettingsCard.tsx
-var import_jsx_runtime4 = require("react/jsx-runtime");
-var TUNNEL_MODES = ["off", "quick", "named"];
+// packages/dsh-remote-web/src/client/settings/RemoteSettingsForm.tsx
+var import_jsx_runtime3 = require("react/jsx-runtime");
 function boolOf(text, fallback) {
   if (text === "true") return true;
   if (text === "false") return false;
   return fallback;
 }
-var RemoteSettingsCardController = class {
-  form;
-  store;
-  /** @param scope - the configuration form for the `remote-web-ui` entry. */
-  constructor(scope) {
-    this.form = new CardForm(scope, [
-      booleanField("enabled"),
-      choiceField("tunnel", TUNNEL_MODES),
-      textField("tunnelHost"),
-      secretField("tunnelToken"),
-      booleanField("lanBind"),
-      booleanField("requirePairingForLan"),
-      numberField("tokenTtlMs", { integer: true, min: 6e4 })
-    ]);
-    this.store = this.form.bind(() => this.projection());
-  }
-  projection() {
-    return {
-      ...this.form.shell(),
-      enabled: this.form.field("enabled"),
-      tunnel: this.form.field("tunnel"),
-      tunnelHost: this.form.field("tunnelHost"),
-      tunnelToken: this.form.field("tunnelToken"),
-      lanBind: this.form.field("lanBind"),
-      requirePairingForLan: this.form.field("requirePairingForLan"),
-      tokenTtlMs: this.form.field("tokenTtlMs")
-    };
-  }
-  /**
-   * Build the face the card's slot registration injects.
-   * @returns the card's snapshot and its form actions.
-   */
-  inject() {
-    return { hooks: { remoteSettingsCard: this.store }, ...this.form.actions() };
-  }
-  /**
-   * Release the card's form subscription and bound stores; the slot
-   * disposer calls this on teardown.
-   */
-  dispose() {
-    this.form.dispose();
-  }
-};
-function RemoteSettingsCard(props) {
-  const { t } = props;
-  const state = props.useRemoteSettingsCard((snapshot) => snapshot);
+function RemoteSettingsForm({ model, t }) {
+  const subscribe = (0, import_react3.useCallback)((listener) => model.subscribe(listener), [model]);
+  const read = (0, import_react3.useCallback)(() => model.getState(), [model]);
+  const state = (0, import_react3.useSyncExternalStore)(subscribe, read, read);
+  const [open, setOpen] = (0, import_react3.useState)(false);
+  if (!state.available) return null;
+  const expanded = open;
   const disabled = !state.writable;
+  const blocked = !state.dirty || state.invalid || state.saving;
   const fieldProps = {
     overriddenLabel: t("settings.overridden"),
     resetLabel: t("settings.reset"),
-    invalidLabel: t("settings.invalidNumber"),
     disabled
   };
-  const enabledOn = boolOf(state.enabled.text, true);
-  const tunnelValue = state.tunnel.text === "" ? "off" : state.tunnel.text;
-  const lanValue = state.lanBind.text === "" ? "follow" : state.lanBind.text === "true" ? "on" : "off";
-  const [tokenStored, setTokenStored] = (0, import_react4.useState)(false);
-  (0, import_react4.useEffect)(() => {
+  const enabledOn = boolOf(state.fields.enabled.text, true);
+  const tunnelValue = state.fields.tunnel.text === "" ? "off" : state.fields.tunnel.text;
+  const lanValue = state.fields.lanBind.text === "" ? "follow" : state.fields.lanBind.text === "true" ? "on" : "off";
+  const [tokenStored, setTokenStored] = (0, import_react3.useState)(false);
+  (0, import_react3.useEffect)(() => {
     let alive = true;
     void readPairFacts().then((facts) => {
       if (alive) setTokenStored(facts.tunnelTokenStored);
@@ -2091,8 +1640,8 @@ function RemoteSettingsCard(props) {
   }, [state.dirty, state.saving]);
   const namedProblemKey = namedTunnelProblem({
     tunnel: tunnelValue,
-    host: state.tunnelHost.text,
-    tokenDraft: state.tunnelToken.text,
+    host: state.fields.tunnelHost.text,
+    tokenDraft: state.fields.tunnelToken.text,
     tokenStored
   });
   const tunnelOptions = [
@@ -2105,193 +1654,227 @@ function RemoteSettingsCard(props) {
     { value: "on", label: t("settings.lanOn"), detail: t("settings.lanOnDetail") },
     { value: "off", label: t("settings.lanOff"), detail: t("settings.lanOffDetail") }
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
-    PluginSettingsCard,
-    {
-      t,
-      titleKey: "settings.title",
-      descriptionKey: "settings.description",
-      defaultOpen: false,
-      hideFooter: true,
-      state,
-      onSave: props.save,
-      onDiscard: props.discard,
-      children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionAccess") }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            SwitchField,
-            {
-              id: "settings-remote-enabled",
-              label: t("settings.enabled"),
-              hint: t("settings.enabledHint"),
-              on: enabledOn,
-              onLabel: t("settings.on"),
-              offLabel: t("settings.off"),
-              ...fieldProps,
-              ...state.enabled,
-              onChange: (on) => {
-                props.edit("enabled", on ? "true" : "false");
-              },
-              onReset: () => {
-                props.resetField("enabled");
-              }
-            }
-          )
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionPublic") }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            RadioField,
-            {
-              id: "settings-remote-tunnel",
-              label: t("settings.tunnel"),
-              hint: t("settings.tunnelHint"),
-              value: tunnelValue,
-              options: tunnelOptions,
-              ...fieldProps,
-              ...state.tunnel,
-              onChange: (value) => {
-                props.edit("tunnel", value);
-              },
-              onReset: () => {
-                props.resetField("tunnel");
-              }
-            }
-          ),
-          tunnelValue === "named" && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: controls_default.subfield, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-              ValueField,
-              {
-                id: "settings-remote-tunnel-host",
-                label: t("settings.tunnelHost"),
-                hint: t("settings.tunnelHostHint"),
-                placeholder: "https://dsh.example.com",
-                ...fieldProps,
-                ...state.tunnelHost,
-                onEdit: (text) => {
-                  props.edit("tunnelHost", text);
-                },
-                onReset: () => {
-                  props.resetField("tunnelHost");
-                }
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-              ValueField,
-              {
-                id: "settings-remote-tunnel-token",
-                label: t("settings.tunnelToken"),
-                hint: t("settings.tunnelTokenHint"),
-                placeholder: "eyJ...",
-                ...fieldProps,
-                ...state.tunnelToken,
-                onEdit: (text) => {
-                  props.edit("tunnelToken", text);
-                },
-                onReset: () => {
-                  props.resetField("tunnelToken");
-                }
-              }
-            )
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: expanded ? `${settings_default.card} ${settings_default.cardOpen}` : settings_default.card, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+      "button",
+      {
+        type: "button",
+        className: settings_default.header,
+        "aria-expanded": open,
+        "aria-label": `${t(open ? "settings.collapse" : "settings.expand")}: ${t("settings.title")}`,
+        onClick: () => {
+          setOpen(!open);
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: settings_default.headText, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: settings_default.name, title: t("settings.title"), children: t("settings.title") }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: settings_default.description, title: t("settings.description"), children: t("settings.description") })
           ] }),
-          namedProblemKey !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("p", { className: settings_card_default.failed, role: "status", children: t(namedProblemKey) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("section", { className: controls_default.section, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: controls_default.sectionTitle, children: t("settings.sectionLan") }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            RadioField,
+          state.dirty ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: settings_default.pending, title: t("settings.unsaved"), children: t("settings.unsaved") }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            "svg",
             {
-              id: "settings-remote-lan-bind",
-              label: t("settings.lanBind"),
-              hint: t("settings.lanBindHint"),
-              value: lanValue,
-              options: lanOptions,
-              ...fieldProps,
-              ...state.lanBind,
-              onChange: (value) => {
-                if (value === "follow") props.resetField("lanBind");
-                else props.edit("lanBind", value === "on" ? "true" : "false");
-              },
-              onReset: () => {
-                props.resetField("lanBind");
-              }
+              width: "14",
+              height: "14",
+              viewBox: "0 0 14 14",
+              fill: "none",
+              xmlns: "http://www.w3.org/2000/svg",
+              className: open ? `${settings_default.chevron} ${settings_default.chevronOpen}` : settings_default.chevron,
+              children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "path",
+                {
+                  d: "M11.8486 5.5L11.4238 5.92383L8.69727 8.65137C8.44157 8.90706 8.21562 9.13382 8.01172 9.29785C7.79912 9.46883 7.55595 9.61756 7.25 9.66602C7.08435 9.69222 6.91565 9.69222 6.75 9.66602C6.44405 9.61756 6.20088 9.46883 5.98828 9.29785C5.78438 9.13382 5.55843 8.90706 5.30273 8.65137L2.57617 5.92383L2.15137 5.5L3 4.65137L3.42383 5.07617L6.15137 7.80273C6.42595 8.07732 6.59876 8.24849 6.74023 8.3623C6.87291 8.46904 6.92272 8.47813 6.9375 8.48047C6.97895 8.48703 7.02105 8.48703 7.0625 8.48047C7.07728 8.47813 7.12709 8.46904 7.25977 8.3623C7.40124 8.24849 7.57405 8.07732 7.84863 7.80273L10.5762 5.07617L11 4.65137L11.8486 5.5Z",
+                  fill: "currentColor"
+                }
+              )
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(LanBindStatus, { t })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("details", { className: controls_default.other, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("summary", { className: controls_default.otherSummary, children: t("settings.sectionOther") }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            SwitchField,
-            {
-              id: "settings-remote-fence",
-              label: t("settings.requirePairingForLan"),
-              hint: t("settings.requirePairingForLanHint"),
-              on: boolOf(state.requirePairingForLan.text, true),
-              onLabel: t("settings.on"),
-              offLabel: t("settings.off"),
-              ...fieldProps,
-              ...state.requirePairingForLan,
-              onChange: (on) => {
-                props.edit("requirePairingForLan", on ? "true" : "false");
-              },
-              onReset: () => {
-                props.resetField("requirePairingForLan");
-              }
+          )
+        ]
+      }
+    ),
+    expanded ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: settings_default.body, children: !state.exposed ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: settings_default.notExposed, role: "status", children: t("settings.notExposed") }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+      !state.writable ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: settings_default.readOnly, role: "status", children: t("settings.readOnly") }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: settings_default.section, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: settings_default.sectionTitle, children: t("settings.sectionAccess") }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          SwitchField,
+          {
+            id: "settings-remote-enabled",
+            label: t("settings.enabled"),
+            hint: t("settings.enabledHint"),
+            on: enabledOn,
+            onLabel: t("settings.on"),
+            offLabel: t("settings.off"),
+            ...fieldProps,
+            ...state.fields.enabled,
+            onChange: (on) => {
+              model.edit("enabled", on ? "true" : "false");
+            },
+            onReset: () => {
+              model.reset("enabled");
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            ValueField,
+          }
+        )
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: settings_default.section, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: settings_default.sectionTitle, children: t("settings.sectionPublic") }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          RadioField,
+          {
+            id: "settings-remote-tunnel",
+            label: t("settings.tunnel"),
+            hint: t("settings.tunnelHint"),
+            value: tunnelValue,
+            options: tunnelOptions,
+            ...fieldProps,
+            ...state.fields.tunnel,
+            onChange: (value) => {
+              model.edit("tunnel", value);
+            },
+            onReset: () => {
+              model.reset("tunnel");
+            }
+          }
+        ),
+        tunnelValue === "named" && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: settings_default.subfield, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            TextField,
             {
-              id: "settings-remote-token-ttl",
-              label: t("settings.tokenTtlMs"),
-              hint: t("settings.tokenTtlMsHint"),
-              numeric: true,
+              id: "settings-remote-tunnel-host",
+              label: t("settings.tunnelHost"),
+              hint: t("settings.tunnelHostHint"),
+              placeholder: "https://dsh.example.com",
+              invalidLabel: t("settings.tunnelHostInvalid"),
               ...fieldProps,
-              ...state.tokenTtlMs,
+              ...state.fields.tunnelHost,
               onEdit: (text) => {
-                props.edit("tokenTtlMs", text);
+                model.edit("tunnelHost", text);
               },
               onReset: () => {
-                props.resetField("tokenTtlMs");
+                model.reset("tunnelHost");
+              }
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            TextField,
+            {
+              id: "settings-remote-tunnel-token",
+              label: t("settings.tunnelToken"),
+              hint: t("settings.tunnelTokenHint"),
+              placeholder: "eyJ...",
+              invalidLabel: t("settings.tunnelTokenHint"),
+              ...fieldProps,
+              ...state.fields.tunnelToken,
+              onEdit: (text) => {
+                model.edit("tunnelToken", text);
+              },
+              onReset: () => {
+                model.reset("tunnelToken");
               }
             }
           )
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: settings_card_default.footer, children: [
-          state.failed ? /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("p", { className: settings_card_default.failed, role: "status", children: [
-            t("settings.saveFailed"),
-            state.failedReason ? " - " + state.failedReason : ""
-          ] }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            "button",
-            {
-              type: "button",
-              className: settings_card_default.discard,
-              disabled: !state.dirty || state.saving,
-              onClick: props.discard,
-              children: t("settings.discard")
+        namedProblemKey !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: settings_default.failed, role: "status", children: t(namedProblemKey) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: settings_default.section, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: settings_default.sectionTitle, children: t("settings.sectionLan") }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          RadioField,
+          {
+            id: "settings-remote-lan-bind",
+            label: t("settings.lanBind"),
+            hint: t("settings.lanBindHint"),
+            value: lanValue,
+            options: lanOptions,
+            ...fieldProps,
+            ...state.fields.lanBind,
+            onChange: (value) => {
+              if (value === "follow") model.reset("lanBind");
+              else model.edit("lanBind", value === "on" ? "true" : "false");
+            },
+            onReset: () => {
+              model.reset("lanBind");
             }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
-            "button",
-            {
-              type: "button",
-              className: settings_card_default.save,
-              disabled: !state.dirty || state.invalid || state.saving || namedProblemKey !== void 0,
-              onClick: props.save,
-              children: t(state.saving ? "settings.saving" : "settings.save")
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(LanBindStatus, { t })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("details", { className: settings_default.other, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("summary", { className: settings_default.otherSummary, children: t("settings.sectionOther") }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          SwitchField,
+          {
+            id: "settings-remote-fence",
+            label: t("settings.requirePairingForLan"),
+            hint: t("settings.requirePairingForLanHint"),
+            on: boolOf(state.fields.requirePairingForLan.text, true),
+            onLabel: t("settings.on"),
+            offLabel: t("settings.off"),
+            ...fieldProps,
+            ...state.fields.requirePairingForLan,
+            onChange: (on) => {
+              model.edit("requirePairingForLan", on ? "true" : "false");
+            },
+            onReset: () => {
+              model.reset("requirePairingForLan");
             }
-          )
-        ] })
-      ]
-    }
-  );
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          TextField,
+          {
+            id: "settings-remote-token-ttl",
+            label: t("settings.tokenTtlMs"),
+            hint: t("settings.tokenTtlMsHint"),
+            invalidLabel: t("settings.invalidNumber"),
+            numeric: true,
+            ...fieldProps,
+            ...state.fields.tokenTtlMs,
+            onEdit: (text) => {
+              model.edit("tokenTtlMs", text);
+            },
+            onReset: () => {
+              model.reset("tokenTtlMs");
+            }
+          }
+        )
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: settings_default.footer, children: [
+        state.failed ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("p", { className: settings_default.failed, role: "status", children: [
+          t("settings.saveFailed"),
+          state.failedReason ? " - " + state.failedReason : ""
+        ] }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "button",
+          {
+            type: "button",
+            className: settings_default.discard,
+            disabled: !state.dirty || state.saving,
+            onClick: () => {
+              model.discard();
+            },
+            children: t("settings.discard")
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "button",
+          {
+            type: "button",
+            className: settings_default.save,
+            disabled: blocked || namedProblemKey !== void 0,
+            onClick: () => {
+              void model.save();
+            },
+            children: t(state.saving ? "settings.saving" : "settings.save")
+          }
+        )
+      ] })
+    ] }) }) : null
+  ] });
 }
 function LanBindStatus({ t }) {
-  const [frame, setFrame] = (0, import_react4.useState)(void 0);
-  (0, import_react4.useEffect)(() => {
+  const [frame, setFrame] = (0, import_react3.useState)(void 0);
+  (0, import_react3.useEffect)(() => {
     let alive = true;
     const read = () => {
       void readLanBindStatus().then((value) => {
@@ -2325,22 +1908,22 @@ function LanBindStatus({ t }) {
   if (frame.pendingRestart === true) {
     lines.push(t("lan.pendingRestart"));
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: controls_default.status, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: controls_default.statusLine, children: line }, index)) });
+  return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: settings_default.status, children: lines.map((line, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: settings_default.statusLine, children: line }, index)) });
 }
 
 // packages/dsh-remote-web/src/client/settings/settings-face.ts
 var published;
-function publishSettingsFace(face) {
-  published = face;
+function publishSettingsModel(model) {
+  published = model;
 }
-function currentSettingsFace() {
+function currentSettingsModel() {
   return published;
 }
 
 // packages/dsh-remote-web/src/client/entry/PhoneIcon.tsx
-var import_jsx_runtime5 = require("react/jsx-runtime");
+var import_jsx_runtime4 = require("react/jsx-runtime");
 function PhoneIcon({ size = 16, className }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("svg", { width: size, height: size, className, viewBox: "0 0 16 16", fill: "none", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
     "path",
     {
       d: "M4.2 1.8h2.4l.9 2.4-1.5 1.1a7.4 7.4 0 0 0 4.7 4.7l1.1-1.5 2.4.9v2.4a.9.9 0 0 1-1 .9A11.4 11.4 0 0 1 3.3 2.8a.9.9 0 0 1 .9-1Z",
@@ -2352,7 +1935,7 @@ function PhoneIcon({ size = 16, className }) {
 }
 
 // packages/dsh-remote-web/src/client/entry/RemoteEntry.tsx
-var import_jsx_runtime6 = require("react/jsx-runtime");
+var import_jsx_runtime5 = require("react/jsx-runtime");
 function mergeFrame(state, frame) {
   if (state.kind === "lan-required") {
     return {
@@ -2373,21 +1956,21 @@ function mergeFrame(state, frame) {
   };
 }
 function RemoteEntry({ wide, t }) {
-  const [open, setOpen] = (0, import_react5.useState)(false);
-  const [state, setState] = (0, import_react5.useState)({ kind: "lan-required" });
-  const stateRef = (0, import_react5.useRef)(state);
-  (0, import_react5.useEffect)(() => {
+  const [open, setOpen] = (0, import_react4.useState)(false);
+  const [state, setState] = (0, import_react4.useState)({ kind: "lan-required" });
+  const stateRef = (0, import_react4.useRef)(state);
+  (0, import_react4.useEffect)(() => {
     stateRef.current = state;
   }, [state]);
-  const [copied, setCopied] = (0, import_react5.useState)(false);
-  const [copiedToken, setCopiedToken] = (0, import_react5.useState)(false);
-  const eventSource = (0, import_react5.useRef)(void 0);
-  const openSeq = (0, import_react5.useRef)(0);
-  const closeEventSource = (0, import_react5.useCallback)(() => {
+  const [copied, setCopied] = (0, import_react4.useState)(false);
+  const [copiedToken, setCopiedToken] = (0, import_react4.useState)(false);
+  const eventSource = (0, import_react4.useRef)(void 0);
+  const openSeq = (0, import_react4.useRef)(0);
+  const closeEventSource = (0, import_react4.useCallback)(() => {
     eventSource.current?.close();
     eventSource.current = void 0;
   }, []);
-  const mint = (0, import_react5.useCallback)(async (address) => {
+  const mint = (0, import_react4.useCallback)(async (address) => {
     let result;
     try {
       result = await issuePair(address);
@@ -2420,7 +2003,7 @@ function RemoteEntry({ wide, t }) {
       lanAddresses: result.lanAddresses
     };
   }, []);
-  const openPanel = (0, import_react5.useCallback)(async () => {
+  const openPanel = (0, import_react4.useCallback)(async () => {
     const seq = ++openSeq.current;
     setOpen(true);
     const next = await mint();
@@ -2443,12 +2026,12 @@ function RemoteEntry({ wide, t }) {
       }
     };
   }, [mint]);
-  const closePanel = (0, import_react5.useCallback)(() => {
+  const closePanel = (0, import_react4.useCallback)(() => {
     openSeq.current += 1;
     closeEventSource();
     setOpen(false);
   }, [closeEventSource]);
-  (0, import_react5.useEffect)(() => {
+  (0, import_react4.useEffect)(() => {
     if (state.kind !== "ready") return;
     if (state.expired) return;
     const delay = state.expiresAt - Date.now();
@@ -2463,29 +2046,29 @@ function RemoteEntry({ wide, t }) {
       window.clearTimeout(timer);
     };
   }, [state]);
-  (0, import_react5.useEffect)(() => closeEventSource, [closeEventSource]);
-  const handleStop = (0, import_react5.useCallback)(() => {
+  (0, import_react4.useEffect)(() => closeEventSource, [closeEventSource]);
+  const handleStop = (0, import_react4.useCallback)(() => {
     void stopPair().then(() => {
       setState((previous) => previous.kind === "ready" ? { ...previous, phase: "stopped", devices: [] } : previous);
     }).catch(() => {
     });
   }, []);
-  const handleRevoke = (0, import_react5.useCallback)((deviceId) => {
+  const handleRevoke = (0, import_react4.useCallback)((deviceId) => {
     void revokePair(deviceId).then(() => {
       setState((previous) => previous.kind === "ready" ? { ...previous, devices: previous.devices.filter((device) => device.id !== deviceId) } : previous);
     }).catch(() => {
     });
   }, []);
-  const handleRefresh = (0, import_react5.useCallback)(() => {
+  const handleRefresh = (0, import_react4.useCallback)(() => {
     void mint().then(setState);
   }, [mint]);
-  const handlePickAddress = (0, import_react5.useCallback)((address) => {
+  const handlePickAddress = (0, import_react4.useCallback)((address) => {
     void mint(address).then(setState);
   }, [mint]);
-  const handlePickPublic = (0, import_react5.useCallback)(() => {
+  const handlePickPublic = (0, import_react4.useCallback)(() => {
     void mint().then(setState);
   }, [mint]);
-  const handleCopy = (0, import_react5.useCallback)((url) => {
+  const handleCopy = (0, import_react4.useCallback)((url) => {
     void copyText(url).then((ok) => {
       if (!ok) return;
       setCopied(true);
@@ -2494,7 +2077,7 @@ function RemoteEntry({ wide, t }) {
       }, 1500);
     });
   }, []);
-  const handleCopyToken = (0, import_react5.useCallback)((token) => {
+  const handleCopyToken = (0, import_react4.useCallback)((token) => {
     void copyText(token).then((ok) => {
       if (!ok) return;
       setCopiedToken(true);
@@ -2503,12 +2086,12 @@ function RemoteEntry({ wide, t }) {
       }, 1500);
     });
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.entryRow, "data-rail": wide ? void 0 : "rail", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(TooltipAnchor, { wide, label: t("entry.label"), onClick: openPanel, expanded: open }) }),
-    open && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: remote_default.overlay, role: "presentation", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.mask, "aria-hidden": "true", onClick: closePanel }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: remote_default.stack, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.entryRow, "data-rail": wide ? void 0 : "rail", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(TooltipAnchor, { wide, label: t("entry.label"), onClick: openPanel, expanded: open }) }),
+    open && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: remote_default.overlay, role: "presentation", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.mask, "aria-hidden": "true", onClick: closePanel }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: remote_default.stack, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
           RemotePanel,
           {
             t,
@@ -2525,36 +2108,18 @@ function RemoteEntry({ wide, t }) {
             onRevoke: handleRevoke
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(SettingsSection, { t })
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(SettingsSection, { t })
       ] })
     ] }), document.body)
   ] });
 }
-function bindSelectorHook(store) {
-  return function useBoundSelector(selector) {
-    const snapshot = (0, import_react5.useSyncExternalStore)(
-      (onChange) => store.subscribe(onChange),
-      () => store.getSnapshot(),
-      () => store.getSnapshot()
-    );
-    return selector(snapshot);
-  };
-}
 function SettingsSection({ t }) {
-  const face = currentSettingsFace();
-  if (face === void 0) return null;
-  const { hooks = {}, ...actions } = face;
-  const hookProps = Object.fromEntries(
-    Object.entries(hooks).map(([key, store]) => [
-      `use${key.slice(0, 1).toUpperCase()}${key.slice(1)}`,
-      bindSelectorHook(store)
-    ])
-  );
-  const cardProps = { ...actions, ...hookProps, t };
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: remote_default.settingsSection, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(RemoteSettingsCard, { ...cardProps }) });
+  const model = currentSettingsModel();
+  if (model === void 0) return null;
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: remote_default.settingsSection, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(RemoteSettingsForm, { model, t }) });
 }
 function TooltipAnchor({ wide, label, onClick, expanded }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
     "button",
     {
       type: "button",
@@ -2564,15 +2129,15 @@ function TooltipAnchor({ wide, label, onClick, expanded }) {
       "aria-expanded": expanded,
       title: label,
       onClick,
-      children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(PhoneIcon, { size: wide ? 16 : 18 })
+      children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PhoneIcon, { size: wide ? 16 : 18 })
     }
   );
 }
 
 // packages/dsh-remote-web/src/client/entry/FooterRemoteEntry.tsx
-var import_jsx_runtime7 = require("react/jsx-runtime");
+var import_jsx_runtime6 = require("react/jsx-runtime");
 function FooterRemoteEntry(props) {
-  return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
     RemoteEntry,
     {
       wide: props.wide,
@@ -2582,11 +2147,11 @@ function FooterRemoteEntry(props) {
 }
 
 // packages/dsh-remote-web/src/client/panel/PairFailedNotice.tsx
-var import_react6 = require("react");
-var import_jsx_runtime8 = require("react/jsx-runtime");
+var import_react5 = require("react");
+var import_jsx_runtime7 = require("react/jsx-runtime");
 function PairFailedNotice({ t }) {
-  const [visible, setVisible] = (0, import_react6.useState)(true);
-  (0, import_react6.useEffect)(() => {
+  const [visible, setVisible] = (0, import_react5.useState)(true);
+  (0, import_react5.useEffect)(() => {
     const timer = window.setTimeout(() => {
       setVisible(false);
     }, 8e3);
@@ -2595,10 +2160,255 @@ function PairFailedNotice({ t }) {
     };
   }, []);
   if (!visible) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: remote_default.notice, role: "alert", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.noticeTitle, children: t("pair.failed.title") }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.noticeDetail, children: t("pair.failed.detail") })
+  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: remote_default.notice, role: "alert", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: remote_default.noticeTitle, children: t("pair.failed.title") }),
+    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: remote_default.noticeDetail, children: t("pair.failed.detail") })
   ] });
+}
+
+// packages/dsh-remote-web/src/client/settings/remote-settings.ts
+var TUNNEL_MODES = ["off", "quick", "named"];
+function parseInteger(text, min) {
+  const trimmed = text.trim();
+  if (trimmed === "") return { kind: "clear" };
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= min ? { kind: "set", value: parsed } : void 0;
+}
+function formatBoolean(value) {
+  return typeof value === "boolean" ? String(value) : "";
+}
+function parseBoolean(text) {
+  const trimmed = text.trim();
+  if (trimmed === "") return { kind: "clear" };
+  if (trimmed === "true") return { kind: "set", value: true };
+  if (trimmed === "false") return { kind: "set", value: false };
+  return void 0;
+}
+function formatText(value) {
+  return typeof value === "string" ? value : "";
+}
+function parseText(text) {
+  const trimmed = text.trim();
+  return trimmed === "" ? { kind: "clear" } : { kind: "set", value: trimmed };
+}
+var MIN_TOKEN_TTL_MS = 6e4;
+var FIELD_RULES = {
+  enabled: { format: formatBoolean, parse: parseBoolean },
+  tunnel: {
+    format: (value) => typeof value === "string" && TUNNEL_MODES.includes(value) ? value : "",
+    parse: (text) => {
+      if (text === "") return { kind: "clear" };
+      return TUNNEL_MODES.includes(text) ? { kind: "set", value: text } : void 0;
+    }
+  },
+  tunnelHost: { format: formatText, parse: parseText },
+  tunnelToken: { format: formatText, parse: parseText, secret: true },
+  lanBind: { format: formatBoolean, parse: parseBoolean },
+  requirePairingForLan: { format: formatBoolean, parse: parseBoolean },
+  tokenTtlMs: {
+    format: (value) => typeof value === "number" ? String(value) : "",
+    parse: (text) => parseInteger(text, MIN_TOKEN_TTL_MS)
+  }
+};
+var REMOTE_FIELDS = [
+  "enabled",
+  "tunnel",
+  "tunnelHost",
+  "tunnelToken",
+  "lanBind",
+  "requirePairingForLan",
+  "tokenTtlMs"
+];
+var RemoteSettingsModel = class {
+  form;
+  staged = /* @__PURE__ */ new Map();
+  listeners = /* @__PURE__ */ new Set();
+  disposeForm;
+  disposed = false;
+  saving = false;
+  saveQueued = false;
+  failed = false;
+  failedReason;
+  /** @param form - the configuration form for the `remote-web-ui` row. */
+  constructor(form) {
+    this.form = form;
+    this.disposeForm = form.subscribe(() => {
+      this.publish();
+    });
+  }
+  /** Release the form subscription and every listener; later calls are no-ops. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.disposeForm();
+    this.listeners.clear();
+  }
+  /**
+   * Subscribe to state changes.
+   * @param listener - called after every change.
+   * @returns the unsubscribe function.
+   */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+  /** The current projection (a fresh object per call). */
+  getState() {
+    const snapshot = this.form.getSnapshot();
+    const plan = this.plan();
+    const fields = {};
+    for (const field of REMOTE_FIELDS) fields[field] = this.fieldState(field);
+    return {
+      available: snapshot.status !== "loading",
+      exposed: snapshot.status === "ready",
+      writable: snapshot.writable,
+      dirty: plan.length > 0,
+      invalid: plan.some((item) => item.judge === void 0),
+      saving: this.saving,
+      failed: this.failed,
+      ...this.failedReason === void 0 ? {} : { failedReason: this.failedReason },
+      fields
+    };
+  }
+  /**
+   * Stage one draft.
+   * @param field - the field to edit.
+   * @param text - the draft text.
+   */
+  edit(field, text) {
+    this.stage(field, { text, clear: false });
+  }
+  /**
+   * Stage a clear, so saving lets the field re-inherit the layer below.
+   * @param field - the field to reset.
+   */
+  reset(field) {
+    this.stage(field, { text: FIELD_RULES[field].format(this.baseValue(field)), clear: true });
+  }
+  /** Drop every staged edit and the failure state. */
+  discard() {
+    if (this.staged.size === 0 && !this.failed) return;
+    this.staged.clear();
+    this.failed = false;
+    this.failedReason = void 0;
+    this.publish();
+  }
+  /**
+   * Write every staged edit, then re-seed from what the Host settled on.
+   *
+   * The whole batch rides one mutate, so the Host applies every write or
+   * refuses the batch. The settled snapshot is then read back per write: a
+   * redacted secret cannot be compared (the Host strips it from every view),
+   * so a staged secret is judged by the mutation settling alone.
+   */
+  async save() {
+    if (this.saving) {
+      this.saveQueued = true;
+      return;
+    }
+    await this.runSave();
+    if (!this.saveQueued) return;
+    this.saveQueued = false;
+    await this.save();
+  }
+  async runSave() {
+    const plan = this.plan();
+    const valid = plan.filter((item) => item.judge !== void 0);
+    if (plan.length === 0 || this.saving || valid.length !== plan.length) return;
+    const pending = /* @__PURE__ */ new Map();
+    for (const item of plan) pending.set(item.field, this.staged.get(item.field));
+    this.saving = true;
+    this.failed = false;
+    this.failedReason = void 0;
+    this.publish();
+    let accepted = false;
+    let failedReason;
+    try {
+      accepted = await this.form.mutate(valid.map((item) => toFormOp(item)));
+    } catch (error) {
+      failedReason = error instanceof Error ? error.message : String(error);
+    }
+    const landed = accepted && failedReason === void 0 && valid.every((item) => item.judge());
+    for (const [field, before] of pending) {
+      if (landed && this.staged.get(field) === before) this.staged.delete(field);
+    }
+    this.saving = false;
+    this.failed = !landed;
+    this.failedReason = failedReason;
+    this.publish();
+  }
+  /** One field's state: the effective section value, or the staged draft over it. */
+  fieldState(field) {
+    const rule = FIELD_RULES[field];
+    const staged = this.staged.get(field);
+    if (staged === void 0) {
+      return { text: rule.format(this.sectionValue(field)), overridden: this.stored(field), invalid: false };
+    }
+    const write = staged.clear ? { kind: "clear" } : rule.parse(staged.text);
+    return { text: staged.text, overridden: write?.kind === "set", invalid: write === void 0 };
+  }
+  /**
+   * Every staged edit a save would write. A draft that matches the effective
+   * section is not a write at all; a draft the field refuses is still part of
+   * the plan (with no judgment) so the save refuses instead of dropping it.
+   * @returns the planned writes, in staging order.
+   */
+  plan() {
+    const plan = [];
+    for (const [field, staged] of this.staged) {
+      const rule = FIELD_RULES[field];
+      if (staged.clear) {
+        if (this.stored(field)) plan.push({ field, op: { op: "unset" }, judge: () => !this.stored(field) });
+        continue;
+      }
+      if (staged.text === rule.format(this.sectionValue(field))) continue;
+      const write = rule.parse(staged.text);
+      if (write === void 0) plan.push({ field, op: { op: "unset" }, judge: void 0 });
+      else if (write.kind === "clear") plan.push({ field, op: { op: "unset" }, judge: () => !this.stored(field) });
+      else plan.push({ field, op: { op: "set", value: write.value }, judge: () => this.landedSet(field, write.value) });
+    }
+    return plan;
+  }
+  /** Whether the settled user layer holds the value a staged set wrote. */
+  landedSet(field, value) {
+    if (FIELD_RULES[field].secret === true) return true;
+    return this.userLayer()?.[field] === value;
+  }
+  stage(field, edit) {
+    this.staged.set(field, edit);
+    this.failed = false;
+    this.failedReason = void 0;
+    this.publish();
+  }
+  snapshotOf() {
+    return this.form.getSnapshot();
+  }
+  sectionValue(field) {
+    return this.snapshotOf().value?.[field];
+  }
+  baseValue(field) {
+    return this.snapshotOf().base?.[field];
+  }
+  userLayer() {
+    return this.snapshotOf().user;
+  }
+  stored(field) {
+    const user = this.userLayer();
+    return user !== void 0 && Object.hasOwn(user, field);
+  }
+  publish() {
+    for (const listener of [...this.listeners]) listener();
+  }
+};
+function toFormOp(item) {
+  if (item.op.op === "unset") return { op: "unset", path: [item.field] };
+  const value = item.op.value;
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+    throw new Error(`settings field ${item.field} has no scalar value to write`);
+  }
+  return { op: "set", path: [item.field], value };
 }
 
 // packages/dsh-remote-web/src/client/locales.ts
@@ -3192,8 +3002,8 @@ function channelTransition(active, installed) {
 }
 
 // packages/dsh-remote-web/src/client/panel/FenceNotice.tsx
-var import_react7 = require("react");
-var import_jsx_runtime9 = require("react/jsx-runtime");
+var import_react6 = require("react");
+var import_jsx_runtime8 = require("react/jsx-runtime");
 function extractPairToken(input) {
   const trimmed = input.trim();
   if (trimmed === "") return void 0;
@@ -3206,9 +3016,9 @@ function extractPairToken(input) {
   return trimmed;
 }
 function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
-  const [tokenInput, setTokenInput] = (0, import_react7.useState)("");
-  const [submitting, setSubmitting] = (0, import_react7.useState)(false);
-  const [errorMsg, setErrorMsg] = (0, import_react7.useState)(void 0);
+  const [tokenInput, setTokenInput] = (0, import_react6.useState)("");
+  const [submitting, setSubmitting] = (0, import_react6.useState)(false);
+  const [errorMsg, setErrorMsg] = (0, import_react6.useState)(void 0);
   const handleSubmit = async (event) => {
     event.preventDefault();
     const token = extractPairToken(tokenInput);
@@ -3232,19 +3042,19 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
       setSubmitting(false);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: remote_default.fencePage, role: "dialog", "aria-modal": "true", "aria-labelledby": "remote-fence-title", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("main", { className: remote_default.fenceCard, "data-dsh-plugin": "remote-web-ui", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: remote_default.fenceMark, "aria-hidden": "true", children: "\xD7" }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceEyebrow, children: t("fence.unpaired.eyebrow") }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { id: "remote-fence-title", className: remote_default.fenceTitle, children: t("fence.unpaired.title") }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceDetail, children: t("fence.unpaired.hint") }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("ol", { className: remote_default.fenceSteps, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepDesktop") }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepLink") }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("li", { children: t("fence.unpaired.stepOpen") })
+  return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: remote_default.fencePage, role: "dialog", "aria-modal": "true", "aria-labelledby": "remote-fence-title", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("main", { className: remote_default.fenceCard, "data-dsh-plugin": "remote-web-ui", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: remote_default.fenceMark, "aria-hidden": "true", children: "\xD7" }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceEyebrow, children: t("fence.unpaired.eyebrow") }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { id: "remote-fence-title", className: remote_default.fenceTitle, children: t("fence.unpaired.title") }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceDetail, children: t("fence.unpaired.hint") }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("ol", { className: remote_default.fenceSteps, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepDesktop") }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepLink") }),
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("li", { children: t("fence.unpaired.stepOpen") })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("form", { className: remote_default.fenceForm, onSubmit: handleSubmit, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: remote_default.fenceInputRow, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("form", { className: remote_default.fenceForm, onSubmit: handleSubmit, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: remote_default.fenceInputRow, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "input",
           {
             type: "text",
@@ -3259,7 +3069,7 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
             "aria-label": t("fence.unpaired.tokenPlaceholder")
           }
         ),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
           "button",
           {
             className: remote_default.fencePairButton,
@@ -3269,10 +3079,10 @@ function FenceNotice({ t, onRetry, onAccept = acceptPair }) {
           }
         )
       ] }),
-      errorMsg !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceError, role: "alert", children: errorMsg })
+      errorMsg !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceError, role: "alert", children: errorMsg })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { className: remote_default.fenceRetry, type: "button", onClick: onRetry, children: t("fence.unpaired.retry") }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: remote_default.fenceFootnote, children: t("fence.unpaired.footnote") })
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { className: remote_default.fenceRetry, type: "button", onClick: onRetry, children: t("fence.unpaired.retry") }),
+    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: remote_default.fenceFootnote, children: t("fence.unpaired.footnote") })
   ] }) });
 }
 
@@ -4215,7 +4025,7 @@ function createServedEntryForm(options) {
       served = void 0;
     }
     if (served === void 0 || served.length === 0) return fallbackId;
-    return entryIds.find((id4) => served.includes(id4)) ?? namespaceId;
+    return entryIds.find((id3) => served.includes(id3)) ?? namespaceId;
   };
   const bind = () => {
     const target = resolve();
@@ -4236,24 +4046,36 @@ function createServedEntryForm(options) {
     });
     publish();
   };
+  let offDescribe;
   try {
-    forms.describe().subscribe(() => {
+    offDescribe = forms.describe().subscribe(() => {
       bind();
     });
   } catch {
   }
   bind();
   return {
-    getSnapshot: () => snapshot,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
+    form: {
+      getSnapshot: () => snapshot,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      set: (field, value) => bound?.set(field, value) ?? Promise.resolve(false),
+      unset: (field) => bound?.unset(field) ?? Promise.resolve(false),
+      mutate: (ops, expectedRevision) => bound?.mutate(ops, expectedRevision) ?? Promise.resolve(false)
     },
-    set: (field, value) => bound?.set(field, value) ?? Promise.resolve(false),
-    unset: (field) => bound?.unset(field) ?? Promise.resolve(false),
-    mutate: (ops, expectedRevision) => bound?.mutate(ops, expectedRevision) ?? Promise.resolve(false)
+    dispose() {
+      offDescribe?.();
+      offDescribe = void 0;
+      offBound?.();
+      offBound = void 0;
+      bound = void 0;
+      boundId = void 0;
+      listeners.clear();
+    }
   };
 }
 
@@ -4271,12 +4093,13 @@ function servedEntryId(forms) {
     served = void 0;
   }
   if (served === void 0 || served.length === 0) return AGGREGATE_ENTRY_ID;
-  return REMOTE_WEB_UI_ENTRY_IDS.find((id4) => served.includes(id4)) ?? REMOTE_WEB_UI_NS;
+  return REMOTE_WEB_UI_ENTRY_IDS.find((id3) => served.includes(id3)) ?? REMOTE_WEB_UI_NS;
 }
 function bindSettingsForm(ctx) {
   const family = ctx.get("webUiSettings");
   if (family !== void 0 && typeof family.bind === "function") {
-    return family.bind({ namespace: REMOTE_WEB_UI_NS });
+    return { form: family.bind({ namespace: REMOTE_WEB_UI_NS }), dispose: () => {
+    } };
   }
   return createServedEntryForm({
     forms: ctx.configForms,
@@ -4326,7 +4149,16 @@ function apply(ctx) {
   }
   const t = ctx.locale.bind(NS);
   if (adapt !== void 0) adapt.translate = t;
-  const settingsForm = bindSettingsForm(ctx);
+  const settings = bindSettingsForm(ctx);
+  const settingsForm = settings.form;
+  const subscriptions = [];
+  const track = (release) => {
+    subscriptions.push(release);
+  };
+  ctx.effect(() => () => {
+    for (const release of subscriptions.splice(0)) release();
+    settings.dispose();
+  }, "dsh-remote-web: settings subscriptions");
   const enabled = () => {
     const snapshot = settingsForm.getSnapshot();
     return snapshot.status === "ready" ? snapshot.value?.enabled ?? true : snapshot.status === "unavailable";
@@ -4335,7 +4167,7 @@ function apply(ctx) {
     ;
     window.__dshRemoteAdapt?.setEnabled?.(enabled());
   };
-  settingsForm.subscribe(syncAdaptEnabled);
+  track(settingsForm.subscribe(syncAdaptEnabled));
   syncAdaptEnabled();
   try {
     adapt?.flushCloseDetails?.();
@@ -4349,11 +4181,11 @@ function apply(ctx) {
       };
     }
   });
-  const remoteSettings = new RemoteSettingsCardController(settingsForm);
-  publishSettingsFace(remoteSettings.inject());
+  const settingsModel = new RemoteSettingsModel(settingsForm);
+  publishSettingsModel(settingsModel);
   ctx.effect(() => () => {
-    publishSettingsFace(void 0);
-    remoteSettings.dispose();
+    publishSettingsModel(void 0);
+    settingsModel.dispose();
   }, "dsh-remote-web: settings card");
   let disposeRuntime;
   const syncRuntime = () => {
@@ -4379,7 +4211,7 @@ function apply(ctx) {
       disposeRuntime = void 0;
     }
   };
-  settingsForm.subscribe(syncRuntime);
+  track(settingsForm.subscribe(syncRuntime));
   syncRuntime();
   let disposeChannel;
   let hostPairingPolicy;
@@ -4390,7 +4222,7 @@ function apply(ctx) {
     const node = document.createElement("div");
     document.body.appendChild(node);
     const root = (0, import_client.createRoot)(node);
-    root.render((0, import_react8.createElement)(FenceNotice, { t, onRetry: () => {
+    root.render((0, import_react7.createElement)(FenceNotice, { t, onRetry: () => {
       window.location.reload();
     } }));
     fenceNotice = { unmount: () => {
@@ -4445,7 +4277,7 @@ function apply(ctx) {
       bootSeat()?.restore();
     }
   };
-  settingsForm.subscribe(syncChannel);
+  track(settingsForm.subscribe(syncChannel));
   syncChannel();
   const pageOrigin = pageOriginFacts(window);
   if (!isLocalPage(pageOrigin.hostname, pageOrigin.protocol, pageOrigin.transportOwnsHost) && settingsForm.getSnapshot().status !== "ready") {
@@ -4468,7 +4300,7 @@ function apply(ctx) {
       const mount = document.createElement("div");
       document.body.appendChild(mount);
       const root = (0, import_client.createRoot)(mount);
-      root.render((0, import_react8.createElement)(PairFailedNotice, { t }));
+      root.render((0, import_react7.createElement)(PairFailedNotice, { t }));
       void root;
     }, 1500);
     return () => {

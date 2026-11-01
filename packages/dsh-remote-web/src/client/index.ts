@@ -24,7 +24,7 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client
 import { FooterRemoteEntry } from './entry/FooterRemoteEntry.tsx'
 import { RemoteEntry } from './entry/RemoteEntry.tsx'
 import { PairFailedNotice } from './panel/PairFailedNotice.tsx'
-import { RemoteSettingsCardController, type RemoteSettings } from './settings/RemoteSettingsCard.tsx'
+import { RemoteSettingsModel, type RemoteSettings } from './settings/remote-settings.ts'
 import { en, zh, type RemoteKey } from './locales.ts'
 import { PAIR_FAILED_MARKER, runPairBootFlow } from './deep-link.ts'
 import { readPairGatePolicy, sendHeartbeat, shouldStopHeartbeat } from './pair-api.ts'
@@ -39,8 +39,8 @@ import {
 import { isLocalPage } from '../http/remote-channel-rules.ts'
 import { FenceNotice } from './panel/FenceNotice.tsx'
 import { startMobileAdapt, type RemoteAdaptGlobal } from './mobile-adapt.ts'
-import { createServedEntryForm } from './settings/settings-entry-form.ts'
-import { publishSettingsFace } from './settings/settings-face.ts'
+import { createServedEntryForm, type ServedEntryForm } from './settings/settings-entry-form.ts'
+import { publishSettingsModel } from './settings/settings-face.ts'
 
 // Portrait-touch adaptation of the official UI: installed under the plugin
 // lifecycle (apply) so disabling the plugin in cordis patch (disabled: true)
@@ -50,7 +50,7 @@ export type { RemoteEntryProps } from './entry/RemoteEntry.tsx'
 export type { PanelState, RemotePanelProps } from './panel/RemotePanel.tsx'
 export type { PairFailedNoticeProps } from './panel/PairFailedNotice.tsx'
 export type { RemoteKey } from './locales.ts'
-export type { RemoteSettingsCardFace, RemoteSettingsCardState } from './settings/RemoteSettingsCard.tsx'
+export type { RemoteField, RemoteSettings, RemoteSettingsState } from './settings/remote-settings.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -162,12 +162,12 @@ export function servedEntryId(forms: ConfigForms): string {
  * on the entry id the describe mirror justifies and rebound as soon as the
  * mirror answers — see {@link createServedEntryForm}.
  * @param ctx - client context carrying the family binder and/or the shared forms service.
- * @returns the form the card stages and saves through.
+ * @returns the form and the subscription that keeps it bound.
  */
-export function bindSettingsForm(ctx: ClientContext): ConfigForm<RemoteSettings> {
+export function bindSettingsForm(ctx: ClientContext): ServedEntryForm<RemoteSettings> {
   const family = ctx.get('webUiSettings')
   if (family !== undefined && typeof family.bind === 'function') {
-    return family.bind<RemoteSettings>({ namespace: REMOTE_WEB_UI_NS })
+    return { form: family.bind<RemoteSettings>({ namespace: REMOTE_WEB_UI_NS }), dispose: () => {} }
   }
   return createServedEntryForm<RemoteSettings>({
     forms: ctx.configForms,
@@ -249,7 +249,17 @@ export function apply(ctx: ClientContext): void {
   // shared form (natively, or over its loopback bridge); without that group the
   // namespace IS the owning entry id, so the official service is addressed
   // directly.
-  const settingsForm: ConfigForm<RemoteSettings> = bindSettingsForm(ctx)
+  const settings = bindSettingsForm(ctx)
+  const settingsForm: ConfigForm<RemoteSettings> = settings.form
+  // Every subscription this apply installs is released with the fiber: a
+  // remount (a settings-driven row reload, a plugin-manager toggle) must not
+  // leave a listener bound to a disposed form.
+  const subscriptions: Array<() => void> = []
+  const track = (release: () => void): void => { subscriptions.push(release) }
+  ctx.effect(() => () => {
+    for (const release of subscriptions.splice(0)) release()
+    settings.dispose()
+  }, 'dsh-remote-web: settings subscriptions')
   // The row's master switch. It governs the touch adaptation and the
   // phone-side runtime below; the sidebar entry and the settings form stay
   // mounted regardless, because that is where the switch itself lives.
@@ -269,7 +279,7 @@ export function apply(ctx: ClientContext): void {
   const syncAdaptEnabled = (): void => {
     ;(window as unknown as { __dshRemoteAdapt?: RemoteAdaptGlobal }).__dshRemoteAdapt?.setEnabled?.(enabled())
   }
-  settingsForm.subscribe(syncAdaptEnabled)
+  track(settingsForm.subscribe(syncAdaptEnabled))
   syncAdaptEnabled()
   // The replay closes a details panel restored before the wiring; the
   // layout face throws while the root entry has not mounted yet (a real
@@ -294,15 +304,15 @@ export function apply(ctx: ClientContext): void {
     }
   })
 
-  // Settings: one staged form over the `remote-web-ui` settings namespace.
-  // This fork publishes it to the pairing popup (settings-face.ts) instead of
-  // registering a card into the plugin manager, so a user configures the row
-  // where they pair a device.
-  const remoteSettings = new RemoteSettingsCardController(settingsForm)
-  publishSettingsFace(remoteSettings.inject())
+  // Settings: one staged model over the `remote-web-ui` settings namespace.
+  // The pairing popup (settings-face.ts) renders it instead of the plugin
+  // manager contributing a card, so a user configures the row where they pair
+  // a device.
+  const settingsModel = new RemoteSettingsModel(settingsForm)
+  publishSettingsModel(settingsModel)
   ctx.effect(() => () => {
-    publishSettingsFace(undefined)
-    remoteSettings.dispose()
+    publishSettingsModel(undefined)
+    settingsModel.dispose()
   }, 'dsh-remote-web: settings card')
 
   // Phone-side boot flow + heartbeats. Loopback pages (the desktop) never
@@ -331,7 +341,7 @@ export function apply(ctx: ClientContext): void {
       disposeRuntime = undefined
     }
   }
-  settingsForm.subscribe(syncRuntime)
+  track(settingsForm.subscribe(syncRuntime))
   syncRuntime()
 
   // Remote desktop channel: on a non-loopback origin (LAN address or public
@@ -415,7 +425,7 @@ export function apply(ctx: ClientContext): void {
       bootSeat()?.restore()
     }
   }
-  settingsForm.subscribe(syncChannel)
+  track(settingsForm.subscribe(syncChannel))
   syncChannel()
   const pageOrigin = pageOriginFacts(window)
   if (!isLocalPage(pageOrigin.hostname, pageOrigin.protocol, pageOrigin.transportOwnsHost) && settingsForm.getSnapshot().status !== 'ready') {

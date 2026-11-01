@@ -1,13 +1,12 @@
-/* Settings card chrome + form fields.
- * Aligned with the official ui-settings-plugins PluginCard / fields CSS:
- * same semantic tokens, radius, typography and states so the card reads as a
- * sibling of the built-in Shell / Agent loop / Web search cards. */
+/* The remote-connection settings card: chrome, fields and the two controls the
+ * card needs beyond a text input. Aligned with the official ui-settings-plugins
+ * PluginCard / fields CSS (same semantic tokens, radius, typography and states)
+ * so the card reads as a sibling of the built-in settings cards. */
 
 .card {
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-3);
   border-radius: 12px;
-  list-style: none;
   transition: border-color 0.16s, background 0.16s;
 }
 
@@ -24,8 +23,8 @@
   appearance: none;
   width: 100%;
   /* The suite does not force a global border-box, so width:100% + padding
-     would stretch the row 32px past the card and push the trailing pending
-     badge (last flex item) outside the card border. */
+     would stretch the row past the card and push the trailing pending badge
+     outside the card border. */
   box-sizing: border-box;
   font: inherit;
   color: inherit;
@@ -45,41 +44,12 @@
   outline-offset: -2px;
 }
 
-.headerStatic {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 12px;
-  align-items: center;
-  gap: 13px;
-  padding: 16px;
-  display: flex;
-}
-
 .headText {
   flex-direction: column;
   flex: 1;
   gap: 4px;
   min-width: 0;
   display: flex;
-}
-
-/* Optional leading plugin mark: a quiet tile that takes the ink color on
-   hover and while the card is open, so the whole row reads as one control. */
-.mark {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-module-platform);
-  color: var(--dsw-alias-label-secondary);
-  transition: color 0.16s;
-}
-
-.header:hover .mark,
-.cardOpen .mark {
-  color: var(--dsw-alias-label-primary);
 }
 
 .name {
@@ -91,8 +61,7 @@
 
 .description {
   /* Secondary, not tertiary: skins whose tertiary token is tuned for large
-     print leave 12-13px hint text below readable contrast (orca-link #778399
-     on cream measures ~3.4:1). */
+     print leave 12-13px hint text below readable contrast. */
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 1.5;
@@ -210,6 +179,19 @@
   outline-offset: 1px;
 }
 
+.section + .section {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  margin-top: 4px;
+}
+
+.sectionTitle {
+  margin: 16px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .field {
   flex-direction: column;
   gap: 6px;
@@ -277,13 +259,8 @@
   outline-offset: 2px;
 }
 
-.reset:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: 2px;
-}
-
 .input,
-.select {
+.inputInvalid {
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-3);
   height: 34px;
@@ -295,129 +272,24 @@
   line-height: 1.5;
 }
 
-.input:focus-visible,
-.select:focus-visible {
+.input:focus-visible {
   border-color: var(--dsw-alias-brand-primary);
   outline: none;
 }
 
 .input:disabled,
-.select:disabled {
+.inputInvalid:disabled {
   color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
 
 .inputInvalid {
-  border: 1px solid var(--dsw-alias-state-error-primary, #b42318);
-  background: var(--dsw-alias-bg-layer-3);
-  height: 34px;
-  font: inherit;
-  color: var(--dsw-alias-label-primary);
-  border-radius: 8px;
-  padding: 0 12px;
-  font-size: 13px;
-  line-height: 1.5;
+  border-color: var(--dsw-alias-state-error-primary, #b42318);
 }
 
 .inputInvalid:focus-visible {
   outline: 2px solid var(--dsw-alias-state-error-primary, #b42318);
   outline-offset: 1px;
-  border-color: var(--dsw-alias-state-error-primary, #b42318);
-}
-
-.selectWrap {
-  position: relative;
-}
-
-.selectButton {
-  appearance: none;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  display: flex;
-}
-
-.selectLabel {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.selectChevron {
-  color: var(--dsw-alias-label-tertiary);
-  flex: none;
-  transition: transform 0.16s;
-}
-
-.selectChevronOpen {
-  transform: rotate(180deg);
-}
-
-.selectPopup {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 40;
-  flex-direction: column;
-  max-height: 240px;
-  overflow-y: auto;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-3);
-  box-shadow: 0 8px 24px var(--dsw-alias-bg-mask-2);
-  padding: 4px;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 0.1s ease, transform 0.1s ease;
-  display: flex;
-}
-
-.selectPopupOpen {
-  opacity: 1;
-  transform: none;
-}
-
-.selectPopupClose {
-  opacity: 0;
-  transform: translateY(-4px);
-  pointer-events: none;
-}
-
-.selectOption {
-  /* 弹层是 max-height 受限的 flex 列：选项必须保持自然行高，超出交给弹层滚动 */
-  flex-shrink: 0;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--dsw-alias-label-primary);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.selectOption:hover,
-.selectOptionActive {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.selectOptionSelected {
-  color: var(--dsw-alias-brand-primary);
-  font-weight: 500;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 10%, transparent);
-}
-
-.invalid {
-  color: var(--dsw-alias-state-error-primary, #b42318);
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .hint {
@@ -427,17 +299,138 @@
   line-height: 1.5;
 }
 
+.invalid {
+  color: var(--dsw-alias-state-error-primary, #b42318);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.state {
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 11px;
+  background: var(--dsw-alias-bg-layer-3);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.switchOn {
+  border-color: transparent;
+  background: var(--dsw-alias-brand-primary);
+}
+
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1);
+  transition: transform 150ms ease;
+}
+
+.knobOn {
+  transform: translateX(16px);
+}
+
+.radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.radio input {
+  margin: 2px 0 0;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.radioText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radioLabel {
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.radioDetail {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.subfield {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 22px;
+}
+
+.other {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.otherSummary {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+/* Live facts under the LAN decision (bind host, firewall, reachable URLs). */
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 0 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.statusLine {
+  word-break: break-all;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card,
   .header,
-  .mark,
   .chevron,
   .chevronOpen,
-  .discard,
-  .save,
-  .selectChevron,
-  .selectChevronOpen,
-  .selectPopup {
+  .switch,
+  .knob {
     transition: none;
   }
 }

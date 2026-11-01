@@ -7,13 +7,13 @@
  * state per the client stack rules: nothing here survives remounts or crosses
  * entries.
  */
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PairingPhase } from '../../pairing/pairing.ts'
 import { RemotePanel, type PanelState } from '../panel/RemotePanel.tsx'
-import { RemoteSettingsCard, type RemoteSettingsCardProps } from '../settings/RemoteSettingsCard.tsx'
-import { currentSettingsFace } from '../settings/settings-face.ts'
+import { RemoteSettingsForm } from '../settings/RemoteSettingsForm.tsx'
+import { currentSettingsModel } from '../settings/settings-face.ts'
 import { copyText, issuePair, revokePair, stopPair, type DeviceFrame, type IssueResponse, type PairStateFrame, type RelayStatusFrame, type TunnelStatusFrame } from '../pair-api.ts'
 import { PhoneIcon } from './PhoneIcon.tsx'
 import css from '../panel/remote.module.css'
@@ -265,25 +265,6 @@ export function RemoteEntry({ wide, t }: RemoteEntryProps) {
 }
 
 /**
- * A snapshot store as the selector hook a card expects.
- *
- * The slot runtime turns an injected `hooks` entry into a `use<Hook>` prop of
- * this shape; rendering the card outside a slot has to build the same thing.
- * @param store - the injected snapshot store.
- * @returns a selector hook over that store.
- */
-function bindSelectorHook(store: { getSnapshot(): unknown; subscribe(listener: () => void): () => void }) {
-  return function useBoundSelector<S>(selector: (snapshot: unknown) => S): S {
-    const snapshot = useSyncExternalStore(
-      (onChange) => store.subscribe(onChange),
-      () => store.getSnapshot(),
-      () => store.getSnapshot(),
-    )
-    return selector(snapshot)
-  }
-}
-
-/**
  * The popup's settings section: the staged form the plugin manager used to
  * show. Keeping it here makes the pairing sheet the row's one settings
  * surface — no second trip to the plugin page.
@@ -291,21 +272,11 @@ function bindSelectorHook(store: { getSnapshot(): unknown; subscribe(listener: (
  * @returns the settings card, or null while the client apply has not run.
  */
 function SettingsSection({ t }: { t: RemoteEntryProps['t'] }) {
-  const face = currentSettingsFace()
-  if (face === undefined) return null
-  const { hooks = {}, ...actions } = face as {
-    hooks?: Record<string, { getSnapshot(): unknown; subscribe(listener: () => void): () => void }>
-  } & Record<string, unknown>
-  const hookProps = Object.fromEntries(
-    Object.entries(hooks).map(([key, store]) => [
-      `use${key.slice(0, 1).toUpperCase()}${key.slice(1)}`,
-      bindSelectorHook(store),
-    ]),
-  )
-  const cardProps = { ...actions, ...hookProps, t } as unknown as RemoteSettingsCardProps
+  const model = currentSettingsModel()
+  if (model === undefined) return null
   return (
     <div className={css.settingsSection}>
-      <RemoteSettingsCard {...cardProps} />
+      <RemoteSettingsForm model={model} t={t} />
     </div>
   )
 }
