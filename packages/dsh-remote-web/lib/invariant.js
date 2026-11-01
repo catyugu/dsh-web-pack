@@ -2,8 +2,8 @@ import { createRequire as __dshCreateRequire } from 'node:module';
 const require = __dshCreateRequire(import.meta.url);
 
 // packages/dsh-remote-web/src/invariant.ts
-var PACKAGE_NAME = "@linxin666/dsh-remote-web-ui";
-var name = "remote-web-ui-invariant";
+var PACKAGE_NAME = "@catyugu/dsh-remote-web";
+var name = "remote-web-invariant";
 var inject = ["invariants"];
 var install = () => {
 };

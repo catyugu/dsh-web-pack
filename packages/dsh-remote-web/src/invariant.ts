@@ -1,16 +1,16 @@
 /**
- * Package-owned invariant companion for `@linxin666/dsh-remote-web-ui`.
- * @module @linxin666/dsh-remote-web-ui/invariant
+ * Package-owned invariant companion for `@catyugu/dsh-remote-web`.
+ * @module @catyugu/dsh-remote-web/invariant
  */
 
 /* jscpd:ignore-start */
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = '@linxin666/dsh-remote-web-ui'
+const PACKAGE_NAME = '@catyugu/dsh-remote-web'
 
 /** Cordis companion plugin name. */
-export const name = 'remote-web-ui-invariant'
+export const name = 'remote-web-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
@@ -18,7 +18,8 @@ export const inject = ['invariants']
  * No runtime invariant: this package owns no durable package-local event
  * stream; its route-table and device-session relationships are asserted by
  * the package's own specs (route register/dispose symmetry via the
- * webServer disposer contract, token/revocation semantics on the service).
+ * webServer disposer contract, token/revocation/lease semantics on the
+ * service).
  */
 const install: InvariantInstaller = () => {}
 
