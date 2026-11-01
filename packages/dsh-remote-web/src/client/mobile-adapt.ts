@@ -22,6 +22,7 @@
  */
 
 import type { RemoteKey } from './locales.ts'
+import adaptCss from './mobile-adapt.css'
 
 /** The window global the plugin apply() wires the layout service into. */
 export interface RemoteAdaptGlobal {
@@ -112,219 +113,11 @@ function isMobilePortrait(): boolean {
 }
 
 /**
- * The injected rules. Grouped by surface; version comments trace rules back
- * to the dsh-LAN reference they were ported from.
+ * The injected rules live in `mobile-adapt.css`: the build hands them to
+ * this module as text (see scripts/build-remote-web.mjs), so the stylesheet
+ * stays a real asset with its rule comments while this file keeps only
+ * behavior.
  */
-const ADAPT_CSS: readonly string[] = [
-  'html,body{height:100%}',
-  // The app frame fills the dynamic viewport (browser chrome collapse).
-  // Scoped to the application frame: a bare [class$="_frame"] also matches the
-  // chat turn rail, message thumbnails, the subagent pill and PlanReviewPanel,
-  // stretching each to a full-width 100dvh pointer-events:auto block.
-  '[class*="_frame"]:has([class*="_centerCol"]){width:100%;height:100dvh}',
-  // Collapsed rail: bigger touch targets.
-  '[class$="_railFish"] button,[class$="_panelIcon"],[class$="_newSession"]{min-width:44px;min-height:44px}',
-  // Message list padding on narrow screens.
-  '[class$="_scroll"]{padding:8px 10px}',
-  // 16px inputs prevent iOS focus zoom; keep the send button touchy.
-  '[class$="_input"],textarea,input{font-size:16px}',
-  '[class$="_composer"]{padding-bottom:calc(4px + env(safe-area-inset-bottom))}',
-  // v50: slightly smaller type on portrait phones.
-  '[class$="_scrollBody"] [class$="_root"]{font-size:14.5px}',
-  '[class$="_scrollBody"] [class$="_bubble"]{font-size:14.5px}',
-  '[class$="_titleRow"] *{font-size:13px}',
-  '[class*="_sidebarCol"] [class$="_root"],[class*="_sidebarCol"] [class$="_newSession"],[class*="_sidebarCol"] [class$="_trigger"],[class*="_sidebarCol"] [class$="_title"]{font-size:13px}',
-  '[class*="_sidebarCol"] [class$="_meta"],[class*="_sidebarCol"] [class$="_time"]{font-size:11.5px}',
-  // v50: collapsed rail hidden; the whale button is the entry. The frame's
-  // grid is inline-styled (56px rail track when collapsed); pin the first
-  // track to 0 so content uses the full width. On portrait phones the
-  // details track is always 0 (computeColumns drops it when there is no
-  // room), so the three-track override is safe here.
-  '[class$="_frame"][data-sidebar-collapsed]{grid-template-columns:0 minmax(0,1fr) 0 !important}',
-  // The official collapsed sidebar is an absolutely-positioned overlay rail
-  // (it leaves the grid flow), so the in-flow centerCol would auto-place
-  // into the now-0px FIRST track and collapse the conversation to zero width
-  // on an intermittent basis (the rail flips relative <-> absolute as the
-  // host overlay mounts). Pin every column to an explicit track so the
-  // center always lands on the 1fr track regardless of the sidebar's
-  // computed position.
-  '[class$="_frame"][data-sidebar-collapsed] [class*="_sidebarCol"]{grid-column:1/2}',
-  '[class$="_frame"][data-sidebar-collapsed] [class$="_centerCol"]{grid-column:2/3}',
-  '[class$="_frame"][data-sidebar-collapsed] [class$="_detailsCol"]{grid-column:3/4}',
-  // Keep the chat header title clear of the floating whale.
-  `body.${RAIL_HIDDEN_CLASS} [class$="_titleRow"]{padding-left:52px}`,
-  // The whale button itself.
-  `#${WHALE_ID}{position:fixed;top:calc(4px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));z-index:2147482999;width:34px;height:34px;min-width:34px;padding:0;border-radius:10px;background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.25)}`,
-  `#${WHALE_ID} svg{width:20px;height:15px;display:block}`,
-  `#${WHALE_ID}:active{opacity:.72}`,
-  `#${WHALE_ID}{touch-action:none}`,
-  // v51/v52: smaller collapse toggle in the expanded sidebar (the toggle
-  // carries two classes, so match by containment); v47's panelIcon touch
-  // rule forces a 44px min on the icon itself — zero it out so the 13px
-  // glyph fits the 18px button.
-  '[class*="_sidebarCol"] [class$="_logoRow"] [class*="_iconButton"]{width:18px;height:18px}',
-  '[class*="_sidebarCol"] [class$="_logoRow"] [class*="_iconButton"] svg{width:13px;height:13px;min-width:0;min-height:0}',
-  // v77: workspace rows' right-side actions (menu + new session) are
-  // hover-only on desktop; always show them on mobile touch.
-  '[class*="_sidebarCol"] [class*="_projectRow"] [class*="_rowActions"]{display:inline-flex}',
-  // v78: mobile long-press on a row must not start native drag.
-  '[class*="_sidebarCol"] [class*="_sessionRow"],[class*="_sidebarCol"] [class*="_projectRow"]{-webkit-user-drag:none;user-select:none}',
-  // Hide the header Session-log download button (no space on phones).
-  '[class$="_headerUtilities"]{display:none}',
-  // v52 composer: the two lines (permission / model) stay stacked with zero
-  // row gap; the command, context-meter and send/stop buttons float at the
-  // left/right edges vertically centered over both lines. "Both lines" is what
-  // makes _row the containing block for those three floats: _row is the one box
-  // that wraps the lines, so nothing between a float and _row may claim it.
-  '[class$="_composerSeat"] [class$="_card"]{margin-bottom:1px}',
-  '[class$="_composerSeat"] [class$="_row"]{flex-wrap:wrap;row-gap:0;padding:2px 8px 1px;position:relative}',
-  // The attach button is the only file-picker entry on the portrait composer,
-  // and taking it out of flow costs it the paint order it had inline: a
-  // positioned sibling painted after it (the trailing line, see below) covers
-  // it and eats the taps on the covered half. Its own z-index makes the hit
-  // layer a property of the button instead of a side effect of a sibling
-  // (#1829). It clears the composer's own stacking ladder and stays far below
-  // the bottom-sheet menus (2147482000), which own the overlay above it.
-  '[class$="_composerSeat"] [class$="_add"]{position:absolute;left:8px;top:50%;transform:translateY(-50%);z-index:10}',
-  '[class$="_composerSeat"] [class$="_modes"]{min-width:0;padding-left:38px}',
-  // Model line left-aligned with the permission line (same command-button
-  // clearance), rows stay tightly stacked.
-  // The trailing line is forced onto its own row at flex-basis:100% and carries
-  // 116px of side padding (38 left for the command button, 78 right for the
-  // send button). Under the default content-box that padding is ADDED to the
-  // 100% basis, so the line's own box overflowed the card by exactly 116px and
-  // dragged the absolutely-positioned send button out with it: on a 393px phone
-  // the card ended at x=367 while the button sat at x=433..467, past the
-  // viewport's right edge, which is the unreachable button the reporter
-  // measured (#1818). border-box contains the padding inside the basis, so the
-  // line stays within the card and the button lands back inside it.
-  //
-  // The line stays UNPOSITIONED on purpose. position:relative arrived here with
-  // the compact picker and outlived it, but this box is the LAST line only: as
-  // the nearest positioned ancestor it took the containing block from _row, so
-  // the send button and the context meter centered inside the trailing line
-  // instead of over both lines - the send button rode the input's bottom edge,
-  // out of line with the attach button - and, painted after the out-of-flow
-  // attach button, the line covered that button's lower half and swallowed the
-  // taps there (#1829).
-  '[class$="_composerSeat"] [class$="_trailing"]{box-sizing:border-box;flex-basis:100%;min-height:32px;justify-content:flex-start;padding-left:38px;padding-right:78px}',
-  '[class$="_composerSeat"] [class$="_trailing"] *{font-size:12px}',
-  // v54: smaller permission/model buttons (font + height). v79: the
-  // permission trigger collapses to its shield icon on phones — the label
-  // text is the first thing a narrow row drops (the icon color carries the
-  // state), matching the dsh-LAN compact composer.
-  '[class$="_composerSeat"] [class$="_modes"] [class$="_trigger"]{height:24px;min-height:24px;font-size:12px}',
-  '[class$="_composerSeat"] [class$="_trailing"] [class$="_trigger"]{height:24px;min-height:24px;font-size:11px}',
-  // Context meter + send/stop float at the right edge, vertically centered
-  // over both lines (the meter's root contains the track).
-  '[class$="_composerSeat"] [class$="_trailing"] > [class$="_root"]:has([class$="_track"]){position:absolute;right:52px;top:50%;transform:translateY(-50%)}',
-  '[class$="_composerSeat"] [class$="_primary"]{position:absolute;right:8px;top:50%;transform:translateY(-50%)}',
-  // v79: the model picker menu anchors right:0 to its narrow trigger, so on
-  // a phone both the picker menu and the model list fly past the left
-  // viewport edge (model names unreadably cut). Turn the picker into a
-  // bottom sheet: the composer seat carries an identity transform, which
-  // would still become the containing block for fixed children, so free it
-  // first; then pin every seat menu to the viewport bottom with real touch
-  // targets. Covers the picker, the model list, and the other composer
-  // popovers (permission presets, attachments) alike.
-  '[class$="_composerSeat"]{transform:none !important}',
-  '[class$="_composerSeat"] [class$="_menu"]{position:fixed !important;left:8px !important;right:8px !important;top:auto !important;bottom:calc(8px + env(safe-area-inset-bottom)) !important;width:auto !important;max-width:none !important;max-height:70dvh !important;overflow-y:auto !important;z-index:2147482000}',
-  '[class$="_composerSeat"] [class$="_menu"] [class$="_cell"]{height:44px;min-height:44px;font-size:13px}',
-  // v79's compact picker (two synthesized model/effort icon buttons in the
-  // tools row, the trailing text trigger hidden behind a body class, and the
-  // trailing line collapsed to zero width) was removed at the user's request.
-  // The portrait composer keeps the official text trigger with the trailing
-  // line rules above; the bottom-sheet rules immediately above still apply to
-  // the official menu.
-  // Bottom stats line (N rounds / M steps) two sizes below the tabs; v55
-  // wraps freely but clamps at two lines (the official rule is nowrap +
-  // single-line ellipsis); v60 drops the official 32px right padding.
-  '[class$="_composerSeat"] [data-slot="conversation.composer.dock"] [class$="_root"]{font-size:10px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left;line-height:13px;letter-spacing:-0.2px;padding-left:0;padding-right:0}',
-  // (user bubbles keep the v50 14.5px via the _bubble rule.)
-  '[class$="_scrollBody"] [class$="_root"]{font-size:13px}',
-  // v58/v65 port note: the dsh-LAN `_body` gap:6px compaction is deliberately
-  // NOT ported. The official message row is a shrinkable flex column whose
-  // bottom-anchored body then measures shorter than its text (13px root font
-  // on a fixed 24px line box), and the extra gap pushed the first text line
-  // above the row box — every assistant message clipped its top half on the
-  // phone (verified on the real GUI; the removal restores natural heights).
-  // v58/v65: on touch, taps leave :hover/:focus stuck, so official Tooltip
-  // bubbles stay visible on mobile. The bubble class hash sits AFTER the
-  // name, so match by containment, still scoped by role=tooltip so user
-  // message bubbles (no tooltip role) stay visible.
-  '[class*="_bubble"][role="tooltip"]{display:none}',
-  // v65: PlanReviewPanel shares the _frame/_card suffixes and overflows a
-  // narrow phone; pin it to the viewport with border-box and cap its height
-  // so the card sits fully on screen.
-  '[class$="_composerSeat"] [class$="_frame"]{box-sizing:border-box;width:100%;max-width:100%;padding-left:12px;padding-right:12px;height:auto;max-height:calc(100dvh - 96px);align-items:flex-start;overflow-y:auto}',
-  '[class$="_composerSeat"] [class$="_frame"] [class$="_card"]{max-width:none;width:100%}',
-  // v67: header actions (agent-preset mode label + background-task badge)
-  // are re-seated from the title row into the tabs row; hidden in the
-  // original spot so React re-renders do not flicker them back.
-  // Only while the layer has taken the actions over: out of flow (so the
-  // title row keeps its own layout and React keeps owning the node) and
-  // painted over the tabs row by the transform alignActionsText computes.
-  `body.${HEADER_SEATED_CLASS} [class$="_header"] [class$="_titleCluster"] [class$="_headerActions"]{position:absolute;left:0;top:0;margin:0;display:flex;align-items:center;gap:6px;flex:none;z-index:2}`,
-  // v70: match the tab text size with the seated mode label (12px); NB
-  // [class$="_tab"] misses the active tab (its class ends in "_tabActive")
-  // — containment so BOTH tabs match.
-  '[class$="_header"] [class$="_tabs"] [class*="_tab"]{font-size:12px;white-space:nowrap}',
-  // v80: the tabs row must give the painted actions their width up on its own.
-  // The v67 padding reservation could not do it: the row is a nowrap flex
-  // container, and once the tab labels plus their gaps overflow the reduced
-  // content box the flex items spill over the padding box, so the trailing
-  // tabs render underneath the actions (reported on a phone: a long agent
-  // preset label covered the last tabs). Cap the row against the reserve and
-  // let the labels scroll instead. The value rides a CSS variable on <html>
-  // because the update lands before React re-creates the row node, and an
-  // inline reservation on that node is dropped until the next sync tick.
-  // The 2px bottom padding keeps the active-tab underline inside the clipping
-  // box; the matching negative margin keeps the header height official.
-  `body.${HEADER_SEATED_CLASS} [class$="_header"] [class$="_tabs"]{max-width:max(0px,calc(100% - var(${HEADER_RESERVE_VAR},0px)));overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin-bottom:-2px}`,
-  `body.${HEADER_SEATED_CLASS} [class$="_header"] [class$="_tabs"]::-webkit-scrollbar{display:none}`,
-  `body.${HEADER_SEATED_CLASS} [class$="_header"] [class$="_tabs"] > [class*="_tab"]{flex:0 0 auto}`,
-  // Mobile scope: hide the plugin surfaces that do not fit a phone — the
-  // right-hand details column and every desktop-oriented tool surface. The
-  // list keys on the L2 semantic roots (data-dsh-plugin, ownership stays
-  // with the declaring plugin), so official class churn cannot resurrect
-  // them. These are render suppressions: the client bundles still load.
-  // The pet is part of the hidden set by design: the mobile remote mirror
-  // carries the desktop-less phone surface, and a floating pet would only
-  // cover the small viewport. The suppression is the requirement, not a bug.
-  `body.${ACTIVE_CLASS} [class$=\"_detailsCol\"]{display:none !important}`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"ssh\"],`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"skill-explorer\"],`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"task-board\"],`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"git-graph\"],`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"pet\"],`,
-  `body.${ACTIVE_CLASS} [data-dsh-plugin=\"usage\"]{display:none !important}`,
-  // The official workbench (Files / source control) mounts into a
-  // full-viewport portal layer with no data-dsh-plugin root, so the plugin
-  // list above cannot key on it; its open state persists across page loads,
-  // and on a phone it covers the entire conversation with no visible close
-  // control — the remote-opens-to-an-empty-screen report. Hide the
-  // workbench panel only: the same portal layer also hosts the settings
-  // modal, which must stay reachable (verified in the GUI QA round).
-  `body.${ACTIVE_CLASS} [class$=\"_overlayLayer\"] [class$=\"_workbench\"]{display:none !important}`,
-  // v68: settings modal on mobile — the official panel is a fixed 800px
-  // two-column layout (nav + content); switch to a column layout: the
-  // section nav becomes a horizontal scrollable row on top.
-  // Scoped to the portrait body class like the suppressions above: these
-  // are the only rules in this array that reshape an official two-column
-  // surface, and the overlay portal is shared with every other dialog.
-  // Unscoped, the tag — which lives in <head> for as long as the layer
-  // is active and is restored by the sync tick after a revert —
-  // collapsed the DESKTOP settings panel into a stacked column (measured
-  // on a real 1440px host: panel flex-direction row -> column, nav 800px
-  // tall -> 236px, content 612px -> 800px wide and pushed below the nav).
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"]{flex-direction:column;max-height:calc(100dvh - 32px)}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_nav"]{flex-direction:row;gap:4px;width:100%;padding:12px 12px 0;overflow-x:auto;overflow-y:hidden}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_navTitle"]{display:none}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_navList"]{flex-direction:row;gap:4px}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_navCell"]{height:34px;padding:0 12px;gap:6px;flex:none;border-radius:10px}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_navLabel"]{font-size:13px}`,
-  `body.${ACTIVE_CLASS} [class$="_overlay"] [class$="_panel"] [class$="_content"]{flex:1;min-height:0}`,
-]
 
 /** The DeepSeek fish glyph (the official brand mark path). */
 const FISH_PATH = 'M22.9168 1.43018C22.6713 1.31018 22.5658 1.53918 22.4223 1.65519C22.3733 1.69269 22.3318 1.74169 22.2903 1.78669C21.9317 2.1697 21.5127 2.42121 20.9657 2.39121C20.1657 2.34621 19.4827 2.59771 18.8787 3.20973C18.7502 2.45521 18.3236 2.0047 17.6746 1.71569C17.3351 1.56568 16.9916 1.41518 16.7536 1.08867C16.5876 0.856163 16.5421 0.597155 16.4591 0.341647C16.4061 0.187643 16.3536 0.0301382 16.1761 0.00363739C15.9836 -0.0263635 15.9081 0.135141 15.8326 0.270145C15.5306 0.822162 15.4136 1.43018 15.4251 2.0462C15.4516 3.43174 16.0366 4.53527 17.1991 5.3203C17.3311 5.4103 17.3651 5.5003 17.3236 5.63181C17.2441 5.90231 17.1501 6.16482 17.0671 6.43533C17.0141 6.60784 16.9351 6.64584 16.7501 6.57033C16.1121 6.30383 15.5611 5.90931 15.074 5.4328C14.2475 4.63328 13.5 3.75075 12.568 3.05973C12.349 2.89822 12.13 2.74822 11.9034 2.60522C10.9524 1.68169 12.028 0.923165 12.277 0.833162C12.5375 0.739159 12.3675 0.41615 11.5259 0.42015C10.6844 0.42365 9.91439 0.705658 8.93286 1.08117C8.78935 1.13767 8.63835 1.17867 8.48384 1.21267C7.59332 1.04367 6.66829 1.00617 5.70226 1.11517C3.88321 1.31768 2.43016 2.1777 1.36213 3.64575C0.0790928 5.4103 -0.222916 7.41536 0.146595 9.50642C0.535106 11.7105 1.66014 13.535 3.38869 14.9616C5.18125 16.4406 7.24581 17.1657 9.60138 17.0266C11.0319 16.9441 12.6245 16.7526 14.421 15.2321C14.874 15.4576 15.3496 15.5476 16.1381 15.6151C16.7456 15.6716 17.3306 15.5851 17.7836 15.4911C18.4931 15.3411 18.4441 14.6841 18.1876 14.5636C16.1081 13.595 16.5646 13.9891 16.1496 13.67C17.2061 12.42 18.8202 10.1979 19.3182 7.17235C19.3672 6.83834 19.4297 6.36783 19.4222 6.09732C19.4182 5.93231 19.4562 5.86831 19.6447 5.84931C20.1657 5.78931 20.6712 5.64681 21.1357 5.3913C22.4833 4.65528 23.0268 3.44624 23.1548 1.9972C23.1738 1.77569 23.1508 1.54668 22.9168 1.43018Z'
@@ -386,7 +179,7 @@ export function startMobileAdapt(): void {
     const tag = document.createElement('style')
     tag.dataset.plugin = 'remote-web-ui'
     tag.dataset.pluginCss = ADAPT_CSS_ID
-    tag.textContent = ADAPT_CSS.join('')
+    tag.textContent = adaptCss
     document.head.appendChild(tag)
     // Seed the lookup cache: the tag is created here, outside nodeOf, so the
     // negative cache could otherwise report it missing for one more tick and

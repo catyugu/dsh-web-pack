@@ -18,8 +18,11 @@ TARGET = ROOT / "packages" / "dsh-remote-web" / "src" / "client" / "mobile-adapt
 
 START = "const ADAPT_CSS: readonly string[] = ["
 SUBSTITUTIONS = {
+    "${ACTIVE_CLASS}": "dsh-remote-portrait",
     "${RAIL_HIDDEN_CLASS}": "dsh-remote-rail-hidden",
     "${WHALE_ID}": "dshRemoteWhale",
+    "${HEADER_SEATED_CLASS}": "dsh-remote-header-seated",
+    "${HEADER_RESERVE_VAR}": "--dsh-remote-header-actions-reserve",
 }
 
 
@@ -35,6 +38,8 @@ def rule_text(line: str) -> str:
     else:
         raise ValueError(f"not a string entry: {stripped}")
     text = body[:closing]
+    # A template literal's `\"` is a plain quote by the time it reaches the DOM.
+    text = text.replace('\\"', '"')
     for token, value in SUBSTITUTIONS.items():
         text = text.replace(token, value)
     return text
@@ -54,15 +59,26 @@ def main() -> None:
         "",
     ]
     rules = 0
+    comment: list[str] = []
+
+    def flush_comment() -> None:
+        if not comment:
+            return
+        out.append("/* " + " ".join(comment) + " */")
+        comment.clear()
+
     for line in lines[start + 1:end]:
         stripped = line.strip()
         if stripped == "":
+            flush_comment()
             continue
         if stripped.startswith("//"):
-            out.append("/* " + stripped[2:].strip() + " */")
+            comment.append(stripped[2:].strip())
             continue
+        flush_comment()
         out.append(rule_text(line))
         rules += 1
+    flush_comment()
 
     TARGET.write_text("\n".join(out) + "\n", encoding="utf-8")
     print(f"wrote {rules} rules to {TARGET.relative_to(ROOT)}")

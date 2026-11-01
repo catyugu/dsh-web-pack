@@ -158,6 +158,9 @@ const client = await build({
   target: 'es2022',
   external: CLIENT_EXTERNAL,
   jsx: 'automatic',
+  // A plain stylesheet is text the row injects into its own tag; `*.module.css`
+  // is compiled by the plugin below instead.
+  loader: { '.css': 'text' },
   plugins: [cssModulesPlugin],
   logLevel: 'warning',
 })

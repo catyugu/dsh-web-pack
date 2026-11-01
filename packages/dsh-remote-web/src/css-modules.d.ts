@@ -3,4 +3,8 @@ declare module '*.module.css' {
   export default classes
 }
 
-declare module '*.css'
+/** A plain stylesheet imported as text: the row injects it into its own tag. */
+declare module '*.css' {
+  const text: string
+  export default text
+}
