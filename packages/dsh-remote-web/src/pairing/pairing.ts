@@ -22,9 +22,10 @@
  */
 
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
 import type { PostureHost, PostureSnapshot } from '../ingress/posture.ts'
+import { createDeviceStore, sanitizeUserAgent, type DeviceSession, type DeviceStore, type PairingFsSeams } from './device-store.ts'
+
+export type { DeviceSession, PairingFsSeams } from './device-store.ts'
 
 /** The observable pairing phases the panel renders. */
 export type PairingPhase =
@@ -63,19 +64,6 @@ export interface TokenRecord {
  * through the idleExpireMs config.
  */
 export const DEFAULT_IDLE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1000
-
-/** Cap on the persisted/displayed User-Agent string. */
-const MAX_USER_AGENT_CHARS = 180
-
-/** One paired device session, keyed by the device id stored in its cookie. */
-export interface DeviceSession {
-  /** Pairing time (ms epoch). */
-  createdAt: number
-  /** Last time the device passed a gated request or heartbeat. */
-  lastSeenAt: number
-  /** Sanitized User-Agent captured at accept (optional; missing on old files). */
-  userAgent?: string
-}
 
 /** One device row in a loopback snapshot (ids are session credentials). */
 export interface DeviceSnapshot {
@@ -189,12 +177,6 @@ export interface PairingClock {
   randomToken(): string
 }
 
-/** File-operation seam for the revocation-durability step (tests). */
-export interface PairingFsSeams {
-  /** Remove the stale device store (defaults to fs.rmSync with force). */
-  removeFile?(path: string): void
-}
-
 /** Real clock/entropy: 32 random hex chars per token. */
 export const defaultClock: PairingClock = {
   now: () => Date.now(),
@@ -212,7 +194,7 @@ export const defaultClock: PairingClock = {
  */
 export class PairingService {
   private readonly tokens = new Map<string, TokenRecord>()
-  private readonly devices = new Map<string, DeviceSession>()
+  private devices: Map<string, DeviceSession>
   private readonly listeners = new Set<(snapshot: PairingSnapshot) => void>()
   private lastEmitted: PairingSnapshot | undefined
   private stopped = false
@@ -237,8 +219,8 @@ export class PairingService {
   public config: PairingConfig
   /** Clock and entropy source, injectable so tests need no real time. */
   private readonly clock: PairingClock
-  /** Filesystem seams, injectable for the same reason. */
-  private readonly fs: PairingFsSeams
+  /** The device table's durable half (memory-only when no file is configured). */
+  private readonly store: DeviceStore
 
   /**
    * @param config - tunables; see {@link config}.
@@ -248,45 +230,11 @@ export class PairingService {
   constructor(config: PairingConfig, clock: PairingClock = defaultClock, fs: PairingFsSeams = {}) {
     this.config = config
     this.clock = clock
-    this.fs = fs
-    this.loadPersisted()
-  }
-
-  /**
-   * Restore device sessions persisted by a previous process run. A corrupt
-   * or missing file is tolerated (an empty device table, never a throw) —
-   * persistence is an availability convenience, not a security boundary.
-   *
-   * Every still-valid session is restored; nothing is trimmed here, because
-   * the store has no cap to trim against — an authorization the user never
-   * revoked stays until it idles out.
-   */
-  private loadPersisted(): void {
-    const file = this.config.devicesFile
-    if (file === undefined) return
-    try {
-      const saved = JSON.parse(readFileSync(file, 'utf8')) as unknown
-      if (typeof saved !== 'object' || saved === null) return
-      for (const [deviceId, session] of Object.entries(saved)) {
-        if (typeof deviceId !== 'string') continue
-        if (typeof session !== 'object' || session === null) continue
-        const { createdAt, lastSeenAt, userAgent } = session as {
-          createdAt?: unknown
-          lastSeenAt?: unknown
-          userAgent?: unknown
-        }
-        if (typeof createdAt !== 'number' || typeof lastSeenAt !== 'number') continue
-        const label = typeof userAgent === 'string' ? sanitizeUserAgent(userAgent) : undefined
-        this.devices.set(deviceId, {
-          createdAt,
-          lastSeenAt,
-          ...(label !== undefined ? { userAgent: label } : {}),
-        })
-      }
-      if (this.evictIdle()) this.persistRevocation()
-    } catch {
-      // Unreadable/corrupt: start empty rather than refusing to boot.
-    }
+    this.store = createDeviceStore(config.devicesFile, fs)
+    this.devices = this.store.load()
+    // Sessions that idled out while the process was down are dropped before the
+    // table is ever consulted.
+    if (this.evictIdle()) this.store.forget(this.devices)
   }
 
   /** Drop sessions whose lastSeenAt is older than idleExpireMs (and their sockets). */
@@ -358,53 +306,25 @@ export class PairingService {
   }
 
   /**
-   * Write the current device table to the configured file. Called on the
-   * mutation boundaries that change the set of live sessions (accept, stop,
-   * revoke, idle eviction) and, throttled, from sweep() so lastSeenAt
-   * survives a restart without a write per request.
-   *
-   * Device ids are session credentials (the gate authorizes requests by the
-   * cookie's device id), so the file is written 0600 via a temp file and
-   * atomic rename; a crash mid-write can never leave a half-written store.
+   * Write the current device table. Called on the mutation boundaries that
+   * change the set of live sessions (accept, stop, revoke, idle eviction) and,
+   * throttled, from sweep() so lastSeenAt survives a restart without a write
+   * per request.
+   * @returns whether the table reached the disk.
    */
   private persist(): boolean {
-    const file = this.config.devicesFile
-    if (file === undefined) return true
-    try {
-      mkdirSync(dirname(file), { recursive: true })
-      const temp = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`
-      const payload: Record<string, DeviceSession> = {}
-      for (const [id, session] of this.devices) payload[id] = session
-      writeFileSync(temp, JSON.stringify(payload), { mode: 0o600 })
-      renameSync(temp, file)
-      this.dirty = false
-      return true
-    } catch (error) {
-      console.error('dsh-remote-web: failed to persist paired devices', error)
-      return false
-    }
+    const durable = this.store.persist(this.devices)
+    if (durable) this.dirty = false
+    return durable
   }
 
   /**
    * Persist a table change that REVOKES access (stop, per-device revoke, idle
-   * eviction). A failed write would leave the revoked session on disk, and
-   * {@link loadPersisted} restores that file verbatim on the next start — the
-   * device's still-valid cookie would authorize again after an explicit
-   * revocation. When the write cannot be made durable, the stale store is
-   * removed instead (a missing file already loads as an empty table), so the
-   * failure costs a re-pair rather than silently undoing the revocation.
+   * eviction). The store removes the file when the write cannot be made
+   * durable, so a restart can never restore an authorization the user revoked.
    */
   private persistRevocation(): void {
-    if (this.persist()) return
-    const file = this.config.devicesFile
-    if (file === undefined) return
-    try {
-      if (this.fs.removeFile !== undefined) this.fs.removeFile(file)
-      else rmSync(file, { force: true })
-      console.error('dsh-remote-web: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it')
-    } catch (error) {
-      console.error('dsh-remote-web: the device revocation could not be persisted and the stale device store could not be removed', error)
-    }
+    this.store.forget(this.devices)
   }
 
   /** The default LAN base URL (the first interface; undefined when not LAN-reachable). */
@@ -803,12 +723,4 @@ export function canonicalBaseUrl(url: string): string {
   } catch {
     return url
   }
-}
-
-/** Strip control characters and cap the User-Agent stored with a session. */
-export function sanitizeUserAgent(raw: string | undefined): string | undefined {
-  if (raw === undefined) return undefined
-  const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim()
-  if (cleaned === '') return undefined
-  return cleaned.length <= MAX_USER_AGENT_CHARS ? cleaned : cleaned.slice(0, MAX_USER_AGENT_CHARS)
 }

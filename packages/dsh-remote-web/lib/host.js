@@ -8236,11 +8236,77 @@ defineMethod("transform", [
 ], ({ inner }, isInner) => inner.toString(isInner));
 
 // packages/dsh-remote-web/src/pairing/pairing.ts
+import { randomBytes as randomBytes2 } from "node:crypto";
+
+// packages/dsh-remote-web/src/pairing/device-store.ts
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-var DEFAULT_IDLE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1e3;
 var MAX_USER_AGENT_CHARS = 180;
+function sanitizeUserAgent(raw) {
+  if (raw === void 0) return void 0;
+  const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
+  if (cleaned === "") return void 0;
+  return cleaned.length <= MAX_USER_AGENT_CHARS ? cleaned : cleaned.slice(0, MAX_USER_AGENT_CHARS);
+}
+function createDeviceStore(file, seams = {}) {
+  const removeStale = () => {
+    if (file === void 0) return;
+    if (seams.removeFile !== void 0) seams.removeFile(file);
+    else rmSync(file, { force: true });
+  };
+  return {
+    load() {
+      const devices = /* @__PURE__ */ new Map();
+      if (file === void 0) return devices;
+      try {
+        const saved = JSON.parse(readFileSync(file, "utf8"));
+        if (typeof saved !== "object" || saved === null) return devices;
+        for (const [deviceId, session] of Object.entries(saved)) {
+          if (typeof deviceId !== "string") continue;
+          if (typeof session !== "object" || session === null) continue;
+          const { createdAt, lastSeenAt, userAgent } = session;
+          if (typeof createdAt !== "number" || typeof lastSeenAt !== "number") continue;
+          const label = typeof userAgent === "string" ? sanitizeUserAgent(userAgent) : void 0;
+          devices.set(deviceId, {
+            createdAt,
+            lastSeenAt,
+            ...label !== void 0 ? { userAgent: label } : {}
+          });
+        }
+      } catch {
+      }
+      return devices;
+    },
+    persist(devices) {
+      if (file === void 0) return true;
+      try {
+        mkdirSync(dirname(file), { recursive: true });
+        const temp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+        const payload = {};
+        for (const [id, session] of devices) payload[id] = session;
+        writeFileSync(temp, JSON.stringify(payload), { mode: 384 });
+        renameSync(temp, file);
+        return true;
+      } catch (error) {
+        console.error("dsh-remote-web: failed to persist paired devices", error);
+        return false;
+      }
+    },
+    forget(devices) {
+      if (this.persist(devices)) return;
+      try {
+        removeStale();
+        console.error("dsh-remote-web: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it");
+      } catch (error) {
+        console.error("dsh-remote-web: the device revocation could not be persisted and the stale device store could not be removed", error);
+      }
+    }
+  };
+}
+
+// packages/dsh-remote-web/src/pairing/pairing.ts
+var DEFAULT_IDLE_EXPIRE_MS = 30 * 24 * 60 * 60 * 1e3;
 var UnknownLanAddressError = class extends Error {
   /**
    * @param address - the offending literal.
@@ -8252,11 +8318,11 @@ var UnknownLanAddressError = class extends Error {
 };
 var defaultClock = {
   now: () => Date.now(),
-  randomToken: () => randomBytes(16).toString("hex")
+  randomToken: () => randomBytes2(16).toString("hex")
 };
 var PairingService = class {
   tokens = /* @__PURE__ */ new Map();
-  devices = /* @__PURE__ */ new Map();
+  devices;
   listeners = /* @__PURE__ */ new Set();
   lastEmitted;
   stopped = false;
@@ -8280,8 +8346,8 @@ var PairingService = class {
   config;
   /** Clock and entropy source, injectable so tests need no real time. */
   clock;
-  /** Filesystem seams, injectable for the same reason. */
-  fs;
+  /** The device table's durable half (memory-only when no file is configured). */
+  store;
   /**
    * @param config - tunables; see {@link config}.
    * @param clock - clock/entropy source (injectable for tests).
@@ -8290,39 +8356,9 @@ var PairingService = class {
   constructor(config, clock = defaultClock, fs = {}) {
     this.config = config;
     this.clock = clock;
-    this.fs = fs;
-    this.loadPersisted();
-  }
-  /**
-   * Restore device sessions persisted by a previous process run. A corrupt
-   * or missing file is tolerated (an empty device table, never a throw) —
-   * persistence is an availability convenience, not a security boundary.
-   *
-   * Every still-valid session is restored; nothing is trimmed here, because
-   * the store has no cap to trim against — an authorization the user never
-   * revoked stays until it idles out.
-   */
-  loadPersisted() {
-    const file = this.config.devicesFile;
-    if (file === void 0) return;
-    try {
-      const saved = JSON.parse(readFileSync(file, "utf8"));
-      if (typeof saved !== "object" || saved === null) return;
-      for (const [deviceId, session] of Object.entries(saved)) {
-        if (typeof deviceId !== "string") continue;
-        if (typeof session !== "object" || session === null) continue;
-        const { createdAt, lastSeenAt, userAgent } = session;
-        if (typeof createdAt !== "number" || typeof lastSeenAt !== "number") continue;
-        const label = typeof userAgent === "string" ? sanitizeUserAgent(userAgent) : void 0;
-        this.devices.set(deviceId, {
-          createdAt,
-          lastSeenAt,
-          ...label !== void 0 ? { userAgent: label } : {}
-        });
-      }
-      if (this.evictIdle()) this.persistRevocation();
-    } catch {
-    }
+    this.store = createDeviceStore(config.devicesFile, fs);
+    this.devices = this.store.load();
+    if (this.evictIdle()) this.store.forget(this.devices);
   }
   /** Drop sessions whose lastSeenAt is older than idleExpireMs (and their sockets). */
   evictIdle() {
@@ -8389,52 +8425,24 @@ var PairingService = class {
     for (const deviceId of [...this.leases.keys()]) this.closeLeases(deviceId);
   }
   /**
-   * Write the current device table to the configured file. Called on the
-   * mutation boundaries that change the set of live sessions (accept, stop,
-   * revoke, idle eviction) and, throttled, from sweep() so lastSeenAt
-   * survives a restart without a write per request.
-   *
-   * Device ids are session credentials (the gate authorizes requests by the
-   * cookie's device id), so the file is written 0600 via a temp file and
-   * atomic rename; a crash mid-write can never leave a half-written store.
+   * Write the current device table. Called on the mutation boundaries that
+   * change the set of live sessions (accept, stop, revoke, idle eviction) and,
+   * throttled, from sweep() so lastSeenAt survives a restart without a write
+   * per request.
+   * @returns whether the table reached the disk.
    */
   persist() {
-    const file = this.config.devicesFile;
-    if (file === void 0) return true;
-    try {
-      mkdirSync(dirname(file), { recursive: true });
-      const temp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
-      const payload = {};
-      for (const [id, session] of this.devices) payload[id] = session;
-      writeFileSync(temp, JSON.stringify(payload), { mode: 384 });
-      renameSync(temp, file);
-      this.dirty = false;
-      return true;
-    } catch (error) {
-      console.error("dsh-remote-web: failed to persist paired devices", error);
-      return false;
-    }
+    const durable = this.store.persist(this.devices);
+    if (durable) this.dirty = false;
+    return durable;
   }
   /**
    * Persist a table change that REVOKES access (stop, per-device revoke, idle
-   * eviction). A failed write would leave the revoked session on disk, and
-   * {@link loadPersisted} restores that file verbatim on the next start — the
-   * device's still-valid cookie would authorize again after an explicit
-   * revocation. When the write cannot be made durable, the stale store is
-   * removed instead (a missing file already loads as an empty table), so the
-   * failure costs a re-pair rather than silently undoing the revocation.
+   * eviction). The store removes the file when the write cannot be made
+   * durable, so a restart can never restore an authorization the user revoked.
    */
   persistRevocation() {
-    if (this.persist()) return;
-    const file = this.config.devicesFile;
-    if (file === void 0) return;
-    try {
-      if (this.fs.removeFile !== void 0) this.fs.removeFile(file);
-      else rmSync(file, { force: true });
-      console.error("dsh-remote-web: the device revocation could not be persisted; removed the stale device store so a restart cannot restore it");
-    } catch (error) {
-      console.error("dsh-remote-web: the device revocation could not be persisted and the stale device store could not be removed", error);
-    }
+    this.store.forget(this.devices);
   }
   /** The default LAN base URL (the first interface; undefined when not LAN-reachable). */
   get lanBaseUrl() {
@@ -8749,12 +8757,6 @@ function canonicalBaseUrl(url) {
     return url;
   }
 }
-function sanitizeUserAgent(raw) {
-  if (raw === void 0) return void 0;
-  const cleaned = raw.replace(/[\u0000-\u001F\u007F]/g, " ").replace(/\s+/g, " ").trim();
-  if (cleaned === "") return void 0;
-  return cleaned.length <= MAX_USER_AGENT_CHARS ? cleaned : cleaned.slice(0, MAX_USER_AGENT_CHARS);
-}
 
 // packages/dsh-remote-web/src/state/dsh-home.ts
 import { homedir } from "node:os";
@@ -8942,13 +8944,13 @@ function providePairingAccess(ctx, check) {
 }
 
 // packages/dsh-remote-web/src/pairing/pair-grant.ts
-import { randomBytes as randomBytes2 } from "node:crypto";
+import { randomBytes as randomBytes3 } from "node:crypto";
 var DEFAULT_PAIR_GRANT_TTL_MS = 6e4;
 var MAX_LIVE_GRANTS = 256;
 function createPairGrantStore(options = {}) {
   const ttlMs = options.ttlMs ?? DEFAULT_PAIR_GRANT_TTL_MS;
   const now = options.now ?? (() => Date.now());
-  const createGrant = options.createGrant ?? (() => randomBytes2(32).toString("base64url"));
+  const createGrant = options.createGrant ?? (() => randomBytes3(32).toString("base64url"));
   const entries = /* @__PURE__ */ new Map();
   const purgeExpired = (at) => {
     for (const [grant, entry] of entries) {
@@ -10534,7 +10536,7 @@ function tunnelPlanOf(value, port) {
 }
 
 // packages/dsh-remote-web/src/ingress/relay-registry.ts
-import { randomBytes as randomBytes3 } from "node:crypto";
+import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { dirname as dirname3, join as join4 } from "node:path";
 var RELAY_REGISTER_URL = "https://dsh-market.com/api/relay/register";
@@ -10548,14 +10550,14 @@ function relayIdentityFile(profile, home = dshHome()) {
   }
   return join4(home, "dsh-web-pack", "remote-web", "registry", `${profile}.json`);
 }
-function generateRelayIdentity(random = randomBytes3) {
+function generateRelayIdentity(random = randomBytes4) {
   return {
     id: random(8).toString("hex"),
     secret: random(32).toString("base64url"),
     fresh: true
   };
 }
-function loadRelayIdentity(profile, home = dshHome(), random = randomBytes3) {
+function loadRelayIdentity(profile, home = dshHome(), random = randomBytes4) {
   const file = relayIdentityFile(profile, home);
   try {
     if (existsSync2(file)) {

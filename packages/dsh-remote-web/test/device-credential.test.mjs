@@ -1,14 +1,18 @@
 /**
  * Device credentials on the gated channel: which one wins when a request
- * carries two, and what a revoked device gets. A stale cookie shadowing a
- * live header is the case the cookieless flow hits when a browser starts
- * sending an old cookie again.
+ * carries two, what a revoked device gets, and what survives a restart. A
+ * stale cookie shadowing a live header is the case the cookieless flow hits
+ * when a browser starts sending an old cookie again.
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { PairingService } from '../src/pairing/pairing.ts'
 import { pairedDeviceIdOf } from '../src/http/remote-api.ts'
 import { REMOTE_DEVICE_HEADER } from '../src/http/remote-methods.ts'
+import { sanitizeUserAgent } from '../src/pairing/device-store.ts'
 
 /** A service with a frozen clock, a reachable base, and no device store on disk. */
 function makeService() {
@@ -77,4 +81,51 @@ test('no credential at all is refused', () => {
 test('an unknown header device is refused', () => {
   const service = makeService()
   assert.equal(pairedDeviceIdOf(request(undefined, 'no-such-device'), service), undefined)
+})
+
+test('a paired device survives a restart until it is revoked', () => {
+  const home = mkdtempSync(join(tmpdir(), 'dsh-remote-devices-'))
+  const devicesFile = join(home, 'devices.json')
+  try {
+    const config = {
+      tokenTtlMs: 60_000,
+      offlineAfterMs: 25_000,
+      cookieName: 'dsh_pair',
+      devicesFile,
+    }
+    const first = new PairingService(config)
+    first.setPublicBaseUrl('https://phone.example')
+    const { token } = first.issue()
+    const accepted = first.accept(token, 'Mozilla/5.0  Phone ')
+    assert.equal(accepted.ok, true)
+
+    const restarted = new PairingService(config)
+    assert.equal(restarted.hasDevice(accepted.deviceId), true, 'the cookie still authorizes after a restart')
+    assert.equal(restarted.snapshot().devices[0]?.userAgent, 'Mozilla/5.0 Phone', 'the agent is stored sanitized')
+
+    restarted.revoke(accepted.deviceId)
+    assert.equal(JSON.parse(readFileSync(devicesFile, 'utf8'))[accepted.deviceId], undefined)
+    const again = new PairingService(config)
+    assert.equal(again.hasDevice(accepted.deviceId), false, 'a revocation survives the restart too')
+  } finally {
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('a corrupt device store loads empty instead of refusing to boot', () => {
+  const home = mkdtempSync(join(tmpdir(), 'dsh-remote-devices-'))
+  const devicesFile = join(home, 'devices.json')
+  try {
+    writeFileSync(devicesFile, '{not json')
+    const service = new PairingService({ tokenTtlMs: 60_000, offlineAfterMs: 25_000, cookieName: 'dsh_pair', devicesFile })
+    assert.equal(service.deviceCount(), 0)
+  } finally {
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('a user agent is sanitized before it is stored', () => {
+  assert.equal(sanitizeUserAgent('  Mozilla\u0000/5.0 \n phone '), 'Mozilla /5.0 phone')
+  assert.equal(sanitizeUserAgent(undefined), undefined)
+  assert.equal(sanitizeUserAgent('x'.repeat(400)).length, 180)
 })
