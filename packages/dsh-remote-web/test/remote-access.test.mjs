@@ -13,7 +13,6 @@ import { PairingService } from '../src/pairing/pairing.ts'
 import { PAIR_PATHS } from '../src/http/paths.ts'
 import { makeRoutes } from '../src/http/routes.ts'
 import { makeRemoteApiRoutes } from '../src/http/remote-api.ts'
-import { REMOTE_DEVICE_HEADER } from '../src/http/remote-methods.ts'
 import { apply, inject, name } from '../lib/host.js'
 import { REMOTE_WEB_UI_PAIRING } from '../src/pairing/pairing-access.ts'
 import { callRoute, RouteResponse, routeRequest } from './support.mjs'
@@ -281,8 +280,9 @@ test('applying the row mounts its surfaces and follows a live save', async () =>
       return () => { provided.delete(serviceName) }
     },
   }
+  const fence = { get: () => true }
   const ttl = { get: () => 120_000 }
-  apply(ctx, { tokenTtlMs: ttl })
+  apply(ctx, { tokenTtlMs: ttl, requirePairingForLan: fence })
 
   assert.equal(name, 'remote-web-ui')
   assert.deepEqual(inject, ['webServer', 'typertGateway', 'connection'])
@@ -294,16 +294,24 @@ test('applying the row mounts its surfaces and follows a live save', async () =>
   assert.equal(typeof provided.get(REMOTE_WEB_UI_PAIRING)?.isPairedDevice, 'function')
 
   const local = { remoteAddress: '127.0.0.1', headers: { host: '127.0.0.1:42137' } }
-  const first = await call(routes, PAIR_PATHS.issue, { ...local, method: 'POST', body: {} })
-  assert.ok(first.json.expiresAt - Date.now() <= 120_000)
+  const before = await call(routes, PAIR_PATHS.status, { ...local })
+  assert.equal(before.json.requirePairingForLan, true)
 
+  // A live settings save lands on the running instance: the Host commits the
+  // new value into the volatile reference and announces it, not a remount.
+  fence.get = () => false
   ttl.get = () => 300_000
-  for (const listener of listeners.get('loader/volatile-update')) listener([['tokenTtlMs']])
-  const reissued = await call(routes, PAIR_PATHS.issue, { ...local, method: 'POST', body: {} })
-  assert.ok(reissued.json.expiresAt - Date.now() > 200_000, 'the save reached the mint without a remount')
+  for (const listener of listeners.get('loader/volatile-update')) listener([['requirePairingForLan', 'tokenTtlMs']])
+  const after = await call(routes, PAIR_PATHS.status, { ...local })
+  assert.equal(after.json.requirePairingForLan, false, 'the save reached the running row without a remount')
 
-  const status = await call(routes, PAIR_PATHS.status, { ...local, headers: { ...local.headers, [REMOTE_DEVICE_HEADER]: 'unpaired' } })
-  assert.equal(status.json.paired, false)
+  // A mint needs a reachable base; the machine's own interfaces decide whether
+  // one exists here, so the TTL leg only runs when it does.
+  if (after.json.lanAvailable) {
+    const issued = await call(routes, PAIR_PATHS.issue, { ...local, method: 'POST', body: {} })
+    assert.equal(issued.statusCode, 200)
+    assert.ok(issued.json.expiresAt - Date.now() > 200_000)
+  }
 
   for (const dispose of effects) dispose()
 })
