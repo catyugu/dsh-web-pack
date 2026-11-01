@@ -534,6 +534,13 @@ export interface PairRoutesDeps {
   /** Current desktop gate policy, re-read for every status response. */
   requirePairingForLan?: boolean | (() => boolean)
   /**
+   * The row's master switch, re-read per request. When false the pairing
+   * endpoints stay mounted (the panel reads the stopped status and can flip
+   * the switch back) but every mint is refused with `disabled`, so a disabled
+   * row can never hand out a working QR. Defaults to true.
+   */
+  enabled?: boolean | (() => boolean)
+  /**
    * LAN-bind facts for the settings card (managed patch block state, live
    * bind host/port, firewall summary). Re-read per request so a hot-reloaded
    * rebind and a fresh toggle round are both reflected without a restart.
@@ -564,10 +571,11 @@ export interface PairRoutesDeps {
  * @returns the exact routes to register on webServer.
  */
 export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
-  const { service, requirePairingForLan = true } = deps
+  const { service, requirePairingForLan = true, enabled = true } = deps
   const pairingRequired = (): boolean => typeof requirePairingForLan === 'function'
     ? requirePairingForLan()
     : requirePairingForLan
+  const isEnabled = (): boolean => typeof enabled === 'function' ? enabled() : enabled
   const grants = deps.grants ?? createPairGrantStore()
   const events = new PairingEventsStream(service)
   const dynamicTrustedHosts = new Set<string>()
@@ -687,6 +695,12 @@ export function makeRoutes(deps: PairRoutesDeps): WebRoute[] {
     if (!requireMethod(req, res, 'POST')) return
     if (!loopbackFence(req)) {
       writeJson(res, 403, { ok: false, code: 'forbidden' })
+      return
+    }
+    // A disabled row keeps its endpoints so the panel can report the stopped
+    // state and offer the switch, but it must never mint a redeemable token.
+    if (!isEnabled()) {
+      writeJson(res, 503, { ok: false, code: 'disabled' })
       return
     }
     const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true })

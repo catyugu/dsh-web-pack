@@ -37,6 +37,7 @@ export type PanelState =
   | { kind: 'lan-required'; tunnel?: TunnelStatusFrame }
   | { kind: 'loopback-required' }
   | { kind: 'unreachable' }
+  | { kind: 'disabled' }
   | {
       kind: 'ready'
       url: string
@@ -143,6 +144,17 @@ export function RemotePanel({
         <div className={css.banner} role="alert">
           <p className={css.bannerTitle}>{t('status.unreachable')}</p>
           <p className={css.bannerHint}>{t('status.unreachableHint')}</p>
+        </div>
+      ) : state.kind === 'disabled' ? (
+        <div className={css.banner} role="alert">
+          <p className={css.bannerTitle}>{t('status.disabled')}</p>
+          <p className={css.bannerHint}>{t('status.disabledHint')}</p>
+          <div className={css.bannerActions}>
+            <button type="button" className={css.action} onClick={onRefresh}>
+              <IconRefreshOutlineRegular size={14} />
+              {t('action.refresh')}
+            </button>
+          </div>
         </div>
       ) : (
         <>

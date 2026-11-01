@@ -5,18 +5,23 @@ as an independent fork of the retired `@linxin666/dsh-remote-web-ui`.
 
 A phone or another computer scans the QR code beside the settings button and
 opens the same Web GUI: one-time pairing tokens, a revocable device roster, a
-LAN bind toggle, and an optional Cloudflare tunnel (quick or named) with an
-optional stable-origin relay. Phones get a portrait touch adaptation layer; a
+LAN bind toggle, and an optional Cloudflare tunnel (named, or quick and fronted
+by a stable-origin relay). Phones get a portrait touch adaptation layer; a
 remote desktop gets the full workbench. Everything behind `/remote` answers
 only a request that carries a live paired-device cookie.
 
 ## One place for settings
 
-Everything a user can switch — the pairing window, device limits, the cookie
-name, the LAN fence policy, the public base URL, the tunnel token, the relay,
-the LAN bind — lives in the popup the user already opens to pair a device.
-There is no second settings card in the plugin manager: the pairing sheet and
-the staged form are one modal (`src/client/RemoteEntry.tsx`).
+Everything a user can switch — whether remote access is on at all, the pairing
+window, the cookie name, the LAN fence policy, the public base URL, the tunnel
+token, the LAN bind — lives in the popup the user already opens to pair a
+device. There is no second settings card in the plugin manager: the pairing
+sheet and the staged form are one modal (`src/client/entry/RemoteEntry.tsx`).
+
+Turning remote access off revokes every paired device, drops the token and
+stops the public tunnel, but the sidebar entry stays mounted: the switch is
+edited inside the popup that entry opens, so the popup reports the stopped
+state and offers the way back instead of disappearing.
 
 ## The tunnel binary is ours
 
@@ -54,9 +59,9 @@ the patch compose in the ordinary Harness order.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
+| `enabled` | `true` | the popup's master switch: off revokes every device and stops the tunnel |
 | `tokenTtlMs` | 10 min | lifetime of one QR pairing link |
 | `offlineAfterMs` | 25 s | a device is offline once it is quieter than this |
-| `maxDevices` | 4 | paired-device cap; the oldest row is evicted |
 | `idleExpireMs` | 30 days | a silent device session is dropped after this |
 | `cookieName` | `dsh_pair` | cookie carrying the paired device id |
 | `requirePairingForLan` | `true` | non-loopback desktops ride the gated `/remote` channel |
@@ -65,7 +70,6 @@ the patch compose in the ordinary Harness order.
 | `devicesFile` | fork path | override for the device store |
 | `autoTunnel` | `false` | run a Cloudflare quick tunnel (ephemeral hostname) |
 | `tunnelToken` | — | Cloudflare named-tunnel token (fixed hostname) |
-| `relay` | `true` | claim a stable `<id>.dsh-market.com` origin |
 | `lanBind` | off | forward the LAN address to the loopback server |
 | `profile` | `$DSH_PROFILE` or `desktop` | profile whose patch the LAN bind manages |
 

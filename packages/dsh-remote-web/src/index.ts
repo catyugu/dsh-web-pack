@@ -502,10 +502,11 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
   // config object is read per operation (token mint, touch, sweep), and the
   // gate re-reads its fence flag per request, so a saved edit takes effect
   // without a restart (the Host reloads this row, and apply re-runs). When
-  // `enabled` is off, the pairing routes and sweep timer are dropped and all
-  // device/token state is revoked, but the gate listener stays mounted so a
-  // LAN-exposed /api stays behind pairing (now vetoing every non-loopback
-  // request) instead of opening the fence.
+  // `enabled` is off, every device session and the token are revoked and the
+  // public ingress is dropped, but the pairing endpoints stay mounted and the
+  // gate listener too: the panel then reports the stopped state (and refuses
+  // every mint) so the switch stays reachable from the popup, and a
+  // LAN-exposed /api stays behind pairing instead of opening the fence.
   let disposeRoutes: (() => void) | undefined
   let disposeSweep: (() => void) | undefined
   // LAN-bind facts for the settings card, re-read per request so a hot
@@ -594,6 +595,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
     ...makeRoutes({
       service,
       requirePairingForLan: () => resolve().requirePairingForLan,
+      enabled: () => resolve().enabled,
       lanBindStatus,
       indexDocument: fetchAppShell,
       trustedHosts: () => {
@@ -876,8 +878,7 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
         service.setPublicBaseUrl(value.publicBaseUrl)
       }
     }
-    const enabled = value.enabled
-    if (!enabled) {
+    if (!value.enabled) {
       service.stop()
       // The tunnel branch above follows the plan, not the master switch, so an
       // explicit "off" must also drop the public ingress it started: otherwise
@@ -888,7 +889,12 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
       disposeRelayRegistrar()
       publicBase.reset()
     }
-    if (disposeRoutes === undefined && enabled) {
+    // The route family and the sweep are mounted once for the plugin lifetime,
+    // not per switch state: a disabled row still answers the panel so the
+    // settings that turn it back on stay one click away in the same popup.
+    // Minting is refused while disabled (see `enabled` in makeRoutes), and an
+    // emptied roster already refuses every device cookie.
+    if (disposeRoutes === undefined) {
       disposeRoutes = ctx.effect(
         () => {
           const disposers = [
@@ -899,11 +905,8 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
         },
         'remote-web-ui: pairing routes',
       )
-    } else if (disposeRoutes !== undefined && !enabled) {
-      disposeRoutes()
-      disposeRoutes = undefined
     }
-    if (disposeSweep === undefined && enabled) {
+    if (disposeSweep === undefined) {
       disposeSweep = ctx.effect(
         () => {
           const timer = nodeSetInterval(() => { service.sweep() }, SWEEP_INTERVAL_MS)
@@ -912,9 +915,6 @@ function applyImpl(ctx: Context, config?: ResolvedConfigFields): void {
         },
         'remote-web-ui: presence sweep',
       )
-    } else if (disposeSweep !== undefined && !enabled) {
-      disposeSweep()
-      disposeSweep = undefined
     }
     // Settings changed the reachable posture (manual publicBaseUrl, bind):
     // re-probe unless the target set is unchanged.

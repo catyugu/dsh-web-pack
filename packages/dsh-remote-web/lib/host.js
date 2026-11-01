@@ -28961,8 +28961,9 @@ var PairingEventsStream = class {
   }
 };
 function makeRoutes(deps) {
-  const { service, requirePairingForLan = true } = deps;
+  const { service, requirePairingForLan = true, enabled = true } = deps;
   const pairingRequired = () => typeof requirePairingForLan === "function" ? requirePairingForLan() : requirePairingForLan;
+  const isEnabled = () => typeof enabled === "function" ? enabled() : enabled;
   const grants = deps.grants ?? createPairGrantStore();
   const events = new PairingEventsStream(service);
   const dynamicTrustedHosts = /* @__PURE__ */ new Set();
@@ -29041,6 +29042,10 @@ function makeRoutes(deps) {
     if (!requireMethod(req, res, "POST")) return;
     if (!loopbackFence(req)) {
       writeJson(res, 403, { ok: false, code: "forbidden" });
+      return;
+    }
+    if (!isEnabled()) {
+      writeJson(res, 503, { ok: false, code: "disabled" });
       return;
     }
     const body = await readJsonBody(req, { maxBytes: MAX_BODY_BYTES, objectOnly: true });
@@ -31154,6 +31159,7 @@ function applyImpl(ctx, config2) {
     ...makeRoutes({
       service,
       requirePairingForLan: () => resolve3().requirePairingForLan,
+      enabled: () => resolve3().enabled,
       lanBindStatus,
       indexDocument: fetchAppShell,
       trustedHosts: () => {
@@ -31340,14 +31346,13 @@ function applyImpl(ctx, config2) {
         service.setPublicBaseUrl(value.publicBaseUrl);
       }
     }
-    const enabled = value.enabled;
-    if (!enabled) {
+    if (!value.enabled) {
       service.stop();
       tunnel.stop();
       disposeRelayRegistrar();
       publicBase.reset();
     }
-    if (disposeRoutes === void 0 && enabled) {
+    if (disposeRoutes === void 0) {
       disposeRoutes = ctx.effect(
         () => {
           const disposers = [
@@ -31360,11 +31365,8 @@ function applyImpl(ctx, config2) {
         },
         "remote-web-ui: pairing routes"
       );
-    } else if (disposeRoutes !== void 0 && !enabled) {
-      disposeRoutes();
-      disposeRoutes = void 0;
     }
-    if (disposeSweep === void 0 && enabled) {
+    if (disposeSweep === void 0) {
       disposeSweep = ctx.effect(
         () => {
           const timer = nodeSetInterval(() => {
@@ -31377,9 +31379,6 @@ function applyImpl(ctx, config2) {
         },
         "remote-web-ui: presence sweep"
       );
-    } else if (disposeSweep !== void 0 && !enabled) {
-      disposeSweep();
-      disposeSweep = void 0;
     }
     runPostureProbe();
   };

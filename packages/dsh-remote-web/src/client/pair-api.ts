@@ -38,7 +38,13 @@ export interface IssueLoopbackRequired {
   code: 'forbidden'
 }
 
-export type IssueResponse = IssueResult | IssueLanRequired | IssueUnknownAddress | IssueLoopbackRequired
+/** issue() refusal: the row's master switch is off. */
+export interface IssueDisabled {
+  ok: false
+  code: 'disabled'
+}
+
+export type IssueResponse = IssueResult | IssueLanRequired | IssueUnknownAddress | IssueLoopbackRequired | IssueDisabled
 
 /** Public policy fields returned by the pairing status endpoint. */
 export interface PairGatePolicy {
@@ -128,6 +134,10 @@ export async function issuePair(address?: string): Promise<IssueResponse> {
     }),
   })
   if (!response.ok) {
+    // The refusal code rides the body: a disabled row answers 503, and a
+    // missing body must not be mistaken for one of the configuration refusals.
+    const body = await response.json().catch(() => undefined) as { code?: unknown } | undefined
+    if (body?.code === 'disabled') return { ok: false, code: 'disabled' }
     if (response.status === 409) return { ok: false, code: 'lan-required' }
     if (response.status === 403) return { ok: false, code: 'forbidden' }
     if (response.status === 400) return { ok: false, code: 'unknown-address' }

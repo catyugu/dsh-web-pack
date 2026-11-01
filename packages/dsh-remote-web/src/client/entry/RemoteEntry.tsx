@@ -86,9 +86,11 @@ export function RemoteEntry({ wide, t }: RemoteEntryProps) {
     }
     if (!result.ok) {
       // 403 is the loopback-only fence refusing a LAN origin (the panel is a
-      // desktop control endpoint); 409 means the server never bound 0.0.0.0;
-      // 400 means the requested LAN literal is no longer constructible.
+      // desktop control endpoint); 503 means the row is switched off; 409 means
+      // the server never bound 0.0.0.0; 400 means the requested LAN literal is
+      // no longer constructible.
       if (result.code === 'forbidden') return { kind: 'loopback-required' }
+      if (result.code === 'disabled') return { kind: 'disabled' }
       if (result.code === 'unknown-address') return { kind: 'unreachable' }
       return { kind: 'lan-required' }
     }

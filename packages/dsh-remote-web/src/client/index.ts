@@ -250,6 +250,9 @@ export function apply(ctx: ClientContext): void {
   // namespace IS the owning entry id, so the official service is addressed
   // directly.
   const settingsForm: ConfigForm<RemoteSettings> = bindSettingsForm(ctx)
+  // The row's master switch. It governs the touch adaptation and the
+  // phone-side runtime below; the sidebar entry and the settings form stay
+  // mounted regardless, because that is where the switch itself lives.
   const enabled = (): boolean => {
     const snapshot = settingsForm.getSnapshot()
     return snapshot.status === 'ready'
@@ -279,26 +282,15 @@ export function apply(ctx: ClientContext): void {
   // Sidebar foot entry: the sidebar foot seat is `sidebar.footer.action` in
   // the 0.1.2 shell composition (the legacy `sidebar.remote` seat is gone
   // upstream). The pairing link is origin-agnostic, so the entry needs no
-  // workspace source.
+  // workspace source. It mounts for the plugin's whole lifetime and ignores
+  // the `enabled` switch on purpose: that switch is edited inside the popup
+  // this entry opens, so hiding the entry would hide the way back to it.
   ctx.slots.inject('sidebar.footer.action', () => {
-    let disposeEntry: (() => void) | undefined
-    const syncEntry = (): void => {
-      if (enabled() && disposeEntry === undefined) {
-        try {
-          disposeEntry = ctx.slots.register({ name: 'sidebar.footer.action', id: 'remote-web-ui', locale: NS }, FooterRemoteEntry)
-        } catch {
-          // ignore registration collision
-        }
-      } else if (!enabled() && disposeEntry !== undefined) {
-        disposeEntry()
-        disposeEntry = undefined
-      }
-    }
-    const unsubscribe = settingsForm.subscribe(syncEntry)
-    syncEntry()
-    return () => {
-      unsubscribe()
-      disposeEntry?.()
+    try {
+      return ctx.slots.register({ name: 'sidebar.footer.action', id: 'remote-web-ui', locale: NS }, FooterRemoteEntry)
+    } catch {
+      // Registration collision: another row owns the seat.
+      return () => {}
     }
   })
 

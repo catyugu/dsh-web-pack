@@ -393,6 +393,13 @@
   font-size: 13px;
 }
 
+/* Banner-local action row (the disabled notice's re-open retry). */
+.bannerActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 /* Unpaired remote desktop: opaque, blocking page above the shell. */
 .fencePage {
   position: fixed;
