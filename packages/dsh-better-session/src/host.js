@@ -23,7 +23,7 @@ import {
 } from './compaction.js'
 import { settingsFile } from './home.js'
 import { ROUTES, createRoutes } from './routes.js'
-import { EditError, readQuestionText, resendQuestion } from './turns.js'
+import { EditError, readQuestion, resendQuestion } from './turns.js'
 
 /** The services these routes and the compaction override read. */
 export const inject = ['connection', 'agents']
@@ -114,7 +114,7 @@ function operations(ctx, state) {
   const { controller, cache, settingsFor, applyTo } = state
   return {
     report: (line) => ctx.logger?.warn?.(line),
-    prompt: ({ sessionId, messageId }) => guard(() => readQuestionText(liveSession(ctx, sessionId), messageId)),
+    prompt: ({ sessionId, messageId }) => guard(() => readQuestion(liveSession(ctx, sessionId), messageId)),
     resend: ({ sessionId, messageId, operationId, text }) => guard(async () => {
       const result = await resendQuestion(ctx, liveAgent(ctx, sessionId), messageId, operationId, text)
       return {

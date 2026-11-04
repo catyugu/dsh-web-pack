@@ -16,6 +16,10 @@
  * source summary. An empty user message never enters the model context, so the
  * shadowed range leaves the conversation without leaving a hole in it.
  *
+ * A question may carry attachments as well as text. The replay copies the
+ * question's own content blocks, so an image or a file is sent again from its
+ * durable reference; an edit replaces the words and keeps whatever was attached.
+ *
  * @module dsh-better-session/manage/turns
  */
 import { randomUUID } from 'node:crypto'
@@ -313,20 +317,101 @@ export function locateQuestion(events, messageId) {
 }
 
 /**
- * The plain text of one question.
+ * The content blocks of one question, copied and checked against what a replay
+ * can carry.
+ *
+ * A question may carry images and files as well as text. Their references are
+ * durable, so re-sending the question means sending the same blocks again.
+ * A block type this layer does not know is refused: what it would mean on a
+ * replay is not this layer's to guess.
  * @param question - the question event.
- * @returns its text.
- * @throws {EditError} when the question is empty or not plain text.
+ * @returns a copy of its content blocks.
+ * @throws {EditError} when the question is empty or carries a block it cannot replay.
  */
-function textOfQuestion(question) {
+function questionParts(question) {
   const content = question.data?.content
+  const id = String(question.data?.id)
   if (!Array.isArray(content) || content.length === 0) {
-    throw new EditError('PROMPT_NOT_FOUND', `the question "${String(question.data?.id)}" is empty`)
+    throw new EditError('PROMPT_NOT_FOUND', `the question "${id}" is empty`)
   }
-  if (content.some((part) => part.type !== 'text')) {
-    throw new EditError('PROMPT_UNSUPPORTED', `the question "${String(question.data?.id)}" is not plain text`)
+  return content.map((part) => {
+    if (part === null || typeof part !== 'object') {
+      throw new EditError('PROMPT_UNSUPPORTED', `the question "${id}" carries content that is not a block`)
+    }
+    if (part.type === 'text') {
+      if (typeof part.text !== 'string') {
+        throw new EditError('PROMPT_UNSUPPORTED', `the question "${id}" carries a text block without text`)
+      }
+      return { type: 'text', text: part.text }
+    }
+    if (part.type === 'image' || part.type === 'file') {
+      if (part.attachment === null || typeof part.attachment !== 'object'
+        || typeof part.attachment.attachmentId !== 'string') {
+        throw new EditError('PROMPT_UNSUPPORTED', `the question "${id}" carries a ${part.type} block without an attachment`)
+      }
+      return { ...part, attachment: { ...part.attachment } }
+    }
+    throw new EditError('PROMPT_UNSUPPORTED',
+      `the question "${id}" carries a "${String(part.type)}" block, which cannot be re-sent`)
+  })
+}
+
+/**
+ * The plain text of one content list.
+ * @param parts - the content blocks.
+ * @returns the text of every text block, joined in order.
+ */
+function textOfParts(parts) {
+  return parts.filter((part) => part.type === 'text').map((part) => part.text).join('')
+}
+
+/**
+ * The attachments one content list carries, in the shape the edit dialog shows.
+ * @param parts - the content blocks.
+ * @returns one record per image or file.
+ */
+function attachmentsOfParts(parts) {
+  return parts.filter((part) => part.type !== 'text').map((part) => ({
+    type: part.type,
+    ...(typeof part.attachment.name === 'string' && part.attachment.name.length > 0
+      ? { name: part.attachment.name }
+      : {}),
+    ...(part.type === 'image' && typeof part.attachment.mediaType === 'string'
+      ? { mediaType: part.attachment.mediaType }
+      : {}),
+    bytes: Number.isSafeInteger(part.attachment.bytes) ? part.attachment.bytes : 0,
+  }))
+}
+
+/**
+ * The content one question is re-sent with.
+ *
+ * Without edited text the question goes out exactly as it was sent, so a
+ * question that was only an image or a file can be regenerated without inventing
+ * words for it. With edited text every text block becomes that text and the
+ * images and files stay where they were: editing changes what was said, not what
+ * was attached. A question that had no text gets the edited text first.
+ * @param question - the question event.
+ * @param text - the replacement text, or undefined to reuse the question.
+ * @returns the content blocks of the replay.
+ * @throws {EditError} when the question carries content that cannot be replayed.
+ */
+function replayContent(question, text) {
+  const parts = questionParts(question)
+  if (typeof text !== 'string') return parts
+  const edited = []
+  let placed = false
+  for (const part of parts) {
+    if (part.type !== 'text') {
+      edited.push(part)
+      continue
+    }
+    if (placed) continue
+    edited.push({ type: 'text', text })
+    placed = true
   }
-  return content.map((part) => part.text).join('')
+  if (!placed) edited.unshift({ type: 'text', text })
+  return edited
 }
 
 /**
@@ -439,10 +524,12 @@ export async function resendQuestion(ctx, agent, messageId, operationId, text) {
         throw new EditError('QUEUE_NOT_EMPTY', 'the session has queued input; retry when the queue is empty')
       }
       const question = locateQuestion(events, messageId).question
-      const replayText = typeof text === 'string' ? text : textOfQuestion(question)
+      const replay = createUserMessage(
+        replayContent(question, text),
+        { kind: 'user', rpcId: `${REPLAY_RPC_PREFIX}${operationId}` },
+      )
       const removal = await shadowFromQuestion(ctx, agent, messageId, signal, { flush: false, operationId })
       signal.throwIfAborted()
-      const replay = createUserMessage([{ type: 'text', text: replayText }], { kind: 'user', rpcId: `${REPLAY_RPC_PREFIX}${operationId}` })
       agent.followup(replay)
       await sessions.flush(agent.session)
       return { removal, replayMessageId: replay.id, interrupted }
@@ -454,12 +541,13 @@ export async function resendQuestion(ctx, agent, messageId, operationId, text) {
 }
 
 /**
- * Read one question's text.
+ * Read one question for the editor: its text and the attachments a replay keeps.
  * @param session - live session.
  * @param messageId - the question's message identity.
- * @returns the question's text.
+ * @returns the question's text, and one record per image or file it carries.
  */
-export function readQuestionText(session, messageId) {
+export function readQuestion(session, messageId) {
   const { question } = locateQuestion(sessionEvents(session), messageId)
-  return textOfQuestion(question)
+  const parts = questionParts(question)
+  return { text: textOfParts(parts), attachments: attachmentsOfParts(parts) }
 }

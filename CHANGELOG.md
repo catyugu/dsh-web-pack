@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.5
+
+Re-sending a question keeps the images and files it carried.
+
+### Fixed
+
+- "重新生成" and "编辑并重发" work on a message with attachments. The replay
+  copies the question's own content blocks and replaces only the text, so an
+  image or a file is sent again from its durable reference. The operations used
+  to refuse such a question as "not plain text", and their replay was text-only
+  even when the question carried more.
+- A message that is only an image or a file can be regenerated without text.
+  Editing it adds the new text first and keeps the attachment.
+- The edit dialog names the attachments the replay keeps, so an edit is not a
+  surprise removal.
+
 ## 0.5.4
 
 Turning remote access off pauses it instead of unpairing every device.

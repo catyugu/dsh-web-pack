@@ -8,8 +8,21 @@
  * asked to replay.
  */
 import assert from 'node:assert/strict'
-import { resendQuestion, tombstoneMeta } from '../src/turns.js'
+import { readQuestion, resendQuestion, tombstoneMeta } from '../src/turns.js'
 import { removeHome, resetHome } from './support.mjs'
+
+/** One durable image reference, as the attachment service records it. */
+const IMAGE = Object.freeze({
+  attachmentId: 'sha256:11',
+  mediaType: 'image/png',
+  bytes: 64,
+  width: 2,
+  height: 2,
+  name: 'chart.png',
+})
+
+/** One durable file reference, as the attachment service records it. */
+const FILE = Object.freeze({ attachmentId: 'sha256:22', name: 'notes.pdf', bytes: 128 })
 
 /**
  * One conversation whose first turn holds three questions.
@@ -46,7 +59,17 @@ function conversation() {
  * @returns the event payload.
  */
 function question(id, text) {
-  return { id, role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } }
+  return questionWithContent(id, [{ type: 'text', text }])
+}
+
+/**
+ * One question with the exact content blocks it carried.
+ * @param id - the message identity.
+ * @param content - its content blocks.
+ * @returns the event payload.
+ */
+function questionWithContent(id, content) {
+  return { id, role: 'user', content, source: { kind: 'user' } }
 }
 
 /**
@@ -281,7 +304,7 @@ try {
     assert.equal(host.followed.length, 1, 'the question is asked once')
   }
 
-  // A question must carry text a person can re-send.
+  // A question the log does not hold is refused with the code the page reads.
   {
     const { session } = fakeSession(conversation())
     const { ctx, agent } = fakeHost(session)
@@ -291,18 +314,106 @@ try {
     })
   }
 
-  // A question that is not plain text is refused with the code the page reads.
+  // A question that carries an image is re-sent with it: the image is a durable
+  // reference, not text, so the replay has to carry the block itself.
   {
     const events = conversation()
     events[8] = {
       seq: 8,
       type: 'user/message',
-      data: { id: 'question-three', role: 'user', content: [{ type: 'image', attachment: { attachmentId: 'sha256:0' } }], source: { kind: 'user' } },
+      data: questionWithContent('question-three', [
+        { type: 'text', text: 'question three' },
+        { type: 'image', attachment: IMAGE },
+      ]),
+      surfaceOp: 'append',
+    }
+    const { session } = fakeSession(events)
+    const { ctx, agent, state: host } = fakeHost(session)
+    await resendQuestion(ctx, agent, 'question-three', 'operation-image')
+    assert.deepEqual(host.followed[0].content, [
+      { type: 'text', text: 'question three' },
+      { type: 'image', attachment: IMAGE },
+    ], 'the image travels with the question')
+  }
+
+  // Editing an image question changes the words and keeps every attachment.
+  {
+    const events = conversation()
+    events[8] = {
+      seq: 8,
+      type: 'user/message',
+      data: questionWithContent('question-three', [
+        { type: 'text', text: 'question three' },
+        { type: 'image', attachment: IMAGE },
+        { type: 'file', attachment: FILE },
+      ]),
+      surfaceOp: 'append',
+    }
+    const { session } = fakeSession(events)
+    const { ctx, agent, state: host } = fakeHost(session)
+    await resendQuestion(ctx, agent, 'question-three', 'operation-image-edit', 'question three, edited')
+    assert.deepEqual(host.followed[0].content, [
+      { type: 'text', text: 'question three, edited' },
+      { type: 'image', attachment: IMAGE },
+      { type: 'file', attachment: FILE },
+    ], 'the edited words replace the text and the attachments stay')
+  }
+
+  // An image-only question has no text to read, but a person can still add some
+  // while editing; the image keeps its place.
+  {
+    const events = conversation()
+    events[8] = {
+      seq: 8,
+      type: 'user/message',
+      data: questionWithContent('question-three', [{ type: 'image', attachment: IMAGE }]),
+      surfaceOp: 'append',
+    }
+    const { session } = fakeSession(events)
+    const { ctx, agent, state: host } = fakeHost(session)
+    await resendQuestion(ctx, agent, 'question-three', 'operation-image-only', 'what is in this picture?')
+    assert.deepEqual(host.followed[0].content, [
+      { type: 'text', text: 'what is in this picture?' },
+      { type: 'image', attachment: IMAGE },
+    ])
+  }
+
+  // The editor reads the text and names the attachments, so the replay is not a
+  // surprise to the person who asked for it.
+  {
+    const events = conversation()
+    events[8] = {
+      seq: 8,
+      type: 'user/message',
+      data: questionWithContent('question-three', [
+        { type: 'text', text: 'question three' },
+        { type: 'image', attachment: IMAGE },
+        { type: 'file', attachment: FILE },
+      ]),
+      surfaceOp: 'append',
+    }
+    const { session } = fakeSession(events)
+    assert.deepEqual(readQuestion(session, 'question-three'), {
+      text: 'question three',
+      attachments: [
+        { type: 'image', name: 'chart.png', mediaType: 'image/png', bytes: 64 },
+        { type: 'file', name: 'notes.pdf', bytes: 128 },
+      ],
+    })
+  }
+
+  // A block type this layer does not know is refused instead of guessed.
+  {
+    const events = conversation()
+    events[8] = {
+      seq: 8,
+      type: 'user/message',
+      data: questionWithContent('question-three', [{ type: 'audio', attachment: { attachmentId: 'sha256:33' } }]),
       surfaceOp: 'append',
     }
     const { session } = fakeSession(events)
     const { ctx, agent } = fakeHost(session)
-    await assert.rejects(() => resendQuestion(ctx, agent, 'question-three', 'operation-image'), (error) => {
+    await assert.rejects(() => resendQuestion(ctx, agent, 'question-three', 'operation-audio'), (error) => {
       assert.equal(error.code, 'PROMPT_UNSUPPORTED')
       return true
     })

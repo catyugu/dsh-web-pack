@@ -48,6 +48,8 @@
     'dialog.running': '这个会话正在生成回答，确认后会先中断它。',
     'dialog.loading': '正在读取这条消息…',
     'dialog.loadFailed': '读取这条消息失败，请查看 Harness 日志。',
+    'dialog.attachmentsKept': '这条消息的附件会随重发一起保留。',
+    'dialog.attachmentImage': '图片',
     'compaction.title': '上下文压缩配置',
     'compaction.scope': '配置范围',
     'compaction.scopeSession': '本会话',
@@ -94,8 +96,8 @@
     'error.queue': '这个会话还有排队的输入，请等队列清空后再试。',
     'error.compacted': '这条提问已经和压缩过的内容混在一起，无法单独处理。',
     'error.notFound': '没有找到这条提问。',
-    'error.promptMissing': '这条提问没有可重发的文字。',
-    'error.promptUnsupported': '这条提问不是纯文本，无法重发。',
+    'error.promptMissing': '这条提问没有可重发的内容。',
+    'error.promptUnsupported': '这条提问含有无法重发的内容。',
     'error.failed': '操作失败，请查看 Harness 日志。',
     'error.timeout': 'Host 没有在规定时间内回答，刷新一次再试。',
     'error.routeMissing': '这一端还没有加载这些路由：重启一次 Harness 后可用。',
@@ -116,6 +118,8 @@
     'dialog.running': 'This session is generating an answer; confirming interrupts it first.',
     'dialog.loading': 'Reading this message…',
     'dialog.loadFailed': 'Reading this message failed; check the Harness log.',
+    'dialog.attachmentsKept': 'The attachments on this message are kept when it is resent.',
+    'dialog.attachmentImage': 'Image',
     'compaction.title': 'Context compaction',
     'compaction.scope': 'Configuration',
     'compaction.scopeSession': 'This session',
@@ -162,8 +166,8 @@
     'error.queue': 'This session still has queued input; retry when the queue is empty.',
     'error.compacted': 'This question shares a compacted range, so it cannot be handled on its own.',
     'error.notFound': 'Nothing was found for this question.',
-    'error.promptMissing': 'This question has no text to resend.',
-    'error.promptUnsupported': 'This question is not plain text, so it cannot be resent.',
+    'error.promptMissing': 'This question has no content to resend.',
+    'error.promptUnsupported': 'This question contains content that cannot be resent.',
     'error.failed': 'The operation failed; check the Harness log.',
     'error.timeout': 'The Host did not answer in time; reload and retry.',
     'error.routeMissing': 'This sub-component has not loaded these routes yet: restart the Harness once.',
@@ -205,6 +209,8 @@ background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary);
 font-family: inherit; font-size: 14px; line-height: 22px;
 }
 .dsm_textarea:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--dsw-alias-bg-layer-2), 0 0 0 4px var(--dsw-alias-brand-primary); }
+.dsm_attachments { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.dsm_attachmentNames { overflow: hidden; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); text-overflow: ellipsis; white-space: nowrap; }
 `
 
   /** One value the page keeps and every component reads. */
@@ -652,18 +658,22 @@ font-family: inherit; font-size: 14px; line-height: 22px;
   function ResendDialog({ useQuestionAction, settle, reportNotice, t }) {
     const action = useQuestionAction((pending) => pending)
     const [draft, setDraft] = React.useState('')
+    const [attachments, setAttachments] = React.useState([])
     const [state, setState] = React.useState('idle')
     const [busy, setBusy] = React.useState(false)
 
     React.useEffect(() => {
       if (action === null) return undefined
       setBusy(false)
+      setDraft('')
+      setAttachments([])
       if (action.kind !== 'edit') return undefined
       let live = true
       setState('loading')
       readPrompt(action.sessionId, action.messageId).then((prompt) => {
         if (!live) return
-        setDraft(prompt)
+        setDraft(typeof prompt?.text === 'string' ? prompt.text : '')
+        setAttachments(Array.isArray(prompt?.attachments) ? prompt.attachments : [])
         setState('ready')
       }, (reason) => {
         if (!live) return
@@ -703,15 +713,26 @@ font-family: inherit; font-size: 14px; line-height: 22px;
     const runningHint = action.running === true ? ` ${t('dialog.running')}` : ''
 
     if (action.kind === 'edit') {
+      // The attachments are not editable here: the replay keeps every image and
+      // file the question carried, and the dialog says so instead of hiding it.
+      const attachmentNames = attachments.map((attachment) => (
+        typeof attachment?.name === 'string' && attachment.name.length > 0
+          ? attachment.name
+          : t('dialog.attachmentImage')
+      ))
       const body = state === 'loading'
         ? h('p', { className: 'dsm_rowHint' }, t('dialog.loading'))
         : state === 'failed'
           ? h('p', { className: 'dsm_rowHint' }, t('dialog.loadFailed'))
-          : h('textarea', {
-            className: 'dsm_textarea',
-            value: draft,
-            onChange: (event) => setDraft(event.target.value),
-          })
+          : h(React.Fragment, null,
+            h('textarea', {
+              className: 'dsm_textarea',
+              value: draft,
+              onChange: (event) => setDraft(event.target.value),
+            }),
+            attachments.length === 0 ? null : h('div', { className: 'dsm_attachments' },
+              h('span', { className: 'dsm_rowHint' }, t('dialog.attachmentsKept')),
+              h('span', { className: 'dsm_attachmentNames' }, attachmentNames.join(' · '))))
       return h(primitives.Modal, {
         open: true,
         onClose: settle,
